@@ -415,6 +415,32 @@ main { flex: 1; display: flex; flex-direction: column; position: relative; min-h
 
 /* ---------- em breve ---------- */
 .soon { margin: auto; max-width: 520px; text-align: center; padding: 40px 24px; }
+/* Controles e Ajustes: duas colunas de cartões, rolagem própria */
+.pane { height: 100%; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-content: start; padding: 26px 32px 32px; }
+.pane-col { display: grid; gap: 18px; align-content: start; }
+.pane-card { padding: 20px; border-radius: 22px; border: 1px solid var(--line); background: rgba(255, 255, 255, .025); }
+.pane-card h3 { margin: 0 0 4px; font-family: var(--display); font-weight: 400; font-size: 20px; letter-spacing: .02em; }
+.pane-sub { margin: 0 0 14px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.setting { width: 100%; display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 16px; border: 1px solid var(--line-strong); background: rgba(255, 255, 255, .03); text-align: left; margin-top: 10px; }
+.setting.static { cursor: default; }
+.setting > span:first-child { flex: 1; min-width: 0; }
+.setting b { display: block; font-size: 14.5px; }
+.setting small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 3px; line-height: 1.45; }
+.setting .sw { width: 42px; height: 24px; border-radius: 12px; background: rgba(255, 255, 255, .14); position: relative; flex: none; transition: background .2s; }
+.setting .sw::after { content: ""; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .2s; }
+.setting.on .sw { background: var(--neon); }
+.setting.on .sw::after { transform: translateX(18px); }
+.dev .ic.kind { display: grid; place-items: center; background: rgba(255, 255, 255, .06); color: var(--text); }
+.dev .ic.kind svg { width: 22px; height: 22px; }
+.dev .wait { font-size: 12px; font-weight: 700; color: var(--faint); }
+.tag-mini { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 800; letter-spacing: .04em; color: var(--muted); background: rgba(255, 255, 255, .07); vertical-align: 1px; }
+.addr { cursor: pointer; }
+.addr.ok { border-color: rgba(60, 240, 96, .5); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 16px; }
+.chip-t { height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line-strong); background: rgba(255, 255, 255, .03); font-size: 13px; font-weight: 700; color: var(--muted); }
+.chip-t.on { border-color: rgba(60, 240, 96, .6); background: rgba(60, 240, 96, .12); color: var(--text); }
+.chip-group { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin-top: 6px; }
+@media (max-width: 960px) { .pane { grid-template-columns: 1fr; padding: 18px; } }
 .soon h2 { font-family: var(--display); font-weight: 400; font-size: 28px; margin: 0 0 12px; }
 .soon p { color: var(--muted); line-height: 1.6; }
 .soon ul { text-align: left; color: var(--muted); line-height: 1.9; margin: 18px auto 0; display: inline-block; }
@@ -848,28 +874,47 @@ main { perspective: 1800px; }
 
       <!-- EM BREVE -->
       <section class="view" id="view-controls">
-        <div class="soon">
-          <h2>Controles</h2>
-          <p>Todos os dispositivos que já passaram por este PC.</p>
-          <ul>
-            <li>Renomear e escolher o ícone de cada controle</li>
-            <li>Testar botões e analógicos ao vivo</li>
-            <li>Esquecer um controle Bluetooth</li>
-            <li>Ver a bateria e a latência dos celulares</li>
-          </ul>
+        <div class="pane">
+          <div class="pane-col">
+            <div class="pane-card">
+              <h3>Conectados agora</h3>
+              <p class="pane-sub">Controles, celulares e teclados que o Hub está vendo.</p>
+              <div class="found" id="devList"></div>
+            </div>
+          </div>
+          <div class="pane-col">
+            <div class="pane-card">
+              <h3>Controle do celular</h3>
+              <p class="pane-sub">Cada pessoa escolhe o seu no celular, <b>segurando o botão Menu</b>.</p>
+              <div class="found" id="layoutRows"></div>
+              <button class="btn-ghost" id="newLayout" style="margin-top:14px"><span data-icon="plus"></span>Criar layout</button>
+            </div>
+          </div>
         </div>
       </section>
       <section class="view" id="view-settings">
-        <div class="soon">
-          <h2>Ajustes</h2>
-          <p>Poucos ajustes, todos com um padrão bom.</p>
-          <ul>
-            <li>Idioma e tamanho do texto (modo TV)</li>
-            <li>"Entrar só ao apertar um botão"</li>
-            <li>Rede do celular e endereço do QR</li>
-            <li>Atualizações: canal estável ou beta</li>
-            <li>Componente de controle virtual (Modo Universal)</li>
-          </ul>
+        <div class="pane">
+          <div class="pane-col">
+            <div class="pane-card">
+              <h3>Entrar no lobby</h3>
+              <button class="setting" id="setJoin"><span><b>Entrar só ao apertar um botão</b><small>Controles ligados ficam esperando até alguém apertar algo. Bom quando há controles parados na sala.</small></span><span class="sw"></span></button>
+            </div>
+            <div class="pane-card">
+              <h3>Celulares</h3>
+              <p class="pane-sub">O endereço que vai no QR. Se o celular não conecta, tente outro.</p>
+              <div class="found" id="addrList"></div>
+            </div>
+          </div>
+          <div class="pane-col">
+            <div class="pane-card">
+              <h3>Jogos comuns (Modo Universal)</h3>
+              <div id="virtualBox"></div>
+            </div>
+            <div class="pane-card">
+              <h3>Atualizações</h3>
+              <div class="setting static"><span><b id="verTxt">Party Anywhere</b><small id="verSub">O Hub procura sozinho ao abrir e a cada 6 horas.</small></span><button class="btn-ghost sm" id="checkUpd">Procurar agora</button></div>
+            </div>
+          </div>
         </div>
       </section>
     </main>
@@ -1219,6 +1264,7 @@ function renderLobby(newSeatIndex) {
 }
 
 function updateLobbyChrome() {
+  if (currentView === 'controls' && typeof renderControls === 'function') renderControls();
   const active = seats.filter(Boolean);
   document.getElementById('countBig').innerHTML = `${active.length}<span>/10</span>`;
   document.getElementById('slots').innerHTML = COLORS.map((c, i) => {
@@ -2165,6 +2211,8 @@ async function switchView(v) {
     animateView(toEl, 'view-in', dir, IN_MS, 160);
     done = sleep(160 + IN_MS);
   }
+  if (v === 'controls') renderControls();
+  if (v === 'settings') renderSettings();
   // só agora a aba anterior saiu do fluxo: antes, as duas dividiam a altura e o lobby media o palco menor
   // (a carta da volta ficava menor que a da abertura)
   if (v === 'lobby') renderLobby();
@@ -2464,6 +2512,147 @@ function fitCover(el) {
 }
 // atributos de uma capa: lê do GitHub com CORS (para poder medir) e expande quando precisa
 const coverAttrs = (src) => `${/^https?:/.test(src) ? 'crossorigin="anonymous" ' : ''}onload="fitCover(this)"`;
+
+// ===================================================================================
+// Controles e Ajustes. `hubData` é a fonte dos dados: no navegador, demonstração; no app, bridge.js troca
+// pelo núcleo. As telas são as mesmas nos dois.
+// ===================================================================================
+const PIECES = [
+  ['Analógicos e setas', [['stickL', 'Analógico esquerdo'], ['stickR', 'Analógico direito'], ['dpad', 'Setas']]],
+  ['Botões', [['A', 'A'], ['B', 'B'], ['X', 'X'], ['Y', 'Y']]],
+  ['Ombros e gatilhos', [['LB', 'LB'], ['RB', 'RB'], ['LT', 'LT'], ['RT', 'RT']]],
+  ['Centro', [['BACK', 'Voltar'], ['START', 'Start'], ['LS', 'L3'], ['RS', 'R3']]],
+];
+const demoLayouts = [
+  { id: 'simple', name: 'Simples', controls: ['stickL', 'A', 'B', 'START'], builtin: true },
+  { id: 'advanced', name: 'Avançado', controls: PIECES.flatMap(([, g]) => g.map(([id]) => id)), builtin: true },
+];
+const demoSettings = { joinOnButton: false, preferredIp: null, joinUrl: JOIN_URL, virtualPads: false, version: '0.1.0' };
+const hubData = {
+  devices: async () => seats.filter(Boolean).map((x) => ({ key: x.deviceKey, kind: x.kind, deviceName: x.deviceName, via: x.via, battery: x.battery, ping: typeof x.ping === 'number' ? x.ping : null, seat: x.index, layout: x.kind === 'phone' ? 'advanced' : null })),
+  layouts: async () => demoLayouts,
+  saveLayout: async (id, name, controls) => {
+    const l = { id: id || 'custom-' + Date.now(), name, controls, builtin: false };
+    const i = demoLayouts.findIndex((x) => x.id === l.id);
+    if (i >= 0) demoLayouts[i] = l; else demoLayouts.push(l);
+    return l;
+  },
+  deleteLayout: async (id) => { const i = demoLayouts.findIndex((x) => x.id === id && !x.builtin); if (i >= 0) demoLayouts.splice(i, 1); return i >= 0; },
+  settings: async () => demoSettings,
+  setJoinPolicy: async (on) => { demoSettings.joinOnButton = on; },
+  addresses: async () => [{ url: JOIN_URL, interface: 'Wi-Fi', current: true }, { url: 'http://172.24.160.1:27027/', interface: 'vEthernet (WSL)', current: false }],
+  setJoinIp: async () => JOIN_URL,
+  installVirtual: async () => toast('No app, isto baixa e abre o instalador do componente.', null, 'ok'),
+  retryVirtual: async () => false,
+  checkUpdate: async () => { updatePill.click(); },
+};
+
+const describePieces = (c) => {
+  const names = { stickL: 'analógico', stickR: '2º analógico', dpad: 'setas', LT: 'gatilhos', LB: 'ombros' };
+  return [['A', 'B', 'X', 'Y'].filter((b) => c.includes(b)).join(' '), ...Object.keys(names).filter((k) => c.includes(k)).map((k) => names[k])].filter(Boolean).join(' · ');
+};
+
+async function renderControls() {
+  const [devs, layouts] = await Promise.all([hubData.devices(), hubData.layouts()]);
+  const devList = document.getElementById('devList');
+  const kindIcon = { phone: 'phone', keyboard: 'keyboard', gamepad: 'pad' };
+  devList.innerHTML = devs.length ? devs.map((d) => {
+    const seat = d.seat != null ? seats[d.seat] : null;
+    const color = seat ? seat.color : COLORS[d.seat] || '#666';
+    const layout = d.layout ? layouts.find((l) => l.id === d.layout) : null;
+    const info = [d.via, d.battery != null ? `${d.battery}%` : '', d.ping != null ? `${d.ping} ms` : '', layout ? `controle ${layout.name}` : ''].filter(Boolean).join(' · ');
+    const act = d.seat != null
+      ? `<span class="seat-tag" style="--c:${color}">P${d.seat + 1}</span><button class="btn-ghost sm" data-identify-seat="${d.seat}">Identificar</button>`
+      : `<span class="wait">${d.kind === 'keyboard' ? 'Adicionar jogador → Teclado' : 'Esperando um botão'}</span>`;
+    return `<div class="dev"><span class="ic kind">${icon(kindIcon[d.kind] || 'pad')}</span><div class="t"><b>${escapeHtml(d.deviceName || 'Aparelho')}</b><small>${escapeHtml(info)}</small></div><div class="act" style="display:flex;gap:8px;align-items:center">${act}</div></div>`;
+  }).join('') : '<div class="found-empty">Nenhum aparelho ainda. Ligue um controle ou escaneie o QR no Lobby.</div>';
+  document.getElementById('layoutRows').innerHTML = layouts.map((l) => `
+    <div class="dev"><div class="t"><b>${escapeHtml(l.name)}${l.builtin ? '<span class="tag-mini">PRONTO</span>' : ''}</b><small>${escapeHtml(describePieces(l.controls))}</small></div>
+    <div class="act" style="display:flex;gap:6px">${l.builtin ? '' : `<button class="btn-ghost sm" data-edit-layout="${escapeHtml(l.id)}">Editar</button><button class="icon-btn sm" data-del-layout="${escapeHtml(l.id)}" title="Apagar" aria-label="Apagar ${escapeHtml(l.name)}">${icon('close')}</button>`}</div></div>`).join('');
+}
+document.getElementById('view-controls').addEventListener('click', async (e) => {
+  const idf = e.target.closest('[data-identify-seat]');
+  if (idf) { identify(+idf.dataset.identifySeat); return; }
+  const ed = e.target.closest('[data-edit-layout]');
+  if (ed) { const l = (await hubData.layouts()).find((x) => x.id === ed.dataset.editLayout); if (l) openLayoutEditor(l); return; }
+  const del = e.target.closest('[data-del-layout]');
+  if (del) {
+    const l = (await hubData.layouts()).find((x) => x.id === del.dataset.delLayout);
+    if (l && (await hubData.deleteLayout(l.id))) { toast(`Layout ${l.name} apagado. Quem usava volta para o Avançado.`, null, 'ok'); renderControls(); }
+  }
+});
+document.getElementById('newLayout').addEventListener('click', () => openLayoutEditor(null));
+
+function openLayoutEditor(layout) {
+  const picked = new Set(layout ? layout.controls : ['stickL', 'A', 'B', 'START']);
+  openModal(`${head(layout ? 'Editar layout' : 'Criar layout', 'Escolha as peças do controle do celular. Elas se ajustam sozinhas na tela, sem sobrepor.')}
+    <form id="layoutForm">
+      <div class="edit-fields"><label>Nome<input name="name" maxlength="24" required value="${escapeHtml(layout ? layout.name : '')}" placeholder="Ex.: Corrida, Luta, Tiro"></label></div>
+      ${PIECES.map(([group, list]) => `<div class="chip-group">${group}</div><div class="chips">${list.map(([id, label]) => `<button type="button" class="chip-t${picked.has(id) ? ' on' : ''}" data-piece="${id}">${label}</button>`).join('')}</div>`).join('')}
+      <div class="edit-actions"><button class="btn-neon" type="submit">${icon('check')}Salvar</button><button type="button" class="btn-ghost" data-close>Cancelar</button><span id="layoutErr" style="color:var(--danger);font-size:13px"></span></div>
+    </form>`, () => {
+    const form = document.getElementById('layoutForm');
+    form.addEventListener('click', (e) => {
+      const c = e.target.closest('[data-piece]');
+      if (!c) return;
+      if (picked.has(c.dataset.piece)) picked.delete(c.dataset.piece); else picked.add(c.dataset.piece);
+      c.classList.toggle('on', picked.has(c.dataset.piece));
+    });
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = new FormData(form).get('name').trim();
+      try {
+        await hubData.saveLayout(layout ? layout.id : null, name, [...picked]);
+        closeModal();
+        toast(`Layout ${name} salvo. Já aparece no menu dos celulares.`, null, 'ok');
+        renderControls();
+      } catch (err) {
+        document.getElementById('layoutErr').textContent = String(err && err.message ? err.message : err);
+      }
+    });
+    setTimeout(() => form.querySelector('input').focus(), 50);
+  });
+}
+
+async function renderSettings() {
+  const st = await hubData.settings();
+  document.getElementById('setJoin').classList.toggle('on', !!st.joinOnButton);
+  const addrs = await hubData.addresses();
+  const auto = !st.preferredIp;
+  document.getElementById('addrList').innerHTML = `<button class="setting addr${auto ? ' ok' : ''}" data-ip=""><span><b>Automático</b><small>O Hub escolhe a rede mais provável</small></span>${auto ? icon('check') : ''}</button>` +
+    addrs.map((a) => {
+      const ip = a.url.replace(/^https?:\/\//, '').split(':')[0];
+      const on = st.preferredIp === ip;
+      return `<button class="setting addr${on ? ' ok' : ''}" data-ip="${escapeHtml(ip)}"><span><b>${escapeHtml(a.url.replace('http://', ''))}</b><small>${escapeHtml(a.interface)}${a.current ? ' · no QR agora' : ''}</small></span>${on ? icon('check') : ''}</button>`;
+    }).join('');
+  document.getElementById('virtualBox').innerHTML = st.virtualPads
+    ? `<div class="setting static"><span><b>Pronto</b><small>Celulares e teclados aparecem como controles de Xbox para qualquer jogo.</small></span>${icon('check')}</div>`
+    : `<p class="pane-sub">Para jogos comuns (Steam, Epic, qualquer .exe) verem os celulares e teclados como controles, o Windows precisa de um componente de controle virtual (ViGEmBus, gratuito). Jogos feitos com o SDK funcionam sem ele.</p>
+       <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn-neon" id="vInstall">${icon('download')}Instalar componente</button><button class="btn-ghost" id="vRetry">Já instalei: conferir</button></div>`;
+  document.getElementById('verTxt').textContent = `Party Anywhere ${st.version}`;
+  document.getElementById('vInstall')?.addEventListener('click', async () => {
+    try { await hubData.installVirtual(); toast('O instalador abriu: siga na tela e depois toque em "Já instalei: conferir".', null, 'ok'); } catch (err) { toast(String(err), null, 'warn'); }
+  });
+  document.getElementById('vRetry')?.addEventListener('click', async () => {
+    const ok = await hubData.retryVirtual();
+    toast(ok ? 'Pronto: celulares e teclados já aparecem como controles.' : 'O componente ainda não está instalado. Se acabou de instalar, reinicie o PC.', null, ok ? 'ok' : 'warn');
+    renderSettings();
+  });
+}
+document.getElementById('setJoin').addEventListener('click', async () => {
+  const on = !document.getElementById('setJoin').classList.contains('on');
+  await hubData.setJoinPolicy(on);
+  document.getElementById('setJoin').classList.toggle('on', on);
+});
+document.getElementById('addrList').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-ip]');
+  if (!b) return;
+  const url = await hubData.setJoinIp(b.dataset.ip || null);
+  if (url) { JOIN_URL = url; lobbyArc.querySelectorAll('.card.add').forEach((c) => { c.dataset.sig = ''; }); renderLobby(); }
+  toast('Endereço do QR trocado.', null, 'ok');
+  renderSettings();
+});
+document.getElementById('checkUpd').addEventListener('click', () => hubData.checkUpdate());
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));

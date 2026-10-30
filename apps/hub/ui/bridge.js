@@ -185,6 +185,23 @@
     });
   };
 
+  // ------------------------------------------------------------------ Controles e Ajustes: dados do núcleo
+  Object.assign(hubData, {
+    devices: () => invoke('devices_list'),
+    layouts: () => invoke('layouts_list'),
+    saveLayout: (id, name, controls) => invoke('layout_save', { id, name, controls }),
+    deleteLayout: (id) => invoke('layout_delete', { id }),
+    settings: () => invoke('settings_get'),
+    setJoinPolicy: (on) => invoke('set_join_policy', { onButton: on }),
+    addresses: () => invoke('network_addresses'),
+    setJoinIp: (ip) => invoke('set_join_ip', { ip }),
+    installVirtual: () => invoke('virtual_pads_install'),
+    retryVirtual: () => invoke('virtual_pads_retry'),
+    checkUpdate: () => invoke('hub_check_update').then((u) => {
+      if (!u) toast('Você já está na versão mais nova.', null, 'ok');
+    }),
+  });
+
   // ------------------------------------------------------------------ Bluetooth (pareamento próprio vem na fase 3)
   window.openBluetooth = () => {
     openModal(`${head('Controle Bluetooth', 'Pareie uma vez no Windows; depois ele entra sozinho no lobby.', true)}
