@@ -31,11 +31,40 @@ pub struct KeyboardView {
     pub seat: Option<usize>,
 }
 
-/// Teclados conhecidos (chave do aparelho físico → nome e barramento).
-static KNOWN: OnceLock<Mutex<HashMap<String, (String, Bus)>>> = OnceLock::new();
+/// Um teclado físico que o Hub viu.
+struct Known {
+    name: String,
+    bus: Bus,
+    /// Alguém digitou nele desde que o Hub abriu. Só esses aparecem nas listas: mouses gamer e receptores
+    /// sem fio também se apresentam como "teclado" ao Windows (teclas de macro), mas nunca digitam.
+    typed: bool,
+}
 
-fn known() -> &'static Mutex<HashMap<String, (String, Bus)>> {
+/// Teclados conhecidos (chave do aparelho físico → nome, barramento, se já digitou).
+static KNOWN: OnceLock<Mutex<HashMap<String, Known>>> = OnceLock::new();
+
+fn known() -> &'static Mutex<HashMap<String, Known>> {
     KNOWN.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// O que o Windows diz do aparelho físico: o ContainerId (todas as interfaces de um mesmo aparelho têm o
+/// mesmo), se é embutido no PC e o nome que o próprio aparelho informa.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Identity {
+    pub container: Option<String>,
+    pub builtin: bool,
+    pub name: Option<String>,
+}
+
+/// ContainerId que o Windows dá aos aparelhos embutidos no próprio PC (teclado do notebook, PS/2).
+pub const BUILTIN_CONTAINER: &str = "00000000-0000-0000-ffff-ffffffffffff";
+
+/// Nomes genéricos do Windows não ajudam a pessoa a achar o teclado: ficam de fora.
+pub fn useful_name(name: &str) -> Option<String> {
+    let n = name.trim();
+    let lower = n.to_lowercase();
+    let generic = ["hid", "usb input device", "dispositivo de entrada", "teclado padrão", "standard ps/2", "keyboard device"];
+    (!n.is_empty() && !generic.iter().any(|g| lower.contains(g))).then(|| n.chars().take(32).collect())
 }
 
 /// Um teclado físico aparece como várias coleções HID: `HID#VID_..&MI_00&Col01#8&2a1&0&0000#{guid}`,
@@ -87,10 +116,10 @@ pub fn display_name(path: &str, bus: Bus) -> String {
         Some("1B1C") => Some("Corsair"),
         Some("1038") => Some("SteelSeries"),
         Some("0951") | Some("03F0") => Some("HyperX"),
-        Some("258A") | Some("0C45") => Some("Redragon"),
         Some("05AC") => Some("Apple"),
-        Some("04F2") => Some("Chicony"),
         Some("413C") => Some("Dell"),
+        // VIDs de fabricantes de chip (Sinowealth 258A, SONiX 0C45, Chicony 04F2...) são usados por dezenas
+        // de marcas: dizer a marca a partir deles é inventar
         _ => None,
     };
     match (brand, bus) {
@@ -149,9 +178,10 @@ pub fn list(hub: &Hub) -> Vec<KeyboardView> {
         .lock()
         .unwrap()
         .iter()
-        .map(|(id, (name, bus))| {
+        .filter_map(|(id, k)| {
             let key = DeviceKey(format!("kb:{id}"));
-            KeyboardView { key: key.0.clone(), device_name: name.clone(), via: via(*bus), seat: lobby.seat_of_device(&key) }
+            let seat = lobby.seat_of_device(&key);
+            (k.typed || seat.is_some()).then(|| KeyboardView { key: key.0.clone(), device_name: k.name.clone(), via: via(k.bus), seat })
         })
         .collect();
     out.sort_by_key(|k| (k.via != "Do notebook", k.device_name.clone()));
@@ -176,20 +206,27 @@ fn emit(hub: &Hub) {
     let _ = hub.app.emit("keyboards", list(hub));
 }
 
-fn arrived(hub: &Hub, path: &str) -> String {
-    let id = physical_id(path);
-    let bus = classify(path);
-    let name = display_name(path, bus);
-    let fresh = known().lock().unwrap().insert(id.clone(), (name.clone(), bus)).is_none();
-    let key = DeviceKey(format!("kb:{id}"));
-    if fresh {
-        hub.meta.lock().unwrap().insert(
-            key.clone(),
-            DeviceMeta { brand: "keyboard".into(), device_name: name.clone(), via: via(bus).into(), ..Default::default() },
-        );
-        hub.lobby.lock().unwrap().connected(Device { key, kind: DeviceKind::Keyboard, name: None });
-        emit(hub);
+fn arrived(hub: &Hub, path: &str, ident: &Identity) -> String {
+    // o aparelho físico: o ContainerId do Windows; sem ele, o caminho sem coleção e sem interface
+    let id = ident.container.clone().unwrap_or_else(|| physical_id(path));
+    let bus = if ident.builtin { Bus::Notebook } else { classify(path) };
+    let name = match (bus, &ident.name) {
+        (Bus::Notebook, _) => "Teclado do notebook".to_string(),
+        (_, Some(n)) => n.clone(),
+        _ => display_name(path, bus),
+    };
+    let mut map = known().lock().unwrap();
+    if map.contains_key(&id) {
+        return id;
     }
+    map.insert(id.clone(), Known { name: name.clone(), bus, typed: false });
+    drop(map);
+    let key = DeviceKey(format!("kb:{id}"));
+    hub.meta.lock().unwrap().insert(
+        key.clone(),
+        DeviceMeta { brand: "keyboard".into(), device_name: name, via: via(bus).into(), ..Default::default() },
+    );
+    hub.lobby.lock().unwrap().connected(Device { key, kind: DeviceKind::Keyboard, name: None });
     id
 }
 
@@ -211,6 +248,13 @@ fn removed(hub: &Hub, id: &str) {
 fn key_event(hub: &Hub, id: &str, state: &mut [bool; 256], vk: u16, down: bool) {
     if (vk as usize) < 256 {
         state[vk as usize] = down;
+    }
+    // a primeira tecla de verdade: agora ele aparece nas listas
+    if down {
+        let first = known().lock().unwrap().get_mut(id).is_some_and(|k| !std::mem::replace(&mut k.typed, true));
+        if first {
+            emit(hub);
+        }
     }
     let key = DeviceKey(format!("kb:{id}"));
     let seat = hub.lobby.lock().unwrap().seat_of_device(&key);
@@ -317,7 +361,7 @@ mod win {
                 let device = lparam as HANDLE;
                 if wparam == GIDC_ARRIVAL {
                     if let Some(path) = device_path(device) {
-                        let id = arrived(hub, &path);
+                        let id = arrived(hub, &path, &identity(&path));
                         DEVICES.with(|d| d.borrow_mut().insert(device as isize, (id, Box::new([false; 256]))));
                     }
                 } else if wparam == GIDC_REMOVAL {
@@ -356,7 +400,7 @@ mod win {
         if !known {
             // teclado que já estava ligado antes do Hub abrir
             let Some(path) = device_path(device) else { return };
-            let id = arrived(hub, &path);
+            let id = arrived(hub, &path, &identity(&path));
             DEVICES.with(|d| d.borrow_mut().insert(device as isize, (id, Box::new([false; 256]))));
         }
         DEVICES.with(|d| {
@@ -364,6 +408,68 @@ mod win {
                 key_event(hub, id, state, kb.VKey, down);
             }
         });
+    }
+
+    /// `\\?\HID#VID_..&MI_00#7&1a2b&0&0000#{guid}` → `HID\VID_..&MI_00\7&1a2b&0&0000`, e do nó do aparelho
+    /// (ou dos pais dele) o ContainerId e o nome que o aparelho informa.
+    fn identity(path: &str) -> Identity {
+        use windows_sys::Win32::Devices::DeviceAndDriverInstallation::{
+            CM_Get_DevNode_PropertyW, CM_Get_Parent, CM_Locate_DevNodeW, CM_LOCATE_DEVNODE_NORMAL, CR_SUCCESS,
+        };
+        use windows_sys::Win32::Devices::Properties::{
+            DEVPKEY_Device_BusReportedDeviceDesc, DEVPKEY_Device_ContainerId, DEVPKEY_Device_FriendlyName, DEVPROPKEY,
+            DEVPROPTYPE, DEVPROP_TYPE_GUID, DEVPROP_TYPE_STRING,
+        };
+        let trimmed = path.strip_prefix("\\\\?\\").unwrap_or(path);
+        let instance = trimmed.rsplit_once("#{").map(|(a, _)| a).unwrap_or(trimmed).replace('#', "\\");
+        let wide: Vec<u16> = instance.encode_utf16().chain(Some(0)).collect();
+        let mut node = 0u32;
+        if unsafe { CM_Locate_DevNodeW(&mut node, wide.as_ptr(), CM_LOCATE_DEVNODE_NORMAL) } != CR_SUCCESS {
+            return Identity::default();
+        }
+        let prop = |node: u32, key: &DEVPROPKEY, want: DEVPROPTYPE| -> Option<Vec<u8>> {
+            let mut kind: DEVPROPTYPE = 0;
+            let mut size = 0u32;
+            unsafe { CM_Get_DevNode_PropertyW(node, key, &mut kind, std::ptr::null_mut(), &mut size, 0) };
+            if size == 0 || size > 4096 {
+                return None;
+            }
+            let mut buf = vec![0u8; size as usize];
+            let ok = unsafe { CM_Get_DevNode_PropertyW(node, key, &mut kind, buf.as_mut_ptr(), &mut size, 0) } == CR_SUCCESS;
+            (ok && kind == want).then_some(buf)
+        };
+        let text = |b: Vec<u8>| -> String {
+            let w: Vec<u16> = b.as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes(*c)).take_while(|&c| c != 0).collect();
+            String::from_utf16_lossy(&w)
+        };
+        let container = prop(node, &DEVPKEY_Device_ContainerId, DEVPROP_TYPE_GUID).filter(|g| g.len() == 16).map(|g| {
+            let d1 = u32::from_le_bytes([g[0], g[1], g[2], g[3]]);
+            let d2 = u16::from_le_bytes([g[4], g[5]]);
+            let d3 = u16::from_le_bytes([g[6], g[7]]);
+            format!(
+                "{d1:08x}-{d2:04x}-{d3:04x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+                g[8], g[9], g[10], g[11], g[12], g[13], g[14], g[15]
+            )
+        });
+        // o nome que o aparelho informa costuma estar no nó USB/Bluetooth, um ou dois acima do HID
+        let mut name = None;
+        let mut cur = node;
+        for _ in 0..4 {
+            name = prop(cur, &DEVPKEY_Device_BusReportedDeviceDesc, DEVPROP_TYPE_STRING)
+                .or_else(|| prop(cur, &DEVPKEY_Device_FriendlyName, DEVPROP_TYPE_STRING))
+                .map(text)
+                .and_then(|n| useful_name(&n));
+            if name.is_some() {
+                break;
+            }
+            let mut parent = 0u32;
+            if unsafe { CM_Get_Parent(&mut parent, cur, 0) } != CR_SUCCESS {
+                break;
+            }
+            cur = parent;
+        }
+        let builtin = container.as_deref() == Some(BUILTIN_CONTAINER);
+        Identity { container, builtin, name }
     }
 
     unsafe fn device_path(device: HANDLE) -> Option<String> {
@@ -405,6 +511,15 @@ mod tests {
         assert_eq!(classify(bt), Bus::Bluetooth);
         assert_eq!(display_name(laptop, Bus::Notebook), "Teclado do notebook");
         assert_eq!(display_name(usb, Bus::Usb), "Teclado Logitech");
+    }
+
+    #[test]
+    fn generic_windows_names_are_dropped_and_no_brand_is_invented() {
+        assert_eq!(useful_name("Dispositivo de teclado HID"), None);
+        assert_eq!(useful_name("USB Input Device"), None);
+        assert_eq!(useful_name("K380 Multi-Device Keyboard").as_deref(), Some("K380 Multi-Device Keyboard"));
+        let sinowealth = r"\\?\HID#VID_258A&PID_002A&MI_00#8&1&0&0000#{884b96c3-56ef-11d1-bc8c-00a0c91405dd}";
+        assert_eq!(display_name(sinowealth, Bus::Usb), "Teclado USB", "chip genérico não vira marca");
     }
 
     #[test]
