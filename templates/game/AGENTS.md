@@ -31,5 +31,7 @@ controles (o mod lê os jogadores só pelo SDK), `validate_game` antes de public
 
 **Padrão de todo mod: a tela do jogo no celular.** Para cada jogador com `pa_view_wanted` verdadeiro, o mod
 não desenha a parte dele na TV e entrega a visão dele com `pa_submit_view` (ver "Tela do jogo no celular" no
-SDK). Implemente junto com a tela dividida, não depois. Publicar é opcional: um
-release no GitHub (tag igual à `version` da ficha) deixa qualquer pessoa jogar só com o link.
+SDK). Implemente junto com a tela dividida, não depois.
+
+Publicar é opcional: um release no GitHub (tag igual à `version` da ficha) deixa qualquer pessoa jogar só com
+o link.
