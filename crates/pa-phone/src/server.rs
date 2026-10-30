@@ -136,6 +136,13 @@ impl PhoneServer {
         }
     }
 
+    /// "Identificar": a tela do celular pisca na cor do jogador e vibra (no Android; o iPhone não deixa uma
+    /// página vibrar sem um toque na tela).
+    pub fn identify(&self, seat: u8) {
+        self.send_text(seat, &ServerText::Identify);
+        self.rumble(seat, 300, 200);
+    }
+
     pub fn rumble(&self, seat: u8, ms: u16, strength: u8) {
         self.send(seat, Message::Binary(protocol::encode_rumble(ms, strength).into()));
     }

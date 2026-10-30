@@ -103,6 +103,12 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 .go { height: 36px; padding: 0 16px; border-radius: 999px; background: var(--neon); color: #04140a; font-weight: 800; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
 .go[disabled] { opacity: .5; }
 .test small { color: var(--muted); font-size: 12px; }
+/* Identificar: a tela inteira pisca na cor do jogador */
+#flash { position: fixed; inset: 0; background: var(--seat, #3cf060); opacity: 0; pointer-events: none; z-index: 60; }
+#flash.on { animation: flash 1s ease-out; }
+@keyframes flash { 0%, 40% { opacity: .9; } 20%, 60% { opacity: .15; } 100% { opacity: 0; } }
+/* interruptor escondido: no iPhone (Safari 18+), acioná-lo dá um toque de vibração */
+#haptic { position: fixed; left: -100px; top: 0; width: 1px; height: 1px; opacity: 0; }
 #toast { position: fixed; top: 14px; left: 50%; transform: translate(-50%, -140%); max-width: 80vw; padding: 10px 18px;
   border-radius: 999px; background: rgba(12, 16, 12, .92); color: #eef7e2; font: 600 14px system-ui, sans-serif;
   border: 1px solid rgba(60, 240, 96, .4); transition: transform .3s; z-index: 50; pointer-events: none; }
@@ -230,6 +236,11 @@ function onText(m) {
     showStats(m.data);
   } else if (m.t === 'toast') {
     showToast(m.text);
+  } else if (m.t === 'identify') {
+    let el = $('flash');
+    if (!el) { el = document.createElement('div'); el.id = 'flash'; document.body.appendChild(el); }
+    el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+    showToast('É você! O Hub está te procurando.');
   }
 }
 
@@ -425,7 +436,19 @@ $('fsBtn').addEventListener('click', () => {
 });
 // A captura garante o "soltou" mesmo se o dedo escorregar para fora; se falhar, o botão ainda funciona.
 function capture(el, e) { try { el.setPointerCapture(e.pointerId); } catch (_) {} }
-function vibrate(ms) { if (navigator.vibrate) navigator.vibrate(ms); }
+// Android: Vibration API. iPhone: não tem; o Safari 18+ dá um toque de vibração ao acionar um interruptor
+// (<input type=checkbox switch>), mas só durante um toque na tela. Pedidos do Hub no iPhone ficam no visual.
+let hapticLabel = null;
+function vibrate(ms) {
+  if (navigator.vibrate) { navigator.vibrate(ms); return; }
+  if (!hapticLabel) {
+    hapticLabel = document.createElement('label');
+    hapticLabel.id = 'haptic';
+    hapticLabel.innerHTML = '<input type="checkbox" switch>';
+    document.body.appendChild(hapticLabel);
+  }
+  hapticLabel.click();
+}
 
 // Em segundo plano o celular fecha a conexão; ao voltar, reconecta (docs/ARCHITECTURE.md).
 document.addEventListener('visibilitychange', () => {

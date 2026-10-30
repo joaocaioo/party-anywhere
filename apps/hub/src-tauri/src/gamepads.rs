@@ -78,8 +78,16 @@ fn run(hub: &Hub, gilrs: &mut Gilrs, rx: &Receiver<Command>) {
                 Ok(Command::ExpectVirtual) => echo.expect(Instant::now()),
                 Ok(Command::Rumble(key)) => {
                     if let Some((&id, _)) = keys.iter().find(|(_, k)| **k == key) {
-                        if let Ok(effect) = rumble(gilrs, id) {
-                            effects.push((Instant::now(), effect));
+                        // controles Xbox: XInput, que vibra sempre (a vibração do Windows.Gaming.Input pode
+                        // ser descartada sem erro); os outros: pelo gilrs, quando o Windows oferece
+                        let xinput_slot = xbox_rank(gilrs, &ignored, id).and_then(|rank| xinput::physical_slots().get(rank).copied());
+                        match xinput_slot {
+                            Some(slot) => xinput::rumble(slot, 400),
+                            None => {
+                                if let Ok(effect) = rumble(gilrs, id) {
+                                    effects.push((Instant::now(), effect));
+                                }
+                            }
                         }
                     }
                 }
@@ -151,6 +159,117 @@ fn connect(hub: &Hub, gilrs: &Gilrs, id: GamepadId, keys: &mut HashMap<GamepadId
     hub.lobby.lock().unwrap().connected(Device { key: key.clone(), kind: DeviceKind::Gamepad, name: None });
     keys.insert(id, key);
     hub.emit_lobby();
+}
+
+/// Posição do controle entre os controles Xbox de verdade (sem os virtuais), na ordem em que o gilrs os vê.
+/// Casa com a ordem das vagas do XInput que não são virtuais.
+fn xbox_rank(gilrs: &Gilrs, ignored: &HashSet<GamepadId>, id: GamepadId) -> Option<usize> {
+    let mut xbox: Vec<GamepadId> = gilrs
+        .gamepads()
+        .filter(|(gid, gp)| !ignored.contains(gid) && (gp.vendor_id() == Some(0x045e) || brand_of(gp.name()) == "xbox"))
+        .map(|(gid, _)| gid)
+        .collect();
+    xbox.sort_by_key(|g| usize::from(*g));
+    xbox.iter().position(|g| *g == id)
+}
+
+/// Pode vibrar pelo Hub? Controles Xbox (XInput) e os que o Windows.Gaming.Input aceita. PlayStation e
+/// outros sem driver de vibração no Windows, não: a carta pisca em vez disso.
+pub fn can_rumble(brand: &str) -> bool {
+    brand == "xbox"
+}
+
+/// XInput carregado na hora (xinput1_4.dll), com a função 108 (XInputGetCapabilitiesEx, a mesma que o SDL
+/// usa) para saber o fabricante e o modelo de cada vaga e não confundir com os nossos controles virtuais.
+#[cfg(windows)]
+mod xinput {
+    use std::sync::OnceLock;
+
+    use windows_sys::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryA};
+
+    #[repr(C)]
+    #[derive(Default)]
+    struct Gamepad {
+        buttons: u16,
+        lt: u8,
+        rt: u8,
+        lx: i16,
+        ly: i16,
+        rx: i16,
+        ry: i16,
+    }
+    #[repr(C)]
+    #[derive(Default)]
+    struct Caps {
+        kind: u8,
+        sub: u8,
+        flags: u16,
+        gamepad: Gamepad,
+        vib_l: u16,
+        vib_r: u16,
+    }
+    #[repr(C)]
+    #[derive(Default)]
+    struct CapsEx {
+        caps: Caps,
+        vid: u16,
+        pid: u16,
+        ver: u16,
+        unk1: u16,
+        unk2: u32,
+    }
+    #[repr(C)]
+    struct Vibration {
+        left: u16,
+        right: u16,
+    }
+
+    type FarProc = unsafe extern "system" fn() -> isize;
+    type CapsExFn = unsafe extern "system" fn(u32, u32, u32, *mut CapsEx) -> u32;
+    type SetStateFn = unsafe extern "system" fn(u32, *mut Vibration) -> u32;
+
+    fn api() -> Option<&'static (CapsExFn, SetStateFn)> {
+        static API: OnceLock<Option<(CapsExFn, SetStateFn)>> = OnceLock::new();
+        API.get_or_init(|| unsafe {
+            let lib = LoadLibraryA(c"xinput1_4.dll".as_ptr().cast());
+            if lib.is_null() {
+                return None;
+            }
+            let caps = GetProcAddress(lib, 108usize as *const u8)?;
+            let set = GetProcAddress(lib, c"XInputSetState".as_ptr().cast())?;
+            Some((std::mem::transmute::<FarProc, CapsExFn>(caps), std::mem::transmute::<FarProc, SetStateFn>(set)))
+        })
+        .as_ref()
+    }
+
+    /// Vagas do XInput com controle de verdade (os Xbox 360 virtuais do ViGEm têm o modelo 028E).
+    pub fn physical_slots() -> Vec<u32> {
+        let Some((caps_ex, _)) = api() else { return vec![] };
+        (0..4u32)
+            .filter(|&slot| {
+                let mut c = CapsEx::default();
+                unsafe { caps_ex(1, slot, 0, &mut c) == 0 && !(c.vid == 0x045e && c.pid == 0x028e) }
+            })
+            .collect()
+    }
+
+    /// Vibra os dois motores por `ms` e para (numa thread curta: não segura a dos controles).
+    pub fn rumble(slot: u32, ms: u64) {
+        let Some(&(_, set)) = api() else { return };
+        std::thread::spawn(move || unsafe {
+            set(slot, &mut Vibration { left: 45_000, right: 30_000 });
+            std::thread::sleep(std::time::Duration::from_millis(ms));
+            set(slot, &mut Vibration { left: 0, right: 0 });
+        });
+    }
+}
+
+#[cfg(not(windows))]
+mod xinput {
+    pub fn physical_slots() -> Vec<u32> {
+        vec![]
+    }
+    pub fn rumble(_: u32, _: u64) {}
 }
 
 fn read_pad(gilrs: &Gilrs, id: GamepadId) -> Pad {

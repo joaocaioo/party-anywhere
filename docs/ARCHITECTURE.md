@@ -272,7 +272,7 @@ Regras:
 - Os eventos (`SEAT_JOINED`, `RECONNECTING`, `RESUMED`, `LEFT`, `RENAMED`) o SDK gera comparando cada
   `pa_poll` com o anterior; `HUB_LOST` quando o heartbeat para por 1,5 s (os pads ficam neutros).
 - O SDK funciona **sem o Hub aberto**: `pa_connect` falha com um código claro, e o jogo decide.
-- Aplicados hoje pelo Hub: `rumble` (celular e controle) e `toast` (celular). `label`, `layout` e `light`
+- Aplicados hoje pelo Hub: `rumble` (controle Xbox pelo XInput; celular Android) e `toast` (celular). `label`, `layout` e `light`
   já fazem parte da ABI e chegam ao Hub; o protocolo do celular ganha os layouts na próxima versão.
 
 ## Biblioteca: jogos do PC

@@ -75,22 +75,31 @@ pub fn seat_move(hub: Hubs, from: usize, to: usize) -> bool {
     hub.move_seat(from, to)
 }
 
-/// Identificar: o controle vibra, o celular vibra; o teclado só tem a carta piscando (na UI).
+/// Identificar. Controle Xbox: vibra. Celular: a tela pisca na cor do jogador (e vibra no Android; o iPhone
+/// não deixa uma página vibrar sem um toque na tela). Devolve o que aconteceu, para o aviso não prometer
+/// uma vibração que não houve.
 #[tauri::command]
-pub fn seat_identify(hub: Hubs, index: usize) {
-    let Some(seat) = hub.lobby.lock().unwrap().seat(index).cloned() else { return };
+pub fn seat_identify(hub: Hubs, index: usize) -> &'static str {
+    let Some(seat) = hub.lobby.lock().unwrap().seat(index).cloned() else { return "none" };
     match seat.kind {
         DeviceKind::Phone => {
             if let Some(p) = hub.phone.lock().unwrap().as_ref() {
-                p.rumble(index as u8, 300, 200);
+                p.identify(index as u8);
             }
+            "phone"
         }
         DeviceKind::Gamepad => {
+            let brand = hub.meta.lock().unwrap().get(&seat.device).map(|m| m.brand.clone()).unwrap_or_default();
             if let Some(tx) = hub.gamepad_tx.lock().unwrap().as_ref() {
                 let _ = tx.send(crate::gamepads::Command::Rumble(seat.device));
             }
+            if crate::gamepads::can_rumble(&brand) {
+                "rumble"
+            } else {
+                "flash"
+            }
         }
-        DeviceKind::Keyboard => {}
+        DeviceKind::Keyboard => "flash",
     }
 }
 

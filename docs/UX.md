@@ -65,8 +65,9 @@ P1 a P4 seguem a convenção dos consoles. A cor sempre aparece junto do número
 - **Carta de jogador**: número e cor, nome (editável) e um **desenho grande do aparelho**: controle,
   celular ou teclado. Embaixo, o aparelho ("Pixel 8", "Logitech K380", "Teclado do notebook") e o
   estado: latência para celulares, bateria quando houver, "Com fio" ou "Do notebook". Botão
-  **Identificar**: o controle vibra e acende, o celular vibra; no teclado, a carta pisca quando alguém
-  aperta uma tecla nele.
+  **Identificar**: o controle Xbox vibra; a tela do celular pisca na cor do jogador (e vibra no Android:
+  o iPhone não deixa uma página vibrar sem um toque na tela); controles sem vibração no Windows
+  (PlayStation, por enquanto) e teclados: a carta pisca, e o aviso diz isso em vez de prometer vibração.
 - **Arco**: a carta em foco cresce e as vizinhas se afastam para abrir espaço; dos dois lados sempre
   aparece um pedaço de cada carta, inclusive a última.
 - **Ordem**: P1 é quem entrou primeiro. Arrastar cartas (ou segurar LB/RB no controle) reordena.

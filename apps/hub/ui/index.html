@@ -327,7 +327,7 @@ main { flex: 1; display: flex; flex-direction: column; position: relative; min-h
 @container (max-width: 199px) { .mini .t { display: none; } .mini { padding: 6px; } }
 .panel b { white-space: nowrap; }
 .x {
-  position: absolute; top: 12px; right: 12px;
+  position: absolute; top: 12px; right: 12px; z-index: 3;
   width: 28px; height: 28px; border-radius: 50%;
   display: grid; place-items: center;
   background: rgba(0, 0, 0, .45);
@@ -345,6 +345,7 @@ main { flex: 1; display: flex; flex-direction: column; position: relative; min-h
   position: absolute; inset: 0; border-radius: inherit;
   display: none; place-content: center; text-align: center; gap: 10px;
   font-size: 13px; font-weight: 700;
+  pointer-events: none; /* é só aviso: o X (remover) e o resto da carta continuam clicáveis */
 }
 .reco svg { width: 30px; height: 30px; margin: 0 auto; }
 .reco small { color: var(--muted); font-weight: 500; font-size: 11px; }

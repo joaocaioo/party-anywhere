@@ -62,8 +62,26 @@
     invoke('seat_remove', { index: idx }).catch(warn);
     toast(`P${idx + 1} saiu do lobby`, old, null, { label: 'Desfazer', fn: () => invoke('seat_undo_remove', { index: idx }).catch(warn) });
   };
-  const identifyCard = identify;
-  window.identify = (idx) => { identifyCard(idx); invoke('seat_identify', { index: idx }).catch(() => {}); };
+  // Identificar: a carta pisca e o aviso diz o que aconteceu de verdade no aparelho
+  window.identify = (idx) => {
+    const s = seats[idx];
+    if (!s) return;
+    const el = (lobbyArc._order || []).find((c) => c.dataset.key.startsWith(`p${idx}-`));
+    if (el) {
+      el.classList.remove('identify'); void el.offsetWidth; el.classList.add('identify');
+      clearTimeout(el._identifyT); el._identifyT = setTimeout(() => el.classList.remove('identify'), 950);
+    }
+    invoke('seat_identify', { index: idx }).then((what) => {
+      const msg = {
+        rumble: `${s.deviceName} de ${s.name} vibrando`,
+        phone: `A tela do celular de ${s.name} está piscando na cor dele`,
+        flash: s.kind === 'keyboard'
+          ? `${s.name}: aperte uma tecla nesse teclado e o card pisca`
+          : `${s.deviceName} não vibra pelo Hub ainda: o card de ${s.name} está piscando`,
+      }[what];
+      if (msg) toast(msg, s);
+    }).catch(() => {});
+  };
   const renameCard = startRename;
   window.startRename = (nameEl, card) => {
     renameCard(nameEl, card);

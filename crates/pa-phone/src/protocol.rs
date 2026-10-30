@@ -188,6 +188,8 @@ pub enum ServerText<'a> {
     Welcome { seat: u8, color: &'a str, name: &'a str, token: &'a str },
     Reject { reason: &'a str },
     Toast { text: &'a str },
+    /// Identificar: a tela pisca na cor do jogador (e vibra, onde o navegador deixa).
+    Identify,
     /// Resultado da medição, para a página mostrar ao vivo. Formato livre (JSON do spike).
     Stats { data: serde_json::Value },
 }
