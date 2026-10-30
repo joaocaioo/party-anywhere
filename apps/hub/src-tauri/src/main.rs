@@ -10,6 +10,7 @@ mod hub;
 mod keyboards;
 mod nav;
 mod sdk;
+mod settings;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -73,7 +74,8 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             fit_to_screen(app);
-            let hub = hub::Hub::new(app.handle().clone());
+            let (roaming, local) = dirs();
+            let hub = hub::Hub::new(app.handle().clone(), settings::path(&roaming));
             if let Err(e) = hub.start_phones() {
                 eprintln!("party-anywhere: celulares indisponíveis: {e}");
             }
@@ -83,7 +85,6 @@ fn main() {
             nav::start(hub.clone());
             app.manage(hub);
 
-            let (roaming, local) = dirs();
             let path = roaming.join("library.json");
             let (mut lib, note) = Library::load(&path);
             if migrate_steam_art(&mut lib) {
@@ -119,6 +120,14 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::hub_info,
             commands::network_addresses,
+            commands::settings_get,
+            commands::set_join_ip,
+            commands::layouts_list,
+            commands::layout_save,
+            commands::layout_delete,
+            commands::devices_list,
+            commands::virtual_pads_install,
+            commands::virtual_pads_retry,
             commands::lobby_snapshot,
             commands::seat_remove,
             commands::seat_undo_remove,

@@ -8,10 +8,13 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use pa_core::{DeviceKey, DeviceKind, JoinPolicy, Lobby, Pad, Seat, SeatState, MAX_SEATS, SEAT_COLORS};
+use pa_phone::protocol::ServerText;
 use pa_phone::{net, PhoneEvent, PhoneServer, ServerConfig, CONTROLLER_PAGE};
 use pa_virtualpad::VirtualPads;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
+
+use crate::settings::Settings;
 
 pub const PHONE_PORT: u16 = 27027;
 
@@ -34,8 +37,12 @@ pub struct Hub {
     pub pads: Mutex<[Pad; MAX_SEATS]>,
     pub phone: Mutex<Option<PhoneServer>>,
     pub join_url: Mutex<String>,
-    pub virtual_pads: Option<VirtualPads>,
-    pub virtual_error: Option<String>,
+    /// Controles virtuais do Modo Universal (ViGEmBus). Sem o driver fica `None` e dá para tentar de novo
+    /// depois de instalar, sem reiniciar o Hub.
+    pub virtual_pads: Mutex<Option<VirtualPads>>,
+    pub virtual_error: Mutex<Option<String>>,
+    pub settings: Mutex<Settings>,
+    pub settings_path: std::path::PathBuf,
     /// Vagas com controle virtual ligado (celulares e teclados).
     plugged: Mutex<[bool; MAX_SEATS]>,
     /// Vagas removidas recentemente, para o "Desfazer".
@@ -76,21 +83,28 @@ pub struct LobbyView {
 }
 
 impl Hub {
-    pub fn new(app: AppHandle) -> Arc<Self> {
+    pub fn new(app: AppHandle, settings_path: std::path::PathBuf) -> Arc<Self> {
         let (virtual_pads, virtual_error) = match VirtualPads::start(None) {
             Ok(v) => (Some(v), None),
             Err(e) => (None, Some(e.to_string())),
         };
+        let settings = Settings::load(&settings_path);
+        let mut lobby = Lobby::default();
+        if settings.join_on_button {
+            lobby.policy = pa_core::JoinPolicy::OnButtonPress;
+        }
         Arc::new(Self {
             app,
             clock: Instant::now(),
-            lobby: Arc::new(Mutex::new(Lobby::default())),
+            lobby: Arc::new(Mutex::new(lobby)),
             meta: Mutex::new(HashMap::new()),
             pads: Mutex::new([Pad::NEUTRAL; MAX_SEATS]),
             phone: Mutex::new(None),
             join_url: Mutex::new(String::new()),
-            virtual_pads,
-            virtual_error,
+            virtual_pads: Mutex::new(virtual_pads),
+            virtual_error: Mutex::new(virtual_error),
+            settings: Mutex::new(settings),
+            settings_path,
             plugged: Mutex::new([false; MAX_SEATS]),
             removed: Mutex::new(Vec::new()),
             gamepad_tx: Mutex::new(None),
@@ -109,7 +123,13 @@ impl Hub {
         let (server, mut events) =
             tauri::async_runtime::block_on(PhoneServer::start(config, self.clock)).map_err(|e| e.to_string())?;
         let port = server.local_addr().port();
-        let ip = net::lan_candidates().first().map(|c| c.ip.to_string()).unwrap_or_else(|| "127.0.0.1".into());
+        // o endereço escolhido nos Ajustes, se ainda existir neste PC; senão o mais provável
+        let candidates = net::lan_candidates();
+        let preferred = self.settings.lock().unwrap().preferred_ip.clone();
+        let ip = preferred
+            .filter(|p| candidates.iter().any(|c| c.ip.to_string() == *p))
+            .or_else(|| candidates.first().map(|c| c.ip.to_string()))
+            .unwrap_or_else(|| "127.0.0.1".into());
         *self.join_url.lock().unwrap() = format!("http://{ip}:{port}/");
         *self.phone.lock().unwrap() = Some(server);
         let hub = self.clone();
@@ -125,6 +145,21 @@ impl Hub {
                             );
                         }
                         hub.plug(seat as usize);
+                        hub.send_layouts(seat);
+                        hub.emit_lobby();
+                    }
+                    PhoneEvent::LayoutChosen { seat, id } => {
+                        if let Some(key) = hub.device_at(seat as usize) {
+                            let mut st = hub.settings.lock().unwrap();
+                            if st.all_layouts().iter().any(|l| l.id == id) {
+                                st.phone_layout.insert(key.0, id);
+                                let _ = st.save(&hub.settings_path);
+                            }
+                        }
+                        hub.send_layouts(seat);
+                    }
+                    PhoneEvent::Renamed { seat, name } => {
+                        hub.lobby.lock().unwrap().rename(seat as usize, &name);
                         hub.emit_lobby();
                     }
                     PhoneEvent::Disconnected { seat } => {
@@ -150,6 +185,33 @@ impl Hub {
         Ok(())
     }
 
+    /// Manda ao celular da vaga os layouts e o que ele usa.
+    pub fn send_layouts(&self, seat: u8) {
+        let Some(key) = self.device_at(seat as usize) else { return };
+        let (items, current) = {
+            let st = self.settings.lock().unwrap();
+            (serde_json::to_value(st.all_layouts()).unwrap_or_default(), st.layout_for(&key.0))
+        };
+        if let Some(p) = self.phone.lock().unwrap().as_ref() {
+            p.send_text(seat, &ServerText::Layouts { items: &items, current: &current });
+        }
+    }
+
+    /// A lista de layouts mudou (criado, editado, apagado na aba Controles): avisa todos os celulares.
+    pub fn broadcast_layouts(&self) {
+        let phones: Vec<u8> =
+            self.lobby.lock().unwrap().seats().filter(|s| s.kind == DeviceKind::Phone).map(|s| s.index as u8).collect();
+        for seat in phones {
+            self.send_layouts(seat);
+        }
+    }
+
+    pub fn save_settings(&self) {
+        if let Err(e) = self.settings.lock().unwrap().save(&self.settings_path) {
+            eprintln!("party-anywhere: não consegui salvar os ajustes: {e}");
+        }
+    }
+
     pub fn device_at(&self, seat: usize) -> Option<DeviceKey> {
         self.lobby.lock().unwrap().seat(seat).map(|s| s.device.clone())
     }
@@ -164,7 +226,7 @@ impl Hub {
             shm.write_pad(seat, pad);
         }
         if self.plugged.lock().unwrap()[seat] {
-            if let Some(v) = &self.virtual_pads {
+            if let Some(v) = self.virtual_pads.lock().unwrap().as_ref() {
                 v.update(seat as u8, pad);
             }
         }
@@ -172,7 +234,8 @@ impl Hub {
 
     /// Celulares e teclados viram controles de Xbox virtuais (os jogos já veem os controles físicos).
     pub fn plug(&self, seat: usize) {
-        let (Some(v), true) = (&self.virtual_pads, seat < MAX_SEATS) else { return };
+        let guard = self.virtual_pads.lock().unwrap();
+        let (Some(v), true) = (guard.as_ref(), seat < MAX_SEATS) else { return };
         if self.game_connected.load(Ordering::Acquire) {
             return; // o jogo do SDK lê as vagas direto
         }
@@ -187,7 +250,8 @@ impl Hub {
     }
 
     pub fn unplug(&self, seat: usize) {
-        let (Some(v), true) = (&self.virtual_pads, seat < MAX_SEATS) else { return };
+        let guard = self.virtual_pads.lock().unwrap();
+        let (Some(v), true) = (guard.as_ref(), seat < MAX_SEATS) else { return };
         let mut plugged = self.plugged.lock().unwrap();
         if plugged[seat] {
             plugged[seat] = false;
@@ -233,9 +297,45 @@ impl Hub {
                 JoinPolicy::Automatic => "automatic",
                 JoinPolicy::OnButtonPress => "button",
             },
-            virtual_pads: self.virtual_pads.is_some(),
-            virtual_error: self.virtual_error.clone(),
+            virtual_pads: self.virtual_pads.lock().unwrap().is_some(),
+            virtual_error: self.virtual_error.lock().unwrap().clone(),
         }
+    }
+
+    /// Tenta de novo ligar os controles virtuais (depois de instalar o ViGEmBus pelos Ajustes).
+    pub fn retry_virtual_pads(&self) -> bool {
+        if self.virtual_pads.lock().unwrap().is_some() {
+            return true;
+        }
+        match VirtualPads::start(None) {
+            Ok(v) => {
+                *self.virtual_pads.lock().unwrap() = Some(v);
+                *self.virtual_error.lock().unwrap() = None;
+                self.replug_all();
+                self.emit_lobby();
+                true
+            }
+            Err(e) => {
+                *self.virtual_error.lock().unwrap() = Some(e.to_string());
+                false
+            }
+        }
+    }
+
+    /// Troca o endereço do QR (Ajustes): celulares novos entram por ele; o SDK também passa a mostrar.
+    pub fn set_join_ip(&self, ip: Option<String>) {
+        let port = self.phone.lock().unwrap().as_ref().map(|p| p.local_addr().port()).unwrap_or(PHONE_PORT);
+        let candidates = net::lan_candidates();
+        let chosen = ip.clone().filter(|p| candidates.iter().any(|c| c.ip.to_string() == *p));
+        let host = chosen.clone().or_else(|| candidates.first().map(|c| c.ip.to_string())).unwrap_or_else(|| "127.0.0.1".into());
+        let url = format!("http://{host}:{port}/");
+        *self.join_url.lock().unwrap() = url.clone();
+        if let Some(shm) = self.sdk.lock().unwrap().as_ref() {
+            shm.set_join_url(&url);
+        }
+        self.settings.lock().unwrap().preferred_ip = chosen;
+        self.save_settings();
+        self.emit_lobby();
     }
 
     pub fn emit_lobby(&self) {

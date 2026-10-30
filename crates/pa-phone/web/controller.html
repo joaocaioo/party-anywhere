@@ -7,8 +7,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Party Anywhere</title>
 <!--
-  Controle do celular (protocolo v1, ver crates/pa-phone/src/protocol.rs).
-  Servido pelo Hub na rede local; não depende de internet (sem fontes nem scripts externos).
+  Controle do celular (protocolo v1, ver crates/pa-phone/src/protocol.rs). Servido pelo Hub na rede local,
+  sem internet (sem fontes nem scripts externos).
+
+  Layouts: o Hub manda a lista ("Simples", "Avançado" e os criados na aba Controles); cada layout é uma
+  lista de peças e esta página desenha cada peça na sua zona fixa (esquerda: analógico e direcional; centro:
+  Voltar/Start/cliques; direita: A B X Y e o analógico direito; ombros em cima), então nada se sobrepõe.
+  O menu abre segurando o botão do topo (evita abrir sem querer no meio do jogo).
   Cada mudança vai como STATE_T com o instante do toque, para o Hub medir a latência.
 -->
 <style>
@@ -21,6 +26,10 @@
   --neon: #3cf060;
   --seat: #3cf060;
   --a: #22c55e; --b: #ef4444; --x: #3b82f6; --y: #eab308;
+  /* tamanhos relativos à tela deitada: cabem em qualquer celular */
+  --fb: clamp(52px, min(17vh, 11vw), 86px);   /* A B X Y */
+  --sh: clamp(30px, 9vh, 44px);               /* altura dos ombros */
+  --dp: clamp(40px, min(13vh, 8vw), 60px);    /* setas */
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body {
@@ -35,56 +44,81 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 .pad {
   position: fixed; inset: 0;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  grid-template-rows: auto auto 1fr;
-  padding: max(10px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-rows: 44px auto minmax(0, 1fr);
+  column-gap: 10px;
+  padding: max(8px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
   background: radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, var(--seat) 14%, transparent), transparent 70%), var(--bg);
 }
 
-/* topo */
-.bar { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; height: 40px; }
-.who { display: flex; align-items: center; gap: 8px; font-weight: 800; }
-.who i { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 13px; background: var(--seat); color: rgba(0, 0, 0, .78); box-shadow: 0 0 16px var(--seat); }
-.who span { font-size: 14px; }
-.net { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--muted); }
+/* topo: quem eu sou, conexão, menu */
+.bar { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; }
+.who { display: flex; align-items: center; gap: 8px; font-weight: 800; min-width: 0; }
+.who i { width: 30px; height: 30px; border-radius: 50%; flex: none; display: grid; place-items: center; font-style: normal; font-size: 13px; background: var(--seat); color: rgba(0, 0, 0, .78); box-shadow: 0 0 16px var(--seat); }
+.who span { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.net { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--muted); flex: none; }
 .net b { width: 8px; height: 8px; border-radius: 50%; background: var(--neon); }
 .net.warn b { background: #facc15; } .net.bad b { background: #ef4444; }
-.chip { height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+/* menu: segurar ~0,5 s; o anel enche enquanto segura */
+.menu-btn {
+  position: relative; flex: none; height: 34px; padding: 0 14px 0 12px; border-radius: 999px;
+  display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--muted); border: 1px solid var(--line); background: rgba(255, 255, 255, .03);
+}
+.menu-btn .ring { width: 18px; height: 18px; border-radius: 50%; background: conic-gradient(var(--seat) calc(var(--p, 0) * 1turn), rgba(255, 255, 255, .14) 0); -webkit-mask: radial-gradient(circle, transparent 5px, #000 6px); mask: radial-gradient(circle, transparent 5px, #000 6px); }
+.menu-btn.holding { color: var(--text); border-color: color-mix(in srgb, var(--seat) 60%, transparent); }
 
-/* gatilhos e ombros */
+/* ombros */
 .shoulders { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 10px; margin-top: 6px; }
+.shoulders:empty { display: none; }
 .shoulders .side { display: flex; gap: 8px; }
-.sh { width: 74px; height: 38px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); font-weight: 800; font-size: 13px; color: var(--muted); }
+.sh { width: clamp(60px, 13vw, 92px); height: var(--sh); border-radius: 12px; background: var(--panel); border: 1px solid var(--line); font-weight: 800; font-size: 13px; color: var(--muted); }
 
-/* zonas */
-.stick-zone { position: relative; grid-row: 3; grid-column: 1; }
-.stick-zone .hint { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 12px; color: rgba(255, 255, 255, .25); text-align: center; pointer-events: none; }
+/* zonas: cada uma só com as suas peças */
+.zone { position: relative; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding-top: 8px; }
+.stick { position: relative; flex: 1; min-height: 0; border-radius: 20px; }
+.stick .hint { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 12px; color: rgba(255, 255, 255, .25); text-align: center; pointer-events: none; white-space: nowrap; }
+.stick.right { flex: 0 0 38%; background: rgba(255, 255, 255, .02); border: 1px dashed rgba(255, 255, 255, .07); }
+/* com o analógico direito embaixo, A B X Y encolhem para caber em cima dele */
+.zone.with-rs { --fb: clamp(40px, min(11vh, 9vw), 66px); }
 .base, .knob { position: absolute; border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); }
-.base { width: 128px; height: 128px; border: 2px solid rgba(255, 255, 255, .14); background: rgba(255, 255, 255, .04); }
-.knob { width: 62px; height: 62px; background: color-mix(in srgb, var(--seat) 70%, white 10%); box-shadow: 0 0 24px color-mix(in srgb, var(--seat) 60%, transparent); }
+.base { width: 120px; height: 120px; border: 2px solid rgba(255, 255, 255, .14); background: rgba(255, 255, 255, .04); }
+.knob { width: 58px; height: 58px; background: color-mix(in srgb, var(--seat) 70%, white 10%); box-shadow: 0 0 24px color-mix(in srgb, var(--seat) 60%, transparent); }
 
-.mid { grid-row: 3; grid-column: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
-.small { width: 54px; height: 30px; border-radius: 15px; background: var(--panel); border: 1px solid var(--line); font-size: 11px; font-weight: 800; color: var(--muted); }
+.dpad { flex: none; align-self: flex-start; display: grid; grid-template-columns: repeat(3, var(--dp)); grid-template-rows: repeat(3, var(--dp)); }
+.dpad button { border-radius: 12px; background: var(--panel); border: 1px solid var(--line); color: var(--muted); font-size: 18px; font-weight: 900; }
+.dpad [data-b="UP"] { grid-column: 2; grid-row: 1; }
+.dpad [data-b="LEFT"] { grid-column: 1; grid-row: 2; }
+.dpad [data-b="RIGHT"] { grid-column: 3; grid-row: 2; }
+.dpad [data-b="DOWN"] { grid-column: 2; grid-row: 3; }
 
-.face { grid-row: 3; grid-column: 3; position: relative; }
-.abxy { position: absolute; right: 6%; top: 50%; width: 210px; height: 210px; transform: translateY(-50%); }
+.mid { grid-row: 3; grid-column: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding-top: 8px; }
+.small { min-width: 58px; height: 30px; padding: 0 10px; border-radius: 15px; background: var(--panel); border: 1px solid var(--line); font-size: 11px; font-weight: 800; color: var(--muted); }
+
+.face { flex: 1; min-height: 0; display: grid; place-items: center; }
+.abxy { position: relative; width: calc(var(--fb) * 2.6); height: calc(var(--fb) * 2.6); }
 .fb {
-  position: absolute; width: 78px; height: 78px; border-radius: 50%;
-  font-size: 26px; font-weight: 900;
+  position: absolute; width: var(--fb); height: var(--fb); border-radius: 50%;
+  font-size: calc(var(--fb) * .34); font-weight: 900;
   background: color-mix(in srgb, var(--c) 18%, var(--panel));
   border: 2px solid color-mix(in srgb, var(--c) 70%, transparent);
   color: var(--c);
 }
-.fb[data-b="Y"] { left: 66px; top: 0; --c: var(--y); }
-.fb[data-b="X"] { left: 0; top: 66px; --c: var(--x); }
-.fb[data-b="B"] { right: 0; top: 66px; --c: var(--b); }
-.fb[data-b="A"] { left: 66px; bottom: 0; --c: var(--a); }
+.fb[data-b="Y"] { left: calc(50% - var(--fb) / 2); top: 0; --c: var(--y); }
+.fb[data-b="X"] { left: 0; top: calc(50% - var(--fb) / 2); --c: var(--x); }
+.fb[data-b="B"] { right: 0; top: calc(50% - var(--fb) / 2); --c: var(--b); }
+.fb[data-b="A"] { left: calc(50% - var(--fb) / 2); bottom: 0; --c: var(--a); }
+/* só A e B (layout Simples): grandes, na diagonal de quem joga */
+.abxy.two { width: calc(var(--fb) * 2.5); height: calc(var(--fb) * 2.2); }
+.abxy.two .fb { width: calc(var(--fb) * 1.2); height: calc(var(--fb) * 1.2); font-size: calc(var(--fb) * .4); }
+.abxy.two .fb[data-b="A"] { left: 0; bottom: 0; top: auto; }
+.abxy.two .fb[data-b="B"] { right: 0; top: 0; }
 .down { filter: brightness(1.6); transform: scale(.94); }
 .fb.down { background: var(--c); color: rgba(0, 0, 0, .75); }
-.sh.down, .small.down { background: var(--seat); color: rgba(0, 0, 0, .78); }
+.sh.down, .small.down, .dpad .down { background: var(--seat); color: rgba(0, 0, 0, .78); }
 
 /* camadas */
-.layer { position: fixed; inset: 0; display: none; place-content: center; text-align: center; gap: 10px; padding: 24px; background: rgba(11, 12, 15, .94); z-index: 10; }
+.layer { position: fixed; inset: 0; display: none; place-content: center; text-align: center; gap: 10px; padding: 24px; background: rgba(11, 12, 15, .94); z-index: 30; }
 .layer.on { display: grid; }
 .layer h2 { margin: 0; font-size: 20px; }
 .layer p { margin: 0; color: var(--muted); font-size: 14px; }
@@ -93,16 +127,39 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 .rotate { display: none; }
 @media (orientation: portrait) { .rotate { display: grid; } }
 
-.test { position: fixed; left: 50%; top: 52px; transform: translateX(-50%); width: min(560px, calc(100% - 24px)); z-index: 5; display: none; padding: 14px 16px; border-radius: 18px; background: rgba(21, 22, 26, .96); border: 1px solid var(--line); box-shadow: 0 20px 50px rgba(0, 0, 0, .6); }
-.test.on { display: block; }
-.test h3 { margin: 0 0 8px; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; }
-.rows { display: grid; grid-template-columns: auto 1fr 1fr 1fr auto; gap: 4px 12px; font-size: 13px; align-items: baseline; }
+/* menu */
+.sheet { position: fixed; inset: 0; z-index: 40; display: none; background: rgba(6, 7, 9, .82); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.sheet.on { display: block; }
+.sheet .in {
+  position: absolute; right: max(12px, env(safe-area-inset-right)); top: max(10px, env(safe-area-inset-top)); bottom: max(10px, env(safe-area-inset-bottom));
+  width: min(420px, calc(100% - 24px)); overflow-y: auto; touch-action: pan-y;
+  padding: 16px; border-radius: 22px; background: #15161a; border: 1px solid var(--line); box-shadow: 0 20px 60px rgba(0, 0, 0, .6);
+}
+.sheet h3 { margin: 16px 0 8px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.sheet .top { display: flex; align-items: center; gap: 10px; }
+.sheet .top b { font-size: 16px; }
+.sheet .close { margin-left: auto; height: 34px; padding: 0 16px; border-radius: 999px; background: var(--seat); color: rgba(0, 0, 0, .8); font-weight: 800; font-size: 13px; }
+.opt { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255, 255, 255, .03); text-align: left; margin-bottom: 8px; }
+.opt small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.opt .dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--muted); flex: none; }
+.opt.on { border-color: color-mix(in srgb, var(--seat) 70%, transparent); background: color-mix(in srgb, var(--seat) 10%, transparent); }
+.opt.on .dot { border-color: var(--seat); background: radial-gradient(circle, var(--seat) 45%, transparent 50%); }
+.opt .sw { margin-left: auto; width: 40px; height: 24px; border-radius: 12px; background: rgba(255, 255, 255, .15); position: relative; flex: none; }
+.opt .sw::after { content: ""; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .2s; }
+.opt.on .sw { background: var(--seat); }
+.opt.on .sw::after { transform: translateX(16px); }
+.name-row { display: flex; gap: 8px; }
+.name-row input { flex: 1; min-width: 0; height: 42px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255, 255, 255, .04); color: var(--text); font: inherit; font-size: 15px; user-select: text; -webkit-user-select: text; }
+.name-row button { height: 42px; padding: 0 16px; border-radius: 12px; background: rgba(255, 255, 255, .08); font-weight: 800; font-size: 13px; }
+
+/* diagnóstico (medição de latência), dentro do menu */
+.rows { display: grid; grid-template-columns: auto 1fr 1fr 1fr auto; gap: 4px 10px; font-size: 13px; align-items: baseline; }
 .rows .h { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
 .rows b { font-variant-numeric: tabular-nums; }
-.test .actions { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
-.go { height: 36px; padding: 0 16px; border-radius: 999px; background: var(--neon); color: #04140a; font-weight: 800; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+.go { height: 36px; padding: 0 16px; border-radius: 999px; background: rgba(255, 255, 255, .08); font-weight: 800; font-size: 12px; letter-spacing: .04em; margin-top: 10px; }
 .go[disabled] { opacity: .5; }
-.test small { color: var(--muted); font-size: 12px; }
+#burstTxt { color: var(--muted); font-size: 12px; margin-left: 8px; }
+
 /* Identificar: a tela inteira pisca na cor do jogador */
 #flash { position: fixed; inset: 0; background: var(--seat, #3cf060); opacity: 0; pointer-events: none; z-index: 60; }
 #flash.on { animation: flash 1s ease-out; }
@@ -120,39 +177,35 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
   <div class="bar">
     <div class="who"><i id="seatNum">·</i><span id="seatName">Conectando...</span></div>
     <div class="net" id="net"><b></b><span id="netTxt">--</span></div>
-    <button class="chip" id="testBtn">Teste</button>
-    <button class="chip" id="fsBtn" aria-label="Tela cheia">⛶</button>
+    <button class="menu-btn" id="menuBtn" aria-label="Menu (segure)"><span class="ring"></span>Menu</button>
   </div>
-  <div class="shoulders">
-    <div class="side"><button class="sh" data-b="LT">LT</button><button class="sh" data-b="LB">LB</button></div>
-    <div class="side"><button class="sh" data-b="RB">RB</button><button class="sh" data-b="RT">RT</button></div>
-  </div>
-  <div class="stick-zone" id="stickZone"><div class="hint">Toque e arraste<br>em qualquer lugar aqui</div></div>
-  <div class="mid">
-    <button class="small" data-b="BACK">VOLTAR</button>
-    <button class="small" data-b="START">START</button>
-  </div>
-  <div class="face">
-    <div class="abxy">
-      <button class="fb" data-b="Y">Y</button>
-      <button class="fb" data-b="X">X</button>
-      <button class="fb" data-b="B">B</button>
-      <button class="fb" data-b="A">A</button>
-    </div>
-  </div>
+  <div class="shoulders" id="shoulders"></div>
+  <div class="zone" id="left" style="grid-row:3;grid-column:1"></div>
+  <div class="mid" id="mid"></div>
+  <div class="zone" id="right" style="grid-row:3;grid-column:3"></div>
 </div>
 
-<div class="test" id="test">
-  <h3>Teste de latência</h3>
-  <div class="rows">
-    <span class="h"></span><span class="h">p50</span><span class="h">p95</span><span class="h">p99</span><span class="h">amostras</span>
-    <span>Toque → PC</span><b id="t50">--</b><b id="t95">--</b><b id="t99">--</b><b id="tn">0</b>
-    <span>Rede (rajada)</span><b id="r50">--</b><b id="r95">--</b><b id="r99">--</b><b id="rn">0</b>
-    <span>Ida e volta</span><b id="i50">--</b><b id="i95">--</b><b id="i99">--</b><b id="in">0</b>
-  </div>
-  <div class="actions">
-    <button class="go" id="burstBtn">Rajada automática (30 s)</button>
-    <small id="burstTxt">Ou só jogue: cada toque é medido.</small>
+<div class="sheet" id="sheet">
+  <div class="in">
+    <div class="top"><i id="sheetSeat" style="width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-weight:800;font-size:12px;background:var(--seat);color:rgba(0,0,0,.78)">·</i><b>Menu</b><button class="close" id="closeMenu">Voltar ao jogo</button></div>
+    <h3>Controle</h3>
+    <div id="layoutList"></div>
+    <h3>Seu nome</h3>
+    <form class="name-row" id="nameForm"><input id="nameInput" maxlength="20" autocomplete="off" placeholder="Como te chamam"><button>Salvar</button></form>
+    <h3>Preferências</h3>
+    <button class="opt" id="optVibe"><span><b>Vibrar ao tocar</b><small>Um toque leve a cada botão</small></span><span class="sw"></span></button>
+    <button class="opt" id="optFs"><span><b>Tela cheia</b><small>Esconde as barras do navegador</small></span><span class="sw"></span></button>
+    <h3>Diagnóstico</h3>
+    <button class="opt" id="optDiag"><span><b>Medir a conexão</b><small>Atraso do toque até o PC</small></span><span class="sw"></span></button>
+    <div id="diag" hidden>
+      <div class="rows">
+        <span class="h"></span><span class="h">p50</span><span class="h">p95</span><span class="h">p99</span><span class="h">amostras</span>
+        <span>Toque → PC</span><b id="t50">--</b><b id="t95">--</b><b id="t99">--</b><b id="tn">0</b>
+        <span>Rede</span><b id="r50">--</b><b id="r95">--</b><b id="r99">--</b><b id="rn">0</b>
+        <span>Ida e volta</span><b id="i50">--</b><b id="i95">--</b><b id="i99">--</b><b id="in">0</b>
+      </div>
+      <button class="go" id="burstBtn">Medir a rede (30 s)</button><span id="burstTxt"></span>
+    </div>
   </div>
 </div>
 
@@ -167,6 +220,9 @@ const KIND = { heartbeat: 0, touch: 1, burst: 2, stick: 3 };
 const HEARTBEAT_MS = 100;
 const STICK_RADIUS = 60;
 const DEADZONE = 0.12;
+const HOLD_MS = 500;
+// sem o Hub responder ainda: o Avançado (todas as peças)
+const FALLBACK = [{ id: 'advanced', name: 'Avançado', controls: ['stickL', 'stickR', 'dpad', 'A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'BACK', 'START', 'LS', 'RS'] }];
 
 const pad = { buttons: 0, lx: 0, ly: 0, rx: 0, ry: 0, lt: 0, rt: 0 };
 let ws = null;
@@ -178,8 +234,40 @@ const rtts = [];
 let syncTimer = null;
 let burstTimer = null;
 let stopped = false;
+let layouts = FALLBACK;
+let currentLayout = 'advanced';
+const prefs = { vibe: true };
+try { Object.assign(prefs, JSON.parse(localStorage.getItem('pa.prefs') || '{}')); } catch (_) {}
+try { const l = JSON.parse(localStorage.getItem('pa.layout') || 'null'); if (l && l.controls) { layouts = [l]; currentLayout = l.id; } } catch (_) {}
 
 const $ = (id) => document.getElementById(id);
+
+// ---------------------------------------------------------------- layout: peças em zonas fixas
+function render() {
+  const layout = layouts.find((l) => l.id === currentLayout) || layouts[0];
+  const has = new Set(layout.controls);
+  releaseAll();
+  const btn = (b, cls, label) => (has.has(b) ? `<button class="${cls}" data-b="${b}">${label || b}</button>` : '');
+  // ombros
+  const left = btn('LT', 'sh') + btn('LB', 'sh');
+  const right = btn('RB', 'sh') + btn('RT', 'sh');
+  $('shoulders').innerHTML = left || right ? `<div class="side">${left}</div><div class="side">${right}</div>` : '';
+  // esquerda: analógico (área toda) e o direcional embaixo
+  $('left').innerHTML =
+    (has.has('stickL') ? '<div class="stick" data-stick="l"><div class="hint">Toque e arraste<br>em qualquer lugar aqui</div></div>' : '') +
+    (has.has('dpad') ? `<div class="dpad">${['UP', 'LEFT', 'RIGHT', 'DOWN'].map((d) => `<button data-b="${d}">${{ UP: '▲', LEFT: '◀', RIGHT: '▶', DOWN: '▼' }[d]}</button>`).join('')}</div>` : '');
+  $('left').style.justifyContent = !has.has('stickL') && has.has('dpad') ? 'center' : '';
+  // centro
+  $('mid').innerHTML = btn('BACK', 'small', 'VOLTAR') + btn('START', 'small', 'START') + btn('LS', 'small', 'L3') + btn('RS', 'small', 'R3');
+  // direita: A B X Y e o analógico direito embaixo
+  const face = ['Y', 'X', 'B', 'A'].filter((b) => has.has(b));
+  const two = !has.has('X') && !has.has('Y');
+  $('right').classList.toggle('with-rs', has.has('stickR'));
+  $('right').innerHTML =
+    (face.length ? `<div class="face"><div class="abxy${two ? ' two' : ''}">${face.map((b) => `<button class="fb" data-b="${b}">${b}</button>`).join('')}</div></div>` : '') +
+    (has.has('stickR') ? '<div class="stick right" data-stick="r"><div class="hint">Analógico direito</div></div>' : '');
+  wire();
+}
 
 // ---------------------------------------------------------------- conexão
 function deviceName() {
@@ -225,8 +313,18 @@ function onText(m) {
     try { if (m.token) localStorage.setItem('pa.token', m.token); } catch (_) {}
     document.documentElement.style.setProperty('--seat', m.color);
     $('seatNum').textContent = m.seat;
+    $('sheetSeat').textContent = m.seat;
     $('seatName').textContent = `P${m.seat} · ${m.name}`;
+    $('nameInput').value = /^Jogador \d+$/.test(m.name) ? '' : m.name;
     vibrate(60);
+  } else if (m.t === 'layouts') {
+    layouts = m.items && m.items.length ? m.items : FALLBACK;
+    const changed = currentLayout !== m.current;
+    currentLayout = m.current;
+    const l = layouts.find((x) => x.id === currentLayout);
+    try { if (l) localStorage.setItem('pa.layout', JSON.stringify(l)); } catch (_) {}
+    renderLayoutList();
+    if (changed) render();
   } else if (m.t === 'reject') {
     const texts = { full: 'O lobby está cheio (10 de 10).', version: 'Atualize a página.', closed: 'O lobby está fechado agora.' };
     $('rejText').textContent = texts[m.reason] || m.reason;
@@ -278,6 +376,10 @@ function sendRaw(buf) {
   if (ws && ws.readyState === 1) ws.send(buf);
 }
 
+function sendText(obj) {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+}
+
 function sendSync() {
   syncId = (syncId + 1) & 0xffff;
   const t0 = performance.now();
@@ -317,85 +419,180 @@ setInterval(() => {
   if (performance.now() - lastSend >= HEARTBEAT_MS) sendState(KIND.heartbeat, performance.now());
 }, 25);
 
-// ---------------------------------------------------------------- botões
-document.querySelectorAll('[data-b]').forEach((el) => {
-  const name = el.dataset.b;
-  const set = (on, e) => {
-    if (name === 'LT') pad.lt = on ? 1 : 0;
-    else if (name === 'RT') pad.rt = on ? 1 : 0;
-    else if (on) pad.buttons |= 1 << BIT[name];
-    else pad.buttons &= ~(1 << BIT[name]);
-    el.classList.toggle('down', on);
-    sendState(KIND.touch, touchTime(e));
-  };
-  el.addEventListener('pointerdown', (e) => {
+// ---------------------------------------------------------------- botões e analógicos
+function wire() {
+  document.querySelectorAll('#pad [data-b]').forEach((el) => {
+    const name = el.dataset.b;
+    const set = (on, e) => {
+      if (name === 'LT') pad.lt = on ? 1 : 0;
+      else if (name === 'RT') pad.rt = on ? 1 : 0;
+      else if (on) pad.buttons |= 1 << BIT[name];
+      else pad.buttons &= ~(1 << BIT[name]);
+      el.classList.toggle('down', on);
+      sendState(KIND.touch, touchTime(e));
+    };
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      capture(el, e);
+      set(true, e);
+      if (prefs.vibe) vibrate(8);
+      keepAwake();
+    });
+    const up = (e) => { if (el.classList.contains('down')) set(false, e); };
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+    el.addEventListener('lostpointercapture', up);
+  });
+  document.querySelectorAll('#pad [data-stick]').forEach((zone) => stick(zone, zone.dataset.stick === 'l' ? ['lx', 'ly'] : ['rx', 'ry']));
+}
+
+// analógico flutuante: nasce onde o dedo toca
+function stick(zone, [ax, ay]) {
+  let id = null, ox = 0, oy = 0, base = null, knob = null;
+  zone.addEventListener('pointerdown', (e) => {
+    if (id !== null) return;
     e.preventDefault();
-    capture(el, e);
-    set(true, e);
-    vibrate(8);
+    capture(zone, e);
+    id = e.pointerId;
+    const r = zone.getBoundingClientRect();
+    ox = e.clientX - r.left; oy = e.clientY - r.top;
+    base = document.createElement('div'); base.className = 'base';
+    knob = document.createElement('div'); knob.className = 'knob';
+    base.style.left = knob.style.left = ox + 'px';
+    base.style.top = knob.style.top = oy + 'px';
+    zone.append(base, knob);
+    const hint = zone.querySelector('.hint');
+    if (hint) hint.style.display = 'none';
     keepAwake();
   });
-  const up = (e) => { if (el.classList.contains('down')) set(false, e); };
-  el.addEventListener('pointerup', up);
-  el.addEventListener('pointercancel', up);
-  el.addEventListener('lostpointercapture', up);
-});
+  zone.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== id) return;
+    const r = zone.getBoundingClientRect();
+    let dx = e.clientX - r.left - ox, dy = e.clientY - r.top - oy;
+    const len = Math.hypot(dx, dy);
+    if (len > STICK_RADIUS) { dx *= STICK_RADIUS / len; dy *= STICK_RADIUS / len; }
+    knob.style.left = ox + dx + 'px';
+    knob.style.top = oy + dy + 'px';
+    // zona morta radial, reescalada para o eixo ainda chegar a 1
+    const mag = Math.min(1, len / STICK_RADIUS);
+    const k = mag < DEADZONE ? 0 : (mag - DEADZONE) / (1 - DEADZONE) / (mag || 1);
+    const x = (dx / STICK_RADIUS) * k, y = (-dy / STICK_RADIUS) * k;
+    if (Math.abs(x - pad[ax]) < 0.01 && Math.abs(y - pad[ay]) < 0.01) return;
+    pad[ax] = x; pad[ay] = y;
+    sendState(KIND.stick, touchTime(e));
+  });
+  const end = (e) => {
+    if (e.pointerId !== id) return;
+    id = null;
+    base && base.remove(); knob && knob.remove();
+    pad[ax] = 0; pad[ay] = 0;
+    sendState(KIND.touch, touchTime(e));
+  };
+  zone.addEventListener('pointerup', end);
+  zone.addEventListener('pointercancel', end);
+}
 
-// ---------------------------------------------------------------- analógico flutuante
-const zone = $('stickZone');
-let stickId = null, ox = 0, oy = 0, base = null, knob = null;
-zone.addEventListener('pointerdown', (e) => {
-  if (stickId !== null) return;
+// trocar de layout ou abrir o menu solta tudo: nenhum botão fica preso no jogo
+function releaseAll() {
+  pad.buttons = 0; pad.lx = pad.ly = pad.rx = pad.ry = pad.lt = pad.rt = 0;
+  document.querySelectorAll('#pad .down').forEach((el) => el.classList.remove('down'));
+  sendState(KIND.touch, performance.now());
+}
+
+// ---------------------------------------------------------------- menu (segurar para abrir)
+const menuBtn = $('menuBtn');
+let hold = null;
+menuBtn.addEventListener('pointerdown', (e) => {
   e.preventDefault();
-  capture(zone, e);
-  stickId = e.pointerId;
-  const r = zone.getBoundingClientRect();
-  ox = e.clientX - r.left; oy = e.clientY - r.top;
-  base = document.createElement('div'); base.className = 'base';
-  knob = document.createElement('div'); knob.className = 'knob';
-  base.style.left = knob.style.left = ox + 'px';
-  base.style.top = knob.style.top = oy + 'px';
-  zone.append(base, knob);
-  zone.querySelector('.hint').style.display = 'none';
-  keepAwake();
+  capture(menuBtn, e);
+  const t0 = performance.now();
+  menuBtn.classList.add('holding');
+  const tick = () => {
+    const p = Math.min(1, (performance.now() - t0) / HOLD_MS);
+    menuBtn.style.setProperty('--p', p);
+    if (p >= 1) { stopHold(false); openMenu(); return; }
+    hold = requestAnimationFrame(tick);
+  };
+  hold = requestAnimationFrame(tick);
 });
-zone.addEventListener('pointermove', (e) => {
-  if (e.pointerId !== stickId) return;
-  const r = zone.getBoundingClientRect();
-  let dx = e.clientX - r.left - ox, dy = e.clientY - r.top - oy;
-  const len = Math.hypot(dx, dy);
-  if (len > STICK_RADIUS) { dx *= STICK_RADIUS / len; dy *= STICK_RADIUS / len; }
-  knob.style.left = ox + dx + 'px';
-  knob.style.top = oy + dy + 'px';
-  // zona morta radial, reescalada para o eixo ainda chegar a 1
-  const mag = Math.min(1, len / STICK_RADIUS);
-  const k = mag < DEADZONE ? 0 : (mag - DEADZONE) / (1 - DEADZONE) / (mag || 1);
-  const lx = (dx / STICK_RADIUS) * k, ly = (-dy / STICK_RADIUS) * k;
-  if (Math.abs(lx - pad.lx) < 0.01 && Math.abs(ly - pad.ly) < 0.01) return;
-  pad.lx = lx; pad.ly = ly;
-  sendState(KIND.stick, touchTime(e));
-});
-const stickUp = (e) => {
-  if (e.pointerId !== stickId) return;
-  stickId = null;
-  base && base.remove(); knob && knob.remove();
-  pad.lx = 0; pad.ly = 0;
-  sendState(KIND.touch, touchTime(e));
-};
-zone.addEventListener('pointerup', stickUp);
-zone.addEventListener('pointercancel', stickUp);
+function stopHold(tapped) {
+  cancelAnimationFrame(hold);
+  hold = null;
+  menuBtn.classList.remove('holding');
+  menuBtn.style.setProperty('--p', 0);
+  if (tapped) showToast('Segure o botão Menu para abrir');
+}
+menuBtn.addEventListener('pointerup', () => { if (hold) stopHold(true); });
+menuBtn.addEventListener('pointercancel', () => { if (hold) stopHold(false); });
 
-// ---------------------------------------------------------------- teste
-$('testBtn').addEventListener('click', () => $('test').classList.toggle('on'));
+function openMenu() {
+  releaseAll();
+  vibrate(30);
+  renderLayoutList();
+  $('optVibe').classList.toggle('on', prefs.vibe);
+  $('optFs').classList.toggle('on', !!document.fullscreenElement);
+  $('sheet').classList.add('on');
+}
+$('closeMenu').addEventListener('click', () => $('sheet').classList.remove('on'));
+
+function renderLayoutList() {
+  const describe = (c) => {
+    const names = { stickL: 'analógico', stickR: '2º analógico', dpad: 'setas', LT: 'gatilhos', LB: 'ombros' };
+    const parts = Object.keys(names).filter((k) => c.includes(k)).map((k) => names[k]);
+    const face = ['A', 'B', 'X', 'Y'].filter((b) => c.includes(b));
+    return [face.join(' '), ...parts].filter(Boolean).join(' · ');
+  };
+  $('layoutList').innerHTML = layouts.map((l) => `<button class="opt${l.id === currentLayout ? ' on' : ''}" data-layout="${escapeHtml(l.id)}"><span class="dot"></span><span><b>${escapeHtml(l.name)}</b><small>${escapeHtml(describe(l.controls))}</small></span></button>`).join('');
+}
+$('layoutList').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-layout]');
+  if (!b) return;
+  currentLayout = b.dataset.layout;
+  const l = layouts.find((x) => x.id === currentLayout);
+  try { if (l) localStorage.setItem('pa.layout', JSON.stringify(l)); } catch (_) {}
+  renderLayoutList();
+  render();
+  sendText({ t: 'layout', id: currentLayout });
+  vibrate(15);
+});
+$('nameForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const name = $('nameInput').value.trim();
+  if (!name) return;
+  sendText({ t: 'rename', name });
+  $('seatName').textContent = $('seatName').textContent.replace(/·.*$/, `· ${name}`);
+  $('nameInput').blur();
+  showToast('Nome trocado');
+});
+$('optVibe').addEventListener('click', () => {
+  prefs.vibe = !prefs.vibe;
+  $('optVibe').classList.toggle('on', prefs.vibe);
+  try { localStorage.setItem('pa.prefs', JSON.stringify(prefs)); } catch (_) {}
+  if (prefs.vibe) vibrate(20);
+});
+$('optFs').addEventListener('click', () => {
+  const el = document.documentElement;
+  if (document.fullscreenElement) document.exitFullscreen();
+  else (el.requestFullscreen || el.webkitRequestFullscreen || (() => {})).call(el);
+  if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
+  setTimeout(() => $('optFs').classList.toggle('on', !!document.fullscreenElement), 300);
+});
+$('optDiag').addEventListener('click', () => {
+  const on = $('diag').hidden;
+  $('diag').hidden = !on;
+  $('optDiag').classList.toggle('on', on);
+});
+
+// ---------------------------------------------------------------- diagnóstico
 $('burstBtn').addEventListener('click', () => {
   if (burstTimer) return;
   const until = performance.now() + 30000;
   $('burstBtn').disabled = true;
   burstTimer = setInterval(() => {
     const now = performance.now();
-    if (now >= until) { stopBurst(); $('burstTxt').textContent = 'Rajada concluída.'; return; }
+    if (now >= until) { stopBurst(); $('burstTxt').textContent = 'Pronto.'; return; }
     sendState(KIND.burst, now);
-    $('burstTxt').textContent = `Enviando... ${Math.ceil((until - now) / 1000)} s`;
+    $('burstTxt').textContent = `Medindo... ${Math.ceil((until - now) / 1000)} s`;
   }, 16);
 });
 function stopBurst() {
@@ -428,12 +625,6 @@ async function keepAwake() {
   if (wakeLock || !navigator.wakeLock) return;
   try { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } catch (_) {}
 }
-$('fsBtn').addEventListener('click', () => {
-  const el = document.documentElement;
-  if (document.fullscreenElement) document.exitFullscreen();
-  else (el.requestFullscreen || el.webkitRequestFullscreen || (() => {})).call(el);
-  if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
-});
 // A captura garante o "soltou" mesmo se o dedo escorregar para fora; se falhar, o botão ainda funciona.
 function capture(el, e) { try { el.setPointerCapture(e.pointerId); } catch (_) {} }
 // Android: Vibration API. iPhone: não tem; o Safari 18+ dá um toque de vibração ao acionar um interruptor
@@ -449,6 +640,9 @@ function vibrate(ms) {
   }
   hapticLabel.click();
 }
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 
 // Em segundo plano o celular fecha a conexão; ao voltar, reconecta (docs/ARCHITECTURE.md).
 document.addEventListener('visibilitychange', () => {
@@ -456,6 +650,7 @@ document.addEventListener('visibilitychange', () => {
   else if (!ws || ws.readyState > 1) connect();
 });
 
+render();
 connect();
 </script>
 </body>

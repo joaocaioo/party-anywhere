@@ -276,6 +276,7 @@ fn handle_event(ev: PhoneEvent, seats: &mut [SeatStats], pads: Option<&VirtualPa
                 }
             }
         }
+        PhoneEvent::LayoutChosen { .. } | PhoneEvent::Renamed { .. } => {}
         PhoneEvent::ClockSample { seat, rtt_ms, offset_ms } => {
             let s = &mut seats[seat as usize];
             s.clock.add(rtt_ms, offset_ms);

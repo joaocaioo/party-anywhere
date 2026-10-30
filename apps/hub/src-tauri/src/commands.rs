@@ -128,7 +128,158 @@ pub fn seat_identify(hub: Hubs, index: usize) -> &'static str {
 #[tauri::command]
 pub fn set_join_policy(hub: Hubs, on_button: bool) {
     hub.lobby.lock().unwrap().policy = if on_button { JoinPolicy::OnButtonPress } else { JoinPolicy::Automatic };
+    hub.settings.lock().unwrap().join_on_button = on_button;
+    hub.save_settings();
     hub.emit_lobby();
+}
+
+// ---------------------------------------------------------------- ajustes
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingsView {
+    version: &'static str,
+    join_on_button: bool,
+    preferred_ip: Option<String>,
+    join_url: String,
+    virtual_pads: bool,
+    virtual_error: Option<String>,
+}
+
+#[tauri::command]
+pub fn settings_get(hub: Hubs) -> SettingsView {
+    let st = hub.settings.lock().unwrap().clone();
+    SettingsView {
+        version: env!("CARGO_PKG_VERSION"),
+        join_on_button: st.join_on_button,
+        preferred_ip: st.preferred_ip,
+        join_url: hub.join_url.lock().unwrap().clone(),
+        virtual_pads: hub.virtual_pads.lock().unwrap().is_some(),
+        virtual_error: hub.virtual_error.lock().unwrap().clone(),
+    }
+}
+
+/// Endereço do QR: um IP deste PC, ou `None` para o Hub escolher.
+#[tauri::command]
+pub fn set_join_ip(hub: Hubs, ip: Option<String>) -> String {
+    hub.set_join_ip(ip);
+    hub.join_url.lock().unwrap().clone()
+}
+
+/// Baixa o instalador oficial do ViGEmBus (o componente de controle virtual) do GitHub e abre: o Windows
+/// pede permissão de administrador. Depois, "Conferir" liga os controles virtuais sem reiniciar o Hub.
+#[tauri::command]
+pub async fn virtual_pads_install() -> Result<(), String> {
+    let path = tauri::async_runtime::spawn_blocking(|| -> Result<PathBuf, String> {
+        use pa_library::http::Http;
+        #[derive(Deserialize)]
+        struct Rel {
+            assets: Vec<Asset>,
+        }
+        #[derive(Deserialize)]
+        struct Asset {
+            name: String,
+            browser_download_url: String,
+        }
+        let http = Ureq::default();
+        let resp = http.get("https://api.github.com/repos/nefarius/ViGEmBus/releases/latest", None, 2 * 1024 * 1024)?;
+        if !resp.ok() {
+            return Err(format!("não consegui consultar o instalador ({}).", resp.status));
+        }
+        let rel: Rel = serde_json::from_slice(&resp.body).map_err(|_| "resposta inesperada do GitHub.".to_string())?;
+        let asset = rel
+            .assets
+            .into_iter()
+            .find(|a| a.name.to_lowercase().ends_with(".exe") && a.browser_download_url.starts_with("https://github.com/"))
+            .ok_or("o release do ViGEmBus não tem instalador.")?;
+        let bin = http.get(&asset.browser_download_url, None, 50 * 1024 * 1024)?;
+        if !bin.ok() {
+            return Err(format!("o download falhou ({}).", bin.status));
+        }
+        let path = std::env::temp_dir().join(&asset.name);
+        std::fs::write(&path, bin.body).map_err(|e| e.to_string())?;
+        Ok(path)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    std::process::Command::new(&path).spawn().map_err(|e| format!("não consegui abrir o instalador: {e}"))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn virtual_pads_retry(hub: Hubs) -> bool {
+    hub.retry_virtual_pads()
+}
+
+// ---------------------------------------------------------------- controles
+
+#[tauri::command]
+pub fn layouts_list(hub: Hubs) -> Vec<crate::settings::Layout> {
+    hub.settings.lock().unwrap().all_layouts()
+}
+
+#[tauri::command]
+pub fn layout_save(hub: Hubs, id: Option<String>, name: String, controls: Vec<String>) -> Result<crate::settings::Layout, String> {
+    let saved = hub.settings.lock().unwrap().upsert_layout(id.as_deref(), &name, &controls)?;
+    hub.save_settings();
+    hub.broadcast_layouts();
+    Ok(saved)
+}
+
+#[tauri::command]
+pub fn layout_delete(hub: Hubs, id: String) -> bool {
+    let ok = hub.settings.lock().unwrap().delete_layout(&id);
+    if ok {
+        hub.save_settings();
+        hub.broadcast_layouts();
+    }
+    ok
+}
+
+/// Aparelho conectado agora, com ou sem vaga (os que esperam: teclados, controles parados, removidos).
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceView {
+    key: String,
+    kind: &'static str,
+    brand: String,
+    device_name: String,
+    via: String,
+    battery: Option<u8>,
+    ping: Option<u32>,
+    seat: Option<usize>,
+    layout: Option<String>,
+}
+
+#[tauri::command]
+pub fn devices_list(hub: Hubs) -> Vec<DeviceView> {
+    let lobby = hub.lobby.lock().unwrap();
+    let meta = hub.meta.lock().unwrap();
+    let st = hub.settings.lock().unwrap();
+    let kind = |k: DeviceKind| match k {
+        DeviceKind::Phone => "phone",
+        DeviceKind::Gamepad => "gamepad",
+        DeviceKind::Keyboard => "keyboard",
+    };
+    let view = |key: &pa_core::DeviceKey, k: DeviceKind, seat: Option<usize>| {
+        let m = meta.get(key).cloned().unwrap_or_default();
+        DeviceView {
+            key: key.0.clone(),
+            kind: kind(k),
+            brand: m.brand,
+            device_name: m.device_name,
+            via: m.via,
+            battery: m.battery,
+            ping: m.ping_ms,
+            seat,
+            layout: (k == DeviceKind::Phone).then(|| st.layout_for(&key.0)),
+        }
+    };
+    lobby
+        .seats()
+        .map(|s| view(&s.device, s.kind, Some(s.index)))
+        .chain(lobby.waiting().iter().map(|d| view(&d.key, d.kind, None)))
+        .collect()
 }
 
 // ---------------------------------------------------------------- teclados

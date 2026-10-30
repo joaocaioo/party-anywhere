@@ -59,6 +59,10 @@ pub enum PhoneEvent {
     /// Uma troca SYNC/SYNC_DONE completa: ida e volta e a diferença estimada entre os relógios
     /// (relógio do servidor ≈ relógio do celular + offset).
     ClockSample { seat: u8, rtt_ms: f64, offset_ms: f64 },
+    /// O celular escolheu um layout no menu.
+    LayoutChosen { seat: u8, id: String },
+    /// O jogador trocou o nome pelo celular.
+    Renamed { seat: u8, name: String },
 }
 
 type Outbox = mpsc::UnboundedSender<Message>;
@@ -198,7 +202,8 @@ async fn connection(socket: WebSocket, shared: Arc<Shared>, peer: SocketAddr) {
                 let _ = sink.send(reject("version")).await;
                 return;
             }
-            Err(_) => return,
+            // a primeira mensagem tem de ser o hello
+            Ok(_) | Err(_) => return,
         },
         _ => return,
     };
@@ -289,6 +294,15 @@ async fn connection(socket: WebSocket, shared: Arc<Shared>, peer: SocketAddr) {
                 // tipo novo de uma página mais nova: ignorar é compatível
                 Err(DecodeError::UnknownType(_)) => {}
                 Err(_) => break,
+            },
+            Message::Text(t) if has_seat => match serde_json::from_str::<ClientText>(t.as_str()) {
+                Ok(ClientText::Layout { id }) if id.len() <= 64 => {
+                    let _ = shared.events.send(PhoneEvent::LayoutChosen { seat, id });
+                }
+                Ok(ClientText::Rename { name }) => {
+                    let _ = shared.events.send(PhoneEvent::Renamed { seat, name: name.chars().take(40).collect() });
+                }
+                _ => {}
             },
             Message::Text(_) => {}
             Message::Close(_) => break,

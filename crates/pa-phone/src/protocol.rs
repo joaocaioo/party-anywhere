@@ -178,6 +178,10 @@ pub enum ClientText {
         #[serde(default)]
         token: Option<String>,
     },
+    /// Escolheu um layout no menu do celular.
+    Layout { id: String },
+    /// Trocou o nome no menu do celular.
+    Rename { name: String },
 }
 
 /// Mensagens de texto para o celular.
@@ -190,6 +194,9 @@ pub enum ServerText<'a> {
     Toast { text: &'a str },
     /// Identificar: a tela pisca na cor do jogador (e vibra, onde o navegador deixa).
     Identify,
+    /// Layouts que o celular pode usar e o escolhido. `items`: `[{ id, name, controls: [..] }]`
+    /// (controles: stickL, stickR, dpad, A, B, X, Y, LB, RB, LT, RT, BACK, START, LS, RS).
+    Layouts { items: &'a serde_json::Value, current: &'a str },
     /// Resultado da medição, para a página mostrar ao vivo. Formato livre (JSON do spike).
     Stats { data: serde_json::Value },
 }
