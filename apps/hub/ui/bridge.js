@@ -226,21 +226,18 @@
   const known = new Map(); // id → jogo como o núcleo conhece (para mandar só como abrir os novos do PC)
   // arte da Steam vem como referência ("steam:331600"): a capa e a arte larga (hero) são lidas sob demanda,
   // e o library.json guarda só a referência
-  const artCache = new Map();
-  const art = (ref, hero) => {
-    const key = `${ref}|${hero}`;
-    if (!artCache.has(key)) artCache.set(key, invoke('game_art', { reference: ref, hero }).catch(() => null));
-    return artCache.get(key);
-  };
-  async function withArt(g) {
+  // arte da Steam: um endereço que o navegador lê do disco quando a imagem aparece (pa-art), em vez de
+  // converter todas as capas de todos os jogos ao abrir. Sem arquivo, a imagem falha e entra a capa gerada.
+  const artUrl = (ref, hero) => window.__TAURI__.core.convertFileSrc(`steam/${ref.slice(6)}/${hero ? 'hero' : 'cover'}`, 'pa-art');
+  function withArt(g) {
     if (!g.image || !g.image.startsWith('steam:')) return g;
-    const [cover, hero] = await Promise.all([art(g.image, false), art(g.image, true)]);
-    return { ...g, artRef: g.image, image: cover || undefined, artResolved: cover, hero: hero || undefined };
+    const cover = artUrl(g.image, false);
+    return { ...g, artRef: g.image, image: cover, artResolved: cover, hero: artUrl(g.image, true) };
   }
   async function setGames(list, focusId) {
     known.clear();
     list.forEach((g) => known.set(g.id, g));
-    const resolved = await Promise.all(list.map(withArt));
+    const resolved = list.map(withArt);
     const mapped = resolved.map((g) => ({ ...g, image: g.image || undefined, tags: g.update ? [...g.tags, `Nova versão ${g.update}`] : g.tags }));
     games.splice(0, games.length, ...mapped);
     if (arcade) {
@@ -273,11 +270,11 @@
   window.openScanGames = async () => {
     try {
       const found = await invoke('pc_scan');
-      const withCovers = await Promise.all(found.map(async (g) => {
+      const withCovers = found.map((g) => {
         if (!g.image || !g.image.startsWith('steam:')) return { ...g, art: palette(g.id) };
-        const cover = await art(g.image, false);
-        return { ...g, art: palette(g.id), artRef: g.image, image: cover || undefined, artResolved: cover };
-      }));
+        const cover = artUrl(g.image, false);
+        return { ...g, art: palette(g.id), artRef: g.image, image: cover, artResolved: cover };
+      });
       PC_GAMES.splice(0, PC_GAMES.length, ...withCovers);
     } catch (e) { warn(e); }
     scanList();

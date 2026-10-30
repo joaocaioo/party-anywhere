@@ -819,6 +819,25 @@ pub async fn game_art(reference: String, hero: bool) -> Option<String> {
     tauri::async_runtime::spawn_blocking(move || pcgames::art_data_url(&reference, art)).await.ok().flatten()
 }
 
+/// Responde `pa-art`: `/steam/<appid>/cover` ou `/hero` (o caminho pode vir codificado).
+pub fn art_response(path: &str) -> tauri::http::Response<Vec<u8>> {
+    let decoded = path.replace("%2F", "/").replace("%2f", "/");
+    let parts: Vec<&str> = decoded.trim_matches('/').split('/').collect();
+    let file = match parts.as_slice() {
+        ["steam", appid, kind] => pcgames::steam_art_file(appid, if *kind == "hero" { Art::Hero } else { Art::Cover }),
+        _ => None,
+    };
+    let builder = tauri::http::Response::builder().header("Access-Control-Allow-Origin", "*");
+    match file.and_then(|f| std::fs::read(f).ok()) {
+        Some(bytes) => builder
+            .header("Content-Type", "image/jpeg")
+            .header("Cache-Control", "max-age=86400")
+            .body(bytes)
+            .unwrap_or_default(),
+        None => builder.status(404).body(Vec::new()).unwrap_or_default(),
+    }
+}
+
 /// Instalado na pasta de um jogo-base? A UI pergunta a pasta quando o mod precisa.
 #[tauri::command]
 pub fn installed_info(libs: Libs, id: String) -> Option<Installed> {

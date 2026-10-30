@@ -323,6 +323,22 @@ Regras:
 - O menu abre **segurando** o botão do topo por 0,5 s (um anel enche): sem abrir sem querer no meio do jogo.
   Abrir o menu ou trocar de layout solta todos os botões (nada fica preso no jogo).
 
+## Fliperama da Biblioteca: desempenho
+
+O visual é fixo; o desempenho vem de não fazer trabalho à toa (medido com 200 jogos numa Radeon integrada):
+
+- O 3D só desenha quando alguém vê: aba Biblioteca na tela e nenhum motivo para pausar (`arcade.hold`):
+  jogo aberto (a tela do jogo cobre tudo), janela do Hub por cima, Hub em segundo plano ou minimizado.
+  Pausado, a placa de vídeo fica livre para o jogo; o último quadro fica na tela.
+- Páginas (a tela de cada jogo) só do jogo em foco e dos vizinhos (±2); as de longe saem da placa e as capas
+  de mais de 4 de distância saem da memória. Os vizinhos são montados em tempo ocioso, um por vez, primeiro na
+  direção em que a pessoa anda. Memória e texturas ficam planas com qualquer número de jogos.
+- A página é desenhada num canvas em memória comum (`willReadFrequently`): enviar para a placa é uma cópia e
+  medir a cor da luz não para a GPU (num canvas na placa, cada página nova parava a GPU ~120 a 150 ms).
+- Capas decodificadas fora da thread principal (`img.decode()`). As da Steam chegam por `pa-art://`
+  (lidas do disco quando aparecem, com cache), não convertidas todas em base64 ao abrir.
+- `arcade.stats()`: texturas, páginas e capas guardadas, quadros desenhados e os motivos de pausa.
+
 ## Antes do jogo abrir: quem joga
 
 - Depois do zoom na tela do fliperama e antes de abrir o jogo (`preGame` na UI):

@@ -147,6 +147,14 @@ fn steam_art_path(steam: &Path, appid: &str, art: Art) -> Option<PathBuf> {
     [cache.join(format!("{appid}_{file}")), cache.join(appid).join(file)].into_iter().find(|p| p.is_file())
 }
 
+/// O arquivo de arte da Steam de um appid (só dígitos: nada de caminho vindo de fora).
+pub fn steam_art_file(appid: &str, art: Art) -> Option<PathBuf> {
+    if appid.is_empty() || !appid.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    steam_art_path(&steam_root()?, appid, art)
+}
+
 /// Resolve uma referência de arte (`steam:<appid>`) em data URL. Data URLs e links passam direto.
 pub fn art_data_url(reference: &str, art: Art) -> Option<String> {
     if let Some(appid) = reference.strip_prefix("steam:") {

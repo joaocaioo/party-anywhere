@@ -1500,12 +1500,14 @@ let modalCleanup = null;
 
 function openModal(html, onOpen, cls = '') {
   if (modalCleanup) { modalCleanup(); modalCleanup = null; }
+  arcadeHold('modal', true);
   modal.className = 'modal' + (cls ? ' ' + cls : '');
   modal.innerHTML = html;
   overlay.classList.add('open');
   if (onOpen) modalCleanup = onOpen() || null;
 }
 function closeModal() {
+  arcadeHold('modal', false);
   if (modalCleanup) { modalCleanup(); modalCleanup = null; }
   overlay.classList.remove('open');
 }
@@ -1836,6 +1838,7 @@ async function playGame(g) {
   gameRunning = true;
   shellEl.classList.add('launching');
   await arcade.launch();
+  arcadeHold('game', true); // a tela do jogo cobre tudo: o 3D para de desenhar até voltar
   document.getElementById('grTitle').textContent = g.name;
   const run = document.getElementById('gameRun');
   run.classList.add('on');
@@ -2004,6 +2007,7 @@ async function exitGame() {
   run.classList.remove('show');
   await sleep(360);
   run.classList.remove('on');
+  arcadeHold('game', false);
   const back = arcade.exitGame();
   setTimeout(() => shellEl.classList.remove('launching'), 900);
   await back;
@@ -2013,6 +2017,12 @@ async function exitGame() {
 document.getElementById('grExit').addEventListener('click', exitGame);
 window.addEventListener('arcade:play', () => arcade && playGame(arcade.current()));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// motivos para o fliperama parar de desenhar (ver arcade.hold)
+function arcadeHold(reason, on) { if (arcade) arcade.hold(reason, on); }
+// Hub em segundo plano (outro app na frente, o jogo aberto) ou minimizado: nada de 3D gastando a placa
+document.addEventListener('visibilitychange', () => arcadeHold('hidden', document.hidden));
+window.addEventListener('blur', () => arcadeHold('background', true));
+window.addEventListener('focus', () => arcadeHold('background', false));
 
 // Adicionar jogo. Qualquer jogo entra: os do PC rodam no Modo Universal (celulares viram controles de Xbox);
 // os da comunidade, feitos com o SDK, vêm por link e leem os jogadores direto do Hub.
@@ -2851,7 +2861,8 @@ function fitCover(el) {
   } catch (e) { /* sem permissão de leitura: mantém a original */ }
 }
 // atributos de uma capa: lê do GitHub com CORS (para poder medir) e expande quando precisa
-const coverAttrs = (src) => `${/^https?:/.test(src) ? 'crossorigin="anonymous" ' : ''}onload="fitCover(this)"`;
+// listas grandes: a imagem só carrega (e só é medida) quando chega perto da tela
+const coverAttrs = (src) => `${/^https?:/.test(src) ? 'crossorigin="anonymous" ' : ''}loading="lazy" decoding="async" onload="fitCover(this)"`;
 
 // ===================================================================================
 // Controles e Ajustes. `hubData` é a fonte dos dados: no navegador, demonstração; no app, bridge.js troca
@@ -4170,7 +4181,8 @@ function prepCover(game) {
     const img = new Image();
     // capas do GitHub: sem isto o WebGL recusa a imagem de outra origem
     if (/^https?:/.test(src)) img.crossOrigin = 'anonymous';
-    img.onload = () => onload(img);
+    // decodificar fora da thread principal antes de usar: o drawImage não paga a decodificação no quadro
+    img.onload = () => (img.decode ? img.decode().catch(() => {}) : Promise.resolve()).then(() => onload(img));
     img.onerror = onerror;
     img.src = src;
   };
@@ -4230,7 +4242,7 @@ function screenArt(cover, w, h) {
   const b = real ? artBounds(img) : { sx: 0, sy: 0, sw: 600, sh: 560 };
   const k = Math.max(w / b.sw, h / b.sh);
   const sw = w / k, sh = h / k, sx = b.sx + (b.sw - sw) / 2, sy = b.sy + (b.sh - sh) / 2;
-  const c = mkCanvas(Math.round(w), Math.round(h)), g = c.getContext('2d');
+  const c = mkCanvas(Math.round(w), Math.round(h)), g = c.getContext('2d', { willReadFrequently: true });
   g.filter = 'grayscale(1) contrast(1.2) brightness(1.06)';
   g.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
   g.filter = 'none';
@@ -4323,27 +4335,40 @@ const LIME = new THREE.Color().setRGB(176 / 255, 229 / 255, 68 / 255, THREE.SRGB
 // Páginas só para o jogo em foco e os vizinhos (±2); as de longe são liberadas da placa de vídeo.
 // A página nova já sobe para a GPU na hora (initTexture), antes de aparecer no deslize.
 function buildPage(game) {
+  // canvas em memória comum (willReadFrequently): enviar para a placa é uma cópia direta. Um canvas que vive
+  // na placa de vídeo obrigava a GPU a parar (~120 ms numa Radeon integrada) a cada página nova.
   const c = mkCanvas(PW, PH);
-  drawPage(c.getContext('2d'), game);
+  drawPage(c.getContext('2d', { willReadFrequently: true }), game);
   const old = S.pages.get(game.id);
   const tex = canvasTexture(c);
   renderer.initTexture(tex);
   S.pages.set(game.id, { tex, light: averageLight(c) });
   if (old) old.tex.dispose();
 }
-// os vizinhos são montados depois do deslize (em tempo ocioso), para não pesar no quadro do toque
-let pagesTimer = 0;
+// Os vizinhos são montados em tempo ocioso, um por vez (cada página é um canvas grande: montar várias de
+// uma vez travaria o deslize), primeiro na direção em que a pessoa está andando. Segurando o direcional,
+// o próximo já está pronto quando chega.
+let pagesIdle = 0, lastDir = 1;
+const idle = window.requestIdleCallback || ((fn) => setTimeout(() => fn({ timeRemaining: () => 8 }), 16));
 function schedulePages() {
-  clearTimeout(pagesTimer);
-  pagesTimer = setTimeout(() => (window.requestIdleCallback || setTimeout)(refreshPages), 480);
+  if (pagesIdle) return;
+  pagesIdle = idle(() => { pagesIdle = 0; refreshPages(true); }, { timeout: 250 });
 }
-function refreshPages() {
+function refreshPages(onlyOne) {
+  // longe (mais de 2): libera a página da placa de vídeo; mais de 4: libera também a capa
   S.games.forEach((game, j) => {
-    const near = Math.abs(j - S.index) <= 2;
+    const d = Math.abs(j - S.index);
     const page = S.pages.get(game.id);
-    if (near && !page) { prepCover(game); buildPage(game); }
-    if (!near && page) { page.tex.dispose(); S.pages.delete(game.id); }
+    if (d > 2 && page) { page.tex.dispose(); S.pages.delete(game.id); }
+    if (d > 4 && S.covers.get(game.id)) S.covers.delete(game.id);
   });
+  for (const off of [0, lastDir, -lastDir, 2 * lastDir, -2 * lastDir]) {
+    const game = S.games[S.index + off];
+    if (!game || S.pages.has(game.id)) continue;
+    prepCover(game);
+    buildPage(game);
+    if (onlyOne) { schedulePages(); return; }
+  }
 }
 
 // partes fixas que só mudam quando o jogo em foco muda: contador e setas discretas nas bordas
@@ -4498,23 +4523,34 @@ function approach(side, fromP, toP, ms, ease, onK) {
   });
 }
 
-let running = false;
+// O 3D só desenha quando alguém vê: aba Biblioteca na tela e nenhum motivo para pausar (jogo aberto por
+// cima, janela do Hub por cima, Hub em segundo plano ou minimizado). Pausado, não gasta nada da placa de
+// vídeo (o jogo que está rodando agradece); o último quadro fica na tela.
+let running = false, visible = false;
+const holds = new Set();
+function syncLoop() {
+  const want = visible && holds.size === 0;
+  if (want && !running) { running = true; last = performance.now(); renderer.setAnimationLoop(frame); }
+  else if (!want && running) { running = false; renderer.setAnimationLoop(null); }
+}
 function show() {
   stage.classList.add('on');
-  if (!running) { running = true; last = performance.now(); renderer.setAnimationLoop(frame); }
+  visible = true;
+  syncLoop();
 }
 function hide() {
   stage.classList.remove('on');
   stage.style.opacity = 0;
-  running = false;
-  renderer.setAnimationLoop(null);
+  visible = false;
+  syncLoop();
 }
 
 // paralaxe suave com o mouse quando a câmera está parada na frente
 const pointer = { x: 0, y: 0, sx: 0, sy: 0 };
 const lastCam = new V3();
-let last = 0;
+let last = 0, drawn = 0;
 function frame(now) {
+  drawn++;
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   const t = now / 1000;
@@ -4625,6 +4661,7 @@ const api = {
   },
   focus(i) {
     if (i < 0 || i >= S.games.length || i === S.index) return;
+    lastDir = i > S.index ? 1 : -1;
     S.index = i;
     // a página do jogo em foco precisa existir já; as outras ficam para depois do deslize
     const game = S.games[i];
@@ -4633,6 +4670,15 @@ const api = {
     schedulePages();
   },
   step(d) { api.focus(S.index + d); },
+  // diagnóstico: o que está na placa de vídeo e na memória, e quantos quadros já foram desenhados
+  stats() {
+    return { textures: renderer.info.memory.textures, pages: S.pages.size, covers: S.covers.size, drawn, running, holds: [...holds] };
+  },
+  // pausar o desenho por um motivo ('game', 'modal', 'background'); volta quando nenhum motivo resta
+  hold(reason, on) {
+    if (on) holds.add(reason); else holds.delete(reason);
+    syncLoop();
+  },
   current() { return S.games[S.index]; },
   // um jogo editado: capa e página são refeitas no próximo setGames
   invalidate(id) {

@@ -70,6 +70,12 @@ fn main() {
                 let _ = w.set_focus();
             }
         }))
+        // capas da Steam lidas do disco pelo navegador, sob demanda e com cache (sem base64 pela ponte):
+        // pa-art://localhost/steam/<appid>/cover|hero (no Windows: http://pa-art.localhost/...)
+        .register_asynchronous_uri_scheme_protocol("pa-art", |_ctx, request, responder| {
+            let path = request.uri().path().to_string();
+            std::thread::spawn(move || responder.respond(commands::art_response(&path)));
+        })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
