@@ -57,7 +57,12 @@
   listen('lobby', (e) => applyLobby(e.payload));
   invoke('lobby_snapshot').then(applyLobby).catch(warn);
 
-  // controles chegam pelo núcleo (gilrs); a Gamepad API do navegador fica só para navegar
+  // navegar o Hub com controle ou celular: as ações vêm do núcleo (qualquer jogador); a Gamepad API do
+  // navegador fica desligada para o mesmo controle não navegar duas vezes
+  window.__padNavExternal = true;
+  listen('nav', (e) => navAction(e.payload.action, e.payload.color));
+
+  // controles chegam pelo núcleo (gilrs)
   window.addPlayer = () => null;
   window.removeSeat = (idx) => {
     const old = seats[idx];

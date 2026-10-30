@@ -8,6 +8,7 @@ mod commands;
 mod gamepads;
 mod hub;
 mod keyboards;
+mod nav;
 mod sdk;
 
 use std::path::PathBuf;
@@ -79,6 +80,7 @@ fn main() {
             gamepads::start(hub.clone());
             keyboards::start(hub.clone());
             sdk::start(hub.clone());
+            nav::start(hub.clone());
             app.manage(hub);
 
             let (roaming, local) = dirs();

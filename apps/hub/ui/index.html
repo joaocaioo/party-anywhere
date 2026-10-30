@@ -122,6 +122,8 @@ nav.tabs {
 .tab.active { color: var(--neon); background: rgba(60, 240, 96, .12); }
 button:focus:not(:focus-visible) { outline: none; }
 button:focus-visible { outline: 2px solid var(--neon); outline-offset: 2px; }
+/* foco de quem navega com controle ou celular, na cor do jogador */
+.nav-focus { outline: 3px solid var(--focus-c, var(--neon)) !important; outline-offset: 3px; }
 .top-right { justify-self: end; display: flex; align-items: center; gap: 8px; }
 /* atualização: um ícone discreto; só chama atenção quando há uma versão pronta */
 .update {
@@ -307,7 +309,8 @@ main { flex: 1; display: flex; flex-direction: column; position: relative; min-h
 .chip b { display: block; font-size: 13px; font-weight: 700; line-height: 1.25; outline: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(var(--card-w) - 90px); }
 .chip b[contenteditable="true"] { cursor: text; border-bottom: 1px dashed rgba(255, 255, 255, .25); }
 .panel { bottom: 10px; justify-content: space-between; }
-.panel .meta { min-width: 0; }
+.panel .meta { min-width: 0; flex: 1; }
+.panel b span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .panel .meta small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .panel b { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 800; color: var(--neon); }
 .panel b svg { width: 15px; height: 15px; }
@@ -1160,7 +1163,7 @@ function seatStatHTML(s) {
     const cls = s.ping > 35 ? 'bad' : s.ping > 22 ? 'warn' : '';
     stat = `<b class="${cls}">${icon('wifi')}${s.ping} ms</b>`;
   } else if (s.kind === 'keyboard' && s.via === 'Notebook') {
-    stat = `<b>${icon('keyboard')}Do notebook</b>`;
+    stat = `<b>${icon('keyboard')}<span>Notebook</span></b>`;
   } else if (s.battery != null) {
     stat = `<b class="${s.battery < 20 ? 'bad' : ''}">${icon('battery')}${s.battery}%</b>`;
   } else {
@@ -2239,33 +2242,117 @@ window.addEventListener('gamepaddisconnected', (e) => {
   if (s) setReconnecting(s.index);
 });
 
-// Qualquer controle no lobby navega o Hub (UX: feito para a TV).
+// ===================================================================================
+// Navegação por controle: qualquer jogador (controle ou celular) navega o Hub; o mouse continua valendo.
+// LB/RB trocam de aba; direcional/analógico andam (cartas nas telas de cartas; o elemento mais próximo na
+// direção nas janelas e telas de opções); A confirma; B volta; Y adiciona; Start alterna Lobby/Biblioteca.
+// No navegador a entrada vem da Gamepad API; no app, do núcleo (bridge.js chama navAction).
+// ===================================================================================
+const NAV_SEL = 'button:not([disabled]), input:not([type="hidden"]):not([disabled]), select, textarea, a[href], [tabindex]:not([tabindex="-1"])';
+let navEl = null;
+function navCandidates(scope) {
+  return [...scope.querySelectorAll(NAV_SEL)].filter((el) => {
+    if (el.closest('.arc') || el.closest('.view:not(.active)') || el.closest('#demo')) return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden';
+  });
+}
+function setNavFocus(el) {
+  document.querySelectorAll('.nav-focus').forEach((e) => e.classList.remove('nav-focus'));
+  navEl = el || null;
+  if (el) {
+    el.classList.add('nav-focus');
+    el.focus({ preventScroll: true });
+    el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  } else if (document.activeElement && document.activeElement !== document.body && !overlay.contains(document.activeElement)) {
+    document.activeElement.blur();
+  }
+}
+// o vizinho na direção: mais perto no eixo pedido, penalizando o desvio lateral
+function spatial(from, dir, cands) {
+  const a = from.getBoundingClientRect();
+  const ax = a.x + a.width / 2, ay = a.y + a.height / 2;
+  let best = null, bestScore = Infinity;
+  for (const el of cands) {
+    if (el === from) continue;
+    const b = el.getBoundingClientRect();
+    const dx = b.x + b.width / 2 - ax, dy = b.y + b.height / 2 - ay;
+    const main = dir === 'left' ? -dx : dir === 'right' ? dx : dir === 'up' ? -dy : dy;
+    if (main <= 4) continue;
+    const cross = dir === 'left' || dir === 'right' ? Math.abs(dy) : Math.abs(dx);
+    if (cross > main * 1.6 + 24) continue; // fora do cone da direção: não pula para o outro lado da tela
+    const score = main + cross * 2.2;
+    if (score < bestScore) { bestScore = score; best = el; }
+  }
+  return best;
+}
+function navAction(action, color) {
+  if (color) setNavColor(color);
+  if (gameRunning) { if (action === 'b' || action === 'start') exitGame(); return; }
+  const modalOpen = overlay.classList.contains('open');
+  const cardsView = !modalOpen && (currentView === 'lobby' || currentView === 'library');
+  if (action === 'lb' || action === 'rb') {
+    if (modalOpen || switching) return;
+    const i = ORDER.indexOf(currentView) + (action === 'rb' ? 1 : -1);
+    if (i >= 0 && i < ORDER.length) { setNavFocus(null); switchView(ORDER[i]); }
+    return;
+  }
+  if (action === 'y') { if (!modalOpen) addContext(); return; }
+  if (action === 'start') { if (!modalOpen) { setNavFocus(null); switchView(currentView === 'lobby' ? 'library' : 'lobby'); } return; }
+  if (action === 'b') {
+    if (modalOpen) { const back = modal.querySelector('[data-back]'); if (back) back.click(); else closeModal(); setNavFocus(null); }
+    else setNavFocus(null);
+    return;
+  }
+  const scope = modalOpen ? modal : document.querySelector('.shell');
+  const cands = navCandidates(scope);
+  const cur = navEl && cands.includes(navEl) ? navEl : null;
+  if (action === 'a') {
+    if (cur) cur.click();
+    else if (cardsView) activateFocus();
+    else setNavFocus(cands[0]);
+    return;
+  }
+  if (!cur) {
+    // nas telas de cartas, esquerda e direita andam nas cartas; cima vai para as abas, baixo para o rodapé
+    if (cardsView && (action === 'left' || action === 'right')) { moveFocus(action === 'left' ? -1 : 1); return; }
+    if (cardsView) {
+      const pick = cands.filter((el) => (action === 'up' ? el.closest('header') : !el.closest('header')));
+      setNavFocus(pick.find((el) => el.classList.contains('active')) || pick[pick.length - 1] || null);
+      return;
+    }
+    setNavFocus(cands.find((el) => el.matches('.option, .lib-row button, .pc-card, input, .tab.active')) || cands[0]);
+    return;
+  }
+  // saindo do topo para baixo (ou do rodapé para cima) volta para as cartas
+  if (cardsView && ((action === 'down' && cur.closest('header')) || (action === 'up' && !cur.closest('header')))) { setNavFocus(null); return; }
+  const next = spatial(cur, action, cands);
+  if (next) setNavFocus(next);
+}
+// o mouse retoma: o contorno do controle some no primeiro clique
+document.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse' && navEl) setNavFocus(null); }, true);
+
 const padState = {};
 function pollPads(t) {
-  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  const pads = window.__padNavExternal ? [] : navigator.getGamepads ? navigator.getGamepads() : [];
   for (const gp of pads) {
     if (!gp) continue;
-    const st = padState[gp.index] || (padState[gp.index] = { b: [], dir: 0, next: 0 });
+    const st = padState[gp.index] || (padState[gp.index] = { b: [], dir: '', next: 0 });
     const down = (i) => gp.buttons[i] && gp.buttons[i].pressed;
     const hit = (i) => down(i) && !st.b[i];
-    let dir = 0;
-    if (down(14) || gp.axes[0] < -0.6) dir = -1;
-    if (down(15) || gp.axes[0] > 0.6) dir = 1;
     const owner = seats.find((s) => s && s.gpIndex === gp.index);
+    const color = owner && owner.color;
+    let dir = '';
+    if (down(14) || gp.axes[0] < -0.6) dir = 'left';
+    else if (down(15) || gp.axes[0] > 0.6) dir = 'right';
+    else if (down(12) || gp.axes[1] < -0.6) dir = 'up';
+    else if (down(13) || gp.axes[1] > 0.6) dir = 'down';
     if (dir && (dir !== st.dir || t >= st.next)) {
-      if (owner) setNavColor(owner.color);
-      moveFocus(dir);
+      navAction(dir, color);
       st.next = t + (dir !== st.dir ? 380 : 170);
     }
     st.dir = dir;
-    if (hit(0)) { if (owner) setNavColor(owner.color); activateFocus(); }
-    if (gameRunning) {
-      if (hit(1) || hit(9)) exitGame();
-    } else {
-      if (hit(1)) closeModal();
-      if (hit(3)) addContext();
-      if (hit(9)) switchView(currentView === 'lobby' ? 'library' : 'lobby');
-    }
+    for (const [i, action] of [[0, 'a'], [1, 'b'], [3, 'y'], [4, 'lb'], [5, 'rb'], [9, 'start']]) if (hit(i)) navAction(action, color);
     st.b = gp.buttons.map((b) => b.pressed);
   }
   requestAnimationFrame(pollPads);
