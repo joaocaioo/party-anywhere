@@ -65,6 +65,11 @@ fn run(hub: &Hub, gilrs: &mut Gilrs, rx: &Receiver<Command>) {
     let mut ignored: HashSet<GamepadId> = HashSet::new();
     let mut keys: HashMap<GamepadId, DeviceKey> = HashMap::new();
     let mut effects = Vec::new();
+    // Controles Xbox: lidos direto pelo XInput (id do gilrs -> vaga do XInput, último pacote, estado). O
+    // Windows.Gaming.Input do gilrs pode não entregar os botões a um app Win32 (só "conectou"); o XInput
+    // entrega sempre. Os outros controles seguem pelos eventos do gilrs.
+    let mut xin: HashMap<GamepadId, (u32, u32, Pad)> = HashMap::new();
+    let mut remap = true;
 
     // controles já ligados quando o Hub abriu
     let initial: Vec<GamepadId> = gilrs.gamepads().map(|(id, _)| id).collect();
@@ -97,7 +102,42 @@ fn run(hub: &Hub, gilrs: &mut Gilrs, rx: &Receiver<Command>) {
         }
         effects.retain(|(t, _)| t.elapsed() < Duration::from_secs(2));
 
-        let Some(ev) = gilrs.next_event_blocking(Some(Duration::from_millis(50))) else { continue };
+        if remap {
+            remap = false;
+            let slots = xinput::physical_slots();
+            let ids: Vec<GamepadId> = keys.keys().copied().collect();
+            let old = std::mem::take(&mut xin);
+            for id in ids {
+                if let Some(slot) = xbox_rank(gilrs, &ignored, id).and_then(|r| slots.get(r).copied()) {
+                    let kept = old.get(&id).filter(|(s, _, _)| *s == slot).map(|&(_, p, pad)| (p, pad)).unwrap_or((u32::MAX, Pad::NEUTRAL));
+                    xin.insert(id, (slot, kept.0, kept.1));
+                }
+            }
+            if crate::nav::debug() {
+                eprintln!("[input] XInput: {:?}", xin.iter().map(|(id, (slot, _, _))| (*id, *slot)).collect::<Vec<_>>());
+            }
+        }
+        for (id, (slot, packet, prev)) in xin.iter_mut() {
+            let Some((p, pad)) = xinput::state(*slot) else { continue };
+            if p == *packet {
+                continue;
+            }
+            *packet = p;
+            let newly = pad.buttons & !prev.buttons;
+            *prev = pad;
+            if crate::nav::debug() && newly != 0 {
+                eprintln!("[input] XInput vaga {slot}: botões {:#06x}", pad.buttons);
+            }
+            if let Some(key) = keys.get(id) {
+                apply(hub, key, pad, newly != 0);
+            }
+        }
+
+        let wait = if xin.is_empty() { 50 } else { 4 };
+        let Some(ev) = gilrs.next_event_blocking(Some(Duration::from_millis(wait))) else { continue };
+        if crate::nav::debug() && !matches!(ev.event, EventType::AxisChanged(..)) {
+            eprintln!("[input] controle {:?}: {:?} (ignorado: {}, vaga: {:?})", ev.id, ev.event, ignored.contains(&ev.id), keys.get(&ev.id).and_then(|k| hub.lobby.lock().unwrap().seat_of_device(k)));
+        }
         if ignored.contains(&ev.id) {
             continue;
         }
@@ -109,8 +149,10 @@ fn run(hub: &Hub, gilrs: &mut Gilrs, rx: &Receiver<Command>) {
                     continue;
                 }
                 connect(hub, gilrs, ev.id, &mut keys);
+                remap = true;
             }
             EventType::Disconnected => {
+                remap = true;
                 if let Some(key) = keys.remove(&ev.id) {
                     let seat = hub.lobby.lock().unwrap().seat_of_device(&key);
                     hub.lobby.lock().unwrap().disconnected(&key, hub.now_ms());
@@ -121,25 +163,32 @@ fn run(hub: &Hub, gilrs: &mut Gilrs, rx: &Receiver<Command>) {
                 }
             }
             EventType::ButtonPressed(..) | EventType::ButtonReleased(..) | EventType::ButtonChanged(..) | EventType::AxisChanged(..) => {
+                if xin.contains_key(&ev.id) {
+                    continue; // lido pelo XInput
+                }
                 let Some(key) = keys.get(&ev.id) else { continue };
-                let pad = read_pad(gilrs, ev.id);
-                if matches!(ev.event, EventType::ButtonPressed(..)) || crate::hub::pressed(&pad) {
-                    hub.activity(key);
-                }
-                let seat = hub.lobby.lock().unwrap().seat_of_device(key);
-                match seat {
-                    Some(s) => hub.set_pad(s, pad),
-                    None if matches!(ev.event, EventType::ButtonPressed(..)) => {
-                        let joined = hub.lobby.lock().unwrap().pressed(key);
-                        if matches!(joined, Some(JoinOutcome::Joined(_) | JoinOutcome::Rejoined(_))) {
-                            hub.emit_lobby();
-                        }
-                    }
-                    None => {}
-                }
+                apply(hub, key, read_pad(gilrs, ev.id), matches!(ev.event, EventType::ButtonPressed(..)));
             }
             _ => {}
         }
+    }
+}
+
+/// Um controle mudou: vai para a vaga dele; sem vaga, apertar um botão faz entrar.
+fn apply(hub: &Hub, key: &DeviceKey, pad: Pad, newly_pressed: bool) {
+    if newly_pressed || crate::hub::pressed(&pad) {
+        hub.activity(key);
+    }
+    let seat = hub.lobby.lock().unwrap().seat_of_device(key);
+    match seat {
+        Some(s) => hub.set_pad(s, pad),
+        None if newly_pressed => {
+            let joined = hub.lobby.lock().unwrap().pressed(key);
+            if matches!(joined, Some(JoinOutcome::Joined(_) | JoinOutcome::Rejoined(_))) {
+                hub.emit_lobby();
+            }
+        }
+        None => {}
     }
 }
 
@@ -227,12 +276,20 @@ mod xinput {
         right: u16,
     }
 
+    #[repr(C)]
+    #[derive(Default)]
+    struct State {
+        packet: u32,
+        gamepad: Gamepad,
+    }
+
     type FarProc = unsafe extern "system" fn() -> isize;
     type CapsExFn = unsafe extern "system" fn(u32, u32, u32, *mut CapsEx) -> u32;
     type SetStateFn = unsafe extern "system" fn(u32, *mut Vibration) -> u32;
+    type GetStateFn = unsafe extern "system" fn(u32, *mut State) -> u32;
 
-    fn api() -> Option<&'static (CapsExFn, SetStateFn)> {
-        static API: OnceLock<Option<(CapsExFn, SetStateFn)>> = OnceLock::new();
+    fn api() -> Option<&'static (CapsExFn, SetStateFn, GetStateFn)> {
+        static API: OnceLock<Option<(CapsExFn, SetStateFn, GetStateFn)>> = OnceLock::new();
         API.get_or_init(|| unsafe {
             let lib = LoadLibraryA(c"xinput1_4.dll".as_ptr().cast());
             if lib.is_null() {
@@ -240,14 +297,56 @@ mod xinput {
             }
             let caps = GetProcAddress(lib, 108usize as *const u8)?;
             let set = GetProcAddress(lib, c"XInputSetState".as_ptr().cast())?;
-            Some((std::mem::transmute::<FarProc, CapsExFn>(caps), std::mem::transmute::<FarProc, SetStateFn>(set)))
+            let get = GetProcAddress(lib, c"XInputGetState".as_ptr().cast())?;
+            Some((
+                std::mem::transmute::<FarProc, CapsExFn>(caps),
+                std::mem::transmute::<FarProc, SetStateFn>(set),
+                std::mem::transmute::<FarProc, GetStateFn>(get),
+            ))
         })
         .as_ref()
     }
 
+    /// Estado da vaga do XInput: o número do pacote (muda a cada mudança) e o controle. Sem alocar.
+    pub fn state(slot: u32) -> Option<(u32, super::Pad)> {
+        use super::{buttons as b, deadzone};
+        let &(_, _, get) = api()?;
+        let mut s = State::default();
+        if unsafe { get(slot, &mut s) } != 0 {
+            return None;
+        }
+        let g = &s.gamepad;
+        let mut bits = 0u32;
+        for (x, bit) in [
+            (0x0001, b::UP),
+            (0x0002, b::DOWN),
+            (0x0004, b::LEFT),
+            (0x0008, b::RIGHT),
+            (0x0010, b::START),
+            (0x0020, b::BACK),
+            (0x0040, b::LS),
+            (0x0080, b::RS),
+            (0x0100, b::LB),
+            (0x0200, b::RB),
+            (0x1000, b::A),
+            (0x2000, b::B),
+            (0x4000, b::X),
+            (0x8000, b::Y),
+        ] {
+            if g.buttons & x != 0 {
+                bits |= bit;
+            }
+        }
+        let axis = |v: i16| (v as f32 / 32767.0).clamp(-1.0, 1.0);
+        let (lx, ly) = deadzone(axis(g.lx), axis(g.ly));
+        let (rx, ry) = deadzone(axis(g.rx), axis(g.ry));
+        let trig = |v: u8| if v < 30 { 0.0 } else { v as f32 / 255.0 };
+        Some((s.packet, super::Pad { buttons: bits, lx, ly, rx, ry, lt: trig(g.lt), rt: trig(g.rt) }))
+    }
+
     /// Vagas do XInput com controle de verdade (os Xbox 360 virtuais do ViGEm têm o modelo 028E).
     pub fn physical_slots() -> Vec<u32> {
-        let Some((caps_ex, _)) = api() else { return vec![] };
+        let Some((caps_ex, _, _)) = api() else { return vec![] };
         (0..4u32)
             .filter(|&slot| {
                 let mut c = CapsEx::default();
@@ -258,7 +357,7 @@ mod xinput {
 
     /// Vibra os dois motores por `ms` e para (numa thread curta: não segura a dos controles).
     pub fn rumble(slot: u32, ms: u64) {
-        let Some(&(_, set)) = api() else { return };
+        let Some(&(_, set, _)) = api() else { return };
         std::thread::spawn(move || unsafe {
             set(slot, &mut Vibration { left: 45_000, right: 30_000 });
             std::thread::sleep(std::time::Duration::from_millis(ms));
@@ -273,6 +372,9 @@ mod xinput {
         vec![]
     }
     pub fn rumble(_: u32, _: u64) {}
+    pub fn state(_: u32) -> Option<(u32, super::Pad)> {
+        None
+    }
 }
 
 fn read_pad(gilrs: &Gilrs, id: GamepadId) -> Pad {

@@ -282,6 +282,10 @@ Regras:
   analógico/direcional com repetição (380 ms, depois 170 ms) e manda ações à UI (`nav`): cima, baixo,
   esquerda, direita, A, B, Y, LB, RB, Start.
 - Só com a janela do Hub em foco e sem jogo do SDK conectado: enquanto alguém joga, os botões são do jogo.
+  "Em foco" é a janela em primeiro plano do Windows (`GetForegroundWindow`): o foco do Tauri some quando o
+  teclado está dentro da página (WebView2), isto é, depois de qualquer clique no Hub.
+- Controles Xbox são lidos direto pelo XInput (`XInputGetState`, vaga achada como na vibração); os outros, pelos
+  eventos do gilrs. `PA_DEBUG_INPUT=1` mostra no terminal o que chega de cada controle e o que a navegação vê.
 - A UI (`navAction`): nas telas de cartas, esquerda/direita andam nas cartas, cima vai para as abas, baixo
   para o rodapé; nas janelas e telas de opções, o elemento mais próximo dentro de um cone na direção. A
   confirma, B volta, LB/RB trocam de aba. No navegador (modo demonstração) a mesma função recebe a Gamepad API.

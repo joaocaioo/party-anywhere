@@ -92,15 +92,41 @@ impl SeatNav {
     }
 }
 
+/// `PA_DEBUG_INPUT=1`: o terminal mostra os eventos dos controles e o que a navegação vê (foco, jogo do SDK,
+/// botões por vaga). Para diagnosticar "apertei e nada aconteceu".
+pub fn debug() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("PA_DEBUG_INPUT").is_some())
+}
+
+/// A janela do Hub está na frente? O `is_focused` do Tauri diz "não" quando o foco do teclado está dentro da
+/// página (WebView2), isto é, logo depois de qualquer clique no Hub. Vale a janela em primeiro plano do Windows.
+fn in_front(hub: &Hub) -> bool {
+    let Some(w) = hub.app.get_webview_window("main") else { return false };
+    #[cfg(windows)]
+    if let Ok(h) = w.hwnd() {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{GetAncestor, GetForegroundWindow, GA_ROOTOWNER};
+        let fg = unsafe { GetForegroundWindow() };
+        if fg.is_null() {
+            return false;
+        }
+        let root = unsafe { GetAncestor(fg, GA_ROOTOWNER) };
+        let ours = h.0 as usize;
+        return fg as usize == ours || root as usize == ours;
+    }
+    w.is_focused().unwrap_or(false)
+}
+
 pub fn start(hub: Arc<Hub>) {
     std::thread::Builder::new()
         .name("pa-nav".into())
         .spawn(move || {
             let mut state = [SeatNav::default(); MAX_SEATS];
             let mut actions = Vec::with_capacity(8);
+            let mut last_seen = (false, false, [0u32; MAX_SEATS]);
             loop {
                 std::thread::sleep(Duration::from_millis(16));
-                let focused = hub.app.get_webview_window("main").and_then(|w| w.is_focused().ok()).unwrap_or(false);
+                let focused = in_front(&hub);
                 let pads = *hub.pads.lock().unwrap();
                 let allowed: Vec<bool> = {
                     let lobby = hub.lobby.lock().unwrap();
@@ -109,6 +135,13 @@ pub fn start(hub: Arc<Hub>) {
                         .collect()
                 };
                 let now = Instant::now();
+                if debug() {
+                    let seen = (focused, hub.game_connected.load(Ordering::Acquire), pads.map(|p| p.buttons));
+                    if seen != last_seen {
+                        eprintln!("[nav] foco: {}, jogo do SDK: {}, botões por vaga: {:?}, vagas que navegam: {:?}", seen.0, seen.1, seen.2, allowed);
+                        last_seen = seen;
+                    }
+                }
                 for i in 0..MAX_SEATS {
                     actions.clear();
                     // fora de foco ou com jogo do SDK: só acompanha o estado, sem mandar nada
@@ -117,6 +150,9 @@ pub fn start(hub: Arc<Hub>) {
                         continue;
                     }
                     for &action in &actions {
+                        if debug() {
+                            eprintln!("[nav] P{}: {:?}", i + 1, action);
+                        }
                         let _ = hub.app.emit("nav", NavEvent { action, seat: i, color: SEAT_COLORS[i] });
                     }
                 }
