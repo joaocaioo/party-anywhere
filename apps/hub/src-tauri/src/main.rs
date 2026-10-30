@@ -40,6 +40,22 @@ fn fit_to_screen(app: &tauri::App) {
     let _ = w.show();
 }
 
+/// Bibliotecas de antes da arte sob demanda guardavam a capa da Steam inteira no library.json: troca pela
+/// referência `steam:<appid>` (capa e arte larga lidas na hora), se a pessoa não editou a capa.
+fn migrate_steam_art(lib: &mut Library) -> bool {
+    let mut changed = false;
+    for e in lib.games.iter_mut().filter(|e| !e.edited) {
+        if let pa_library::Source::Pc { launch, .. } = &e.source {
+            let appid = launch.strip_prefix("steam://rungameid/");
+            if let (Some(id), true) = (appid, e.cover.as_deref().is_some_and(|c| c.starts_with("data:"))) {
+                e.cover = Some(format!("steam:{id}"));
+                changed = true;
+            }
+        }
+    }
+    changed
+}
+
 /// Jogos e Hub: confere ao abrir e a cada 6 horas (docs/UX.md, "atualização").
 const UPDATE_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
 
@@ -67,7 +83,10 @@ fn main() {
 
             let (roaming, local) = dirs();
             let path = roaming.join("library.json");
-            let (lib, note) = Library::load(&path);
+            let (mut lib, note) = Library::load(&path);
+            if migrate_steam_art(&mut lib) {
+                let _ = lib.save(&path);
+            }
             let libs = Arc::new(LibraryState {
                 lib: Mutex::new(lib),
                 path,
