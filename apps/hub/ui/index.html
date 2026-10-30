@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Party Anywhere Hub</title>
+<!-- no app a classe entra antes de desenhar: sem piscar a moldura do modo navegador -->
+<script>if (window.__TAURI__ || window.__TAURI_INTERNALS__) document.documentElement.classList.add('in-app');</script>
 <!-- tudo local (vendor/, gerado por apps/hub/tools/vendor_ui.py): o Hub funciona sem internet -->
 <link href="vendor/fonts.css" rel="stylesheet">
 <script src="vendor/qrcode.js"></script>
@@ -53,6 +55,19 @@ input { font: inherit; color: inherit; }
 
 /* ---------- moldura ---------- */
 .page { min-height: 100%; padding: 28px 28px 72px; display: flex; }
+/* no app a janela é o próprio cartão: sem a moldura do Windows, fundo transparente, cantos redondos */
+html.in-app, html.in-app body { background: transparent; }
+html.in-app .page { padding: 0; height: 100%; min-height: 0; }
+html.in-app .shell { max-width: none; margin: 0; height: 100vh; border-radius: 22px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04); }
+html.in-app.maximized .shell { border-radius: 0; border-color: transparent; }
+/* minimizar, maximizar e fechar: discretos, no fim do topo */
+.winctl { display: none; }
+html.in-app .winctl { display: flex; gap: 2px; margin-left: 6px; }
+.winctl button { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--faint); transition: background .2s, color .2s; }
+.winctl button:hover { background: rgba(255, 255, 255, .07); color: var(--text); }
+.winctl button.close:hover { background: rgba(239, 68, 68, .2); color: #fecaca; }
+.winctl svg { width: 12px; height: 12px; }
+.shell.in-library .winctl button { background: rgba(6, 14, 3, .5); }
 .shell {
   position: relative;
   flex: 1;
@@ -761,7 +776,7 @@ main { perspective: 1800px; }
     <div class="arcade-stage" id="arcadeStage" aria-hidden="true">
       <canvas id="arcadeCanvas"></canvas>
     </div>
-    <header class="top">
+    <header class="top" data-tauri-drag-region>
       <div class="logo" aria-label="Party Anywhere">
         <span class="logo-word"><b>Party</b><i>Anywhere</i></span>
       </div>
@@ -774,6 +789,11 @@ main { perspective: 1800px; }
       <div class="top-right">
         <button class="btn-soft" id="addBtn"><span data-icon="plus"></span><span class="lbl-long">Adicionar jogador</span></button>
         <button class="update" id="updatePill" aria-label="Atualizações do Hub"></button>
+        <div class="winctl" aria-label="Janela">
+          <button id="winMin" title="Minimizar" aria-label="Minimizar"><svg viewBox="0 0 12 12"><path d="M2 6h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+          <button id="winMax" title="Maximizar" aria-label="Maximizar"><svg viewBox="0 0 12 12"><rect x="2.2" y="2.2" width="7.6" height="7.6" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+          <button id="winClose" class="close" title="Fechar" aria-label="Fechar"><svg viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+        </div>
       </div>
     </header>
 

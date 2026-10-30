@@ -25,6 +25,22 @@ fn dirs() -> (PathBuf, PathBuf) {
     (base("APPDATA"), base("LOCALAPPDATA"))
 }
 
+/// A janela abre do tamanho da tela útil (sem a barra de tarefas): até 1280×820, nunca maior que 92%
+/// da área de trabalho, centralizada. Abre invisível e aparece já no tamanho certo.
+fn fit_to_screen(app: &tauri::App) {
+    let Some(w) = app.get_webview_window("main") else { return };
+    if let Ok(Some(m)) = w.current_monitor() {
+        let scale = m.scale_factor();
+        let area = m.work_area();
+        let (aw, ah) = (area.size.width as f64 / scale, area.size.height as f64 / scale);
+        let width = (aw * 0.92).clamp(860.0, 1280.0).min(aw);
+        let height = (ah * 0.92).clamp(560.0, 820.0).min(ah);
+        let _ = w.set_size(tauri::LogicalSize::new(width, height));
+        let _ = w.center();
+    }
+    let _ = w.show();
+}
+
 /// Jogos e Hub: confere ao abrir e a cada 6 horas (docs/UX.md, "atualização").
 const UPDATE_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
 
@@ -40,6 +56,7 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            fit_to_screen(app);
             let hub = hub::Hub::new(app.handle().clone());
             if let Err(e) = hub.start_phones() {
                 eprintln!("party-anywhere: celulares indisponíveis: {e}");

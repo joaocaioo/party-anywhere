@@ -9,6 +9,18 @@
   const warn = (e) => toast(String(e && e.message ? e.message : e), null, 'warn');
 
   document.documentElement.classList.add('in-app');
+
+  // janela sem moldura: os três botões do topo e os cantos retos quando maximizada
+  const win = T.window.getCurrentWindow();
+  document.getElementById('winMin').addEventListener('click', () => win.minimize());
+  document.getElementById('winMax').addEventListener('click', () => win.toggleMaximize());
+  document.getElementById('winClose').addEventListener('click', () => win.close());
+  const syncMax = () => win.isMaximized().then((m) => {
+    document.documentElement.classList.toggle('maximized', m);
+    document.getElementById('winMax').title = m ? 'Restaurar' : 'Maximizar';
+  }).catch(() => {});
+  win.onResized(syncMax);
+  syncMax();
   document.getElementById('demo')?.remove();
   document.getElementById('demoToggle')?.remove();
 
