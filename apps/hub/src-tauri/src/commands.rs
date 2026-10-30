@@ -219,8 +219,8 @@ pub fn layouts_list(hub: Hubs) -> Vec<crate::settings::Layout> {
 }
 
 #[tauri::command]
-pub fn layout_save(hub: Hubs, id: Option<String>, name: String, controls: Vec<String>) -> Result<crate::settings::Layout, String> {
-    let saved = hub.settings.lock().unwrap().upsert_layout(id.as_deref(), &name, &controls)?;
+pub fn layout_save(hub: Hubs, id: Option<String>, name: String, modes: Vec<crate::settings::Mode>) -> Result<crate::settings::Layout, String> {
+    let saved = hub.settings.lock().unwrap().upsert_layout(id.as_deref(), &name, modes)?;
     hub.save_settings();
     hub.broadcast_layouts();
     Ok(saved)

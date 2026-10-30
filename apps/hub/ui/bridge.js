@@ -189,7 +189,7 @@
   Object.assign(hubData, {
     devices: () => invoke('devices_list'),
     layouts: () => invoke('layouts_list'),
-    saveLayout: (id, name, controls) => invoke('layout_save', { id, name, controls }),
+    saveLayout: (id, name, modes) => invoke('layout_save', { id, name, modes }),
     deleteLayout: (id) => invoke('layout_delete', { id }),
     settings: () => invoke('settings_get'),
     setJoinPolicy: (on) => invoke('set_join_policy', { onButton: on }),

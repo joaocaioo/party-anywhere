@@ -52,6 +52,14 @@ body {
 }
 button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
 input { font: inherit; color: inherit; }
+/* barra de rolagem: a mesma em todo o Hub. Fina, quase invisível em repouso, verde ao passar o mouse.
+   (Sem scrollbar-width/scrollbar-color: no Chromium eles desligam estas regras.) */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb { min-height: 44px; border-radius: 999px; border: 3px solid transparent; background: rgba(255, 255, 255, .13) padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: rgba(60, 240, 96, .5); }
+::-webkit-scrollbar-thumb:active { background-color: rgba(60, 240, 96, .7); }
+::-webkit-scrollbar-button { display: none; height: 0; width: 0; }
 
 /* ---------- moldura ---------- */
 .page { min-height: 100%; padding: 28px 28px 72px; display: flex; }
@@ -415,32 +423,144 @@ main { flex: 1; display: flex; flex-direction: column; position: relative; min-h
 
 /* ---------- em breve ---------- */
 .soon { margin: auto; max-width: 520px; text-align: center; padding: 40px 24px; }
-/* Controles e Ajustes: duas colunas de cartões, rolagem própria */
-.pane { height: 100%; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-content: start; padding: 26px 32px 32px; }
-.pane-col { display: grid; gap: 18px; align-content: start; }
-.pane-card { padding: 20px; border-radius: 22px; border: 1px solid var(--line); background: rgba(255, 255, 255, .025); }
-.pane-card h3 { margin: 0 0 4px; font-family: var(--display); font-weight: 400; font-size: 20px; letter-spacing: .02em; }
-.pane-sub { margin: 0 0 14px; font-size: 13px; color: var(--muted); line-height: 1.5; }
-.setting { width: 100%; display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 16px; border: 1px solid var(--line-strong); background: rgba(255, 255, 255, .03); text-align: left; margin-top: 10px; }
-.setting.static { cursor: default; }
-.setting > span:first-child { flex: 1; min-width: 0; }
-.setting b { display: block; font-size: 14.5px; }
-.setting small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 3px; line-height: 1.45; }
-.setting .sw { width: 42px; height: 24px; border-radius: 12px; background: rgba(255, 255, 255, .14); position: relative; flex: none; transition: background .2s; }
-.setting .sw::after { content: ""; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .2s; }
-.setting.on .sw { background: var(--neon); }
-.setting.on .sw::after { transform: translateX(18px); }
-.dev .ic.kind { display: grid; place-items: center; background: rgba(255, 255, 255, .06); color: var(--text); }
-.dev .ic.kind svg { width: 22px; height: 22px; }
-.dev .wait { font-size: 12px; font-weight: 700; color: var(--faint); }
-.tag-mini { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 800; letter-spacing: .04em; color: var(--muted); background: rgba(255, 255, 255, .07); vertical-align: 1px; }
-.addr { cursor: pointer; }
-.addr.ok { border-color: rgba(60, 240, 96, .5); }
-.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 16px; }
-.chip-t { height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line-strong); background: rgba(255, 255, 255, .03); font-size: 13px; font-weight: 700; color: var(--muted); }
-.chip-t.on { border-color: rgba(60, 240, 96, .6); background: rgba(60, 240, 96, .12); color: var(--text); }
-.chip-group { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin-top: 6px; }
-@media (max-width: 960px) { .pane { grid-template-columns: 1fr; padding: 18px; } }
+/* ---------- Controles e Ajustes: uma coluna centrada, grupos de linhas (como os ajustes de um console) ---------- */
+.pane { height: 100%; overflow-y: auto; padding: 30px 32px 48px; }
+.pane-in { width: min(760px, 100%); margin: 0 auto; }
+.pane-in.wide { width: min(1040px, 100%); }
+.pane-head h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 32px; letter-spacing: .02em; text-transform: uppercase; line-height: 1; }
+.pane-head p { margin: 8px 0 0; color: var(--muted); font-size: 14px; }
+.group-label { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 30px 6px 10px; }
+.group-label > span { font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
+.group-label small { font-size: 13px; color: var(--muted); }
+.group-label small b { color: var(--text); font-weight: 600; }
+.group { border-radius: 18px; border: 1px solid var(--line); background: rgba(255, 255, 255, .025); overflow: hidden; }
+.row { width: 100%; min-height: 66px; display: flex; align-items: center; gap: 14px; padding: 13px 18px; text-align: left; position: relative; }
+.row + .row { border-top: 1px solid var(--line); }
+button.row { transition: background .15s; }
+button.row:hover { background: rgba(255, 255, 255, .035); }
+.row.nav-focus { outline-offset: -3px; }
+.row-ic { width: 38px; height: 38px; border-radius: 11px; flex: none; display: grid; place-items: center; background: rgba(255, 255, 255, .055); color: var(--muted); }
+.row-ic svg { width: 19px; height: 19px; }
+.row-ic.seat { background: color-mix(in srgb, var(--c) 16%, transparent); color: var(--c); }
+.row-t { flex: 1; min-width: 0; }
+.row-t b { display: block; font-size: 14.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-t small { display: block; margin-top: 3px; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.row-act { flex: none; display: flex; align-items: center; gap: 8px; }
+.row.empty { color: var(--muted); font-size: 14px; justify-content: center; }
+.addr-txt { font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; font-size: 13.5px; letter-spacing: -.01em; }
+.sw { width: 44px; height: 26px; border-radius: 13px; background: rgba(255, 255, 255, .14); position: relative; flex: none; transition: background .2s; }
+.sw::after { content: ""; position: absolute; left: 3px; top: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .2s; box-shadow: 0 1px 3px rgba(0, 0, 0, .4); }
+.on > .sw { background: var(--neon); }
+.on > .sw::after { transform: translateX(18px); }
+.radio { width: 20px; height: 20px; border-radius: 50%; flex: none; border: 2px solid var(--line-strong); transition: border-color .15s; }
+.on > .radio { border-color: var(--neon); background: radial-gradient(circle, var(--neon) 0 4px, transparent 5px); box-shadow: 0 0 10px rgba(60, 240, 96, .3); }
+.pill { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 11px; border-radius: 999px; flex: none; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+.pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.pill.ok { color: var(--neon); background: rgba(60, 240, 96, .1); }
+.pill.off { color: var(--muted); background: rgba(255, 255, 255, .06); }
+.pill.plain::before { display: none; }
+.btn-neon.sm { height: 32px; padding: 0 14px; font-size: 11px; }
+.tag-mini { display: inline-block; margin-left: 8px; padding: 2px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; letter-spacing: .06em; color: var(--muted); background: rgba(255, 255, 255, .07); vertical-align: 2px; }
+.seat-tag.sm { min-width: 38px; height: 26px; padding: 0 10px; font-size: 14px; }
+@media (max-width: 720px) { .pane { padding: 20px 16px 36px; } .row { flex-wrap: wrap; } .row-act { margin-left: 52px; } }
+
+/* cartões de layout: a tela do celular em miniatura */
+.lay-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
+.lay-card { display: flex; flex-direction: column; gap: 14px; padding: 14px; border-radius: 20px; border: 1px solid var(--line); background: rgba(255, 255, 255, .025); text-align: left; }
+.lay-meta { display: flex; align-items: center; gap: 10px; padding: 0 4px; }
+.lay-meta .row-t b { font-size: 15px; }
+.lay-card.new { align-items: center; justify-content: center; gap: 8px; min-height: 190px; border-style: dashed; border-color: var(--line-strong); color: var(--muted); transition: border-color .2s, color .2s, background .2s; }
+.lay-card.new:hover { border-color: rgba(60, 240, 96, .5); color: var(--text); background: rgba(60, 240, 96, .04); }
+.lay-card.new .plus { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: rgba(60, 240, 96, .12); color: var(--neon); }
+.lay-card.new .plus svg { width: 20px; height: 20px; }
+.lay-card.new b { color: var(--text); font-size: 15px; }
+.lay-card.new small { font-size: 12.5px; text-align: center; max-width: 220px; line-height: 1.45; }
+
+/* ---------- tela do celular (miniatura, editor) ----------
+   Uma tela de referência deitada, proporção CANVAS (2,17). Peças: centro (x, y) em 0..1 e tamanho em
+   unidades da altura (--u), os mesmos números de settings.rs. */
+.phone { padding: 7px 12px; border-radius: 18px; background: #08090b; border: 1px solid var(--line-strong); box-shadow: inset 0 0 0 3px #111216; }
+.phone-bar { display: flex; align-items: center; gap: 6px; height: 14px; padding: 0 2px 4px; }
+.phone-bar i { width: 10px; height: 10px; border-radius: 50%; background: var(--neon); opacity: .8; }
+.phone-bar em { width: 40px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .12); }
+.phone-bar .lseg { margin-left: auto; }
+.phone-bar u { margin-left: auto; width: 30px; height: 9px; border-radius: 5px; border: 1px solid rgba(255, 255, 255, .16); }
+.phone-bar .lseg + u { margin-left: 0; }
+.phone-screen { position: relative; width: 100%; aspect-ratio: 2.17; container-type: inline-size; }
+.pz {
+  --u: calc(100cqw / 2.17);
+  position: absolute; display: grid; place-items: center; padding: 0;
+  font-weight: 900; color: var(--muted); line-height: 1; user-select: none;
+}
+.pz.face { border-radius: 50%; border: max(1px, calc(var(--u) * .008)) solid color-mix(in srgb, var(--c) 70%, transparent); background: color-mix(in srgb, var(--c) 18%, #15161a); color: var(--c); font-size: calc(var(--u) * .08 * var(--s)); }
+.pz.sh { border-radius: calc(var(--u) * .035); border: 1px solid rgba(255, 255, 255, .12); background: #1a1b20; font-size: calc(var(--u) * .05 * var(--s)); }
+.pz.sm { border-radius: 999px; border: 1px solid rgba(255, 255, 255, .12); background: #1a1b20; font-size: calc(var(--u) * .036 * var(--s)); letter-spacing: .04em; }
+.pz.stick { border-radius: 50%; border: max(1px, calc(var(--u) * .006)) dashed rgba(255, 255, 255, .2); background: rgba(255, 255, 255, .025); }
+.pz.stick i { width: 44%; height: 44%; border-radius: 50%; background: color-mix(in srgb, var(--neon) 55%, #15161a); box-shadow: 0 0 calc(var(--u) * .06) rgba(60, 240, 96, .35); display: grid; place-items: center; font-style: normal; font-size: calc(var(--u) * .05 * var(--s)); color: rgba(0, 0, 0, .7); }
+.pz.dpad { display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); gap: 4%; }
+.pz.dpad i { border-radius: 18%; background: #1a1b20; border: 1px solid rgba(255, 255, 255, .12); }
+
+
+/* ---------- editor de layout ---------- */
+.modal.wide { width: min(1200px, 100%); }
+.le { display: grid; gap: 18px; }
+.le-top { display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; }
+.le-cap { display: block; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); margin-bottom: 8px; }
+.le-field { display: grid; flex: 0 1 280px; }
+.le-field input { height: 42px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line-strong); background: rgba(0, 0, 0, .3); font-size: 15px; font-weight: 500; outline: none; }
+.le-field input:focus { border-color: rgba(60, 240, 96, .6); box-shadow: 0 0 0 3px rgba(60, 240, 96, .12); }
+.le-modes { flex: 1 1 360px; min-width: 0; }
+.lseg { display: inline-flex; align-items: center; gap: 4px; padding: 4px; border-radius: 999px; border: 1px solid var(--line-strong); background: rgba(0, 0, 0, .25); max-width: 100%; overflow-x: auto; }
+.lseg button { height: 32px; padding: 0 14px; border-radius: 999px; font-size: 12.5px; font-weight: 700; color: var(--muted); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.lseg button:hover { color: var(--text); }
+.lseg button.on { background: rgba(60, 240, 96, .14); color: var(--neon); }
+.lseg button.mode-add { color: var(--faint); }
+.lseg button.mode-add svg { width: 13px; height: 13px; }
+.lseg.mini { padding: 2px; gap: 2px; border-color: rgba(255, 255, 255, .1); }
+.lseg.mini span { height: 9px; padding: 0 5px; border-radius: 999px; font-size: 6px; font-weight: 800; color: var(--muted); display: grid; place-items: center; }
+.lseg.mini span.on { background: rgba(60, 240, 96, .2); color: var(--neon); }
+.le-mode-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+.le-mode-row input { height: 34px; width: 180px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line-strong); background: rgba(0, 0, 0, .3); font-size: 13.5px; outline: none; }
+.le-mode-row input:focus { border-color: rgba(60, 240, 96, .6); }
+.le-hint { font-size: 12.5px; color: var(--muted); line-height: 1.45; margin-top: 8px; }
+.le-main { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 22px; align-items: start; }
+.le-stage { display: grid; gap: 12px; min-width: 0; }
+.le-stage .phone { width: min(100%, max(420px, calc((100vh - 510px) * 2.17 + 52px))); justify-self: center; padding: 14px 26px; border-radius: 34px; box-shadow: inset 0 0 0 5px #111216, 0 20px 60px rgba(0, 0, 0, .45); }
+.le-stage .phone-bar { height: 26px; gap: 10px; padding-bottom: 8px; }
+.le-stage .phone-bar i { width: 18px; height: 18px; }
+.le-stage .phone-bar em { width: 90px; height: 8px; }
+.le-stage .phone-bar u { width: 60px; height: 18px; border-radius: 9px; }
+.le-stage .phone-bar .lseg.mini span { height: 18px; padding: 0 10px; font-size: 10px; }
+.le-stage .phone-bar .lseg.mini { padding: 3px; }
+.phone-screen.edit { border-radius: 10px; background-color: rgba(255, 255, 255, .012); background-image: radial-gradient(rgba(255, 255, 255, .07) 1px, transparent 1.4px); background-size: calc(100% / 27.125) calc(100% / 12.5); touch-action: none; }
+.phone-screen.edit .pz { cursor: grab; touch-action: none; transition: box-shadow .15s, opacity .15s; }
+.phone-screen.edit .pz:active { cursor: grabbing; }
+.phone-screen.edit .pz.sel { outline: 2px solid var(--neon); outline-offset: 3px; z-index: 2; }
+.phone-screen.edit .pz.bad { outline: 2px solid var(--danger); outline-offset: 2px; box-shadow: 0 0 0 6px rgba(255, 90, 95, .16); }
+.phone-screen.edit .pz.leaving { opacity: .3; }
+.phone-screen.drop { box-shadow: inset 0 0 0 2px rgba(60, 240, 96, .45); }
+.pz.ghost { position: fixed; z-index: 300; pointer-events: none; opacity: .92; transform: translate(-50%, -50%); }
+.pz.ghost.out { opacity: .45; }
+.le-tools { min-height: 44px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 0 4px; font-size: 13px; color: var(--muted); }
+.le-tools b { color: var(--text); font-size: 14px; }
+.le-tools kbd { font: 700 11px Inter, sans-serif; padding: 2px 6px; border-radius: 5px; border: 1px solid var(--line-strong); color: var(--text); }
+.le-side { display: grid; gap: 18px; align-content: start; }
+.pal-group { display: flex; flex-wrap: wrap; gap: 6px; }
+.pal-group + .le-cap { margin-top: 12px; }
+.pal { height: 34px; padding: 0 12px 0 8px; border-radius: 10px; border: 1px solid var(--line-strong); background: rgba(255, 255, 255, .03); font-size: 12.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 7px; cursor: grab; touch-action: none; transition: border-color .15s, background .15s; }
+.pal:hover { border-color: rgba(60, 240, 96, .5); background: rgba(60, 240, 96, .06); }
+.pal .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--c, rgba(255, 255, 255, .25)); flex: none; }
+.pal .dot.sq { border-radius: 4px; }
+.pal.used { opacity: .38; cursor: default; }
+.pal.used:hover { border-color: var(--line-strong); background: rgba(255, 255, 255, .03); }
+.le-tpl { display: flex; flex-wrap: wrap; gap: 6px; }
+.le-foot { position: sticky; bottom: -30px; z-index: 3; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 -30px -30px; padding: 16px 30px 22px; border-top: 1px solid var(--line); background: #15161a; border-radius: 0 0 28px 28px; }
+.le-status { flex: 1; min-width: 220px; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.le-status svg { width: 16px; height: 16px; flex: none; }
+.le-status.ok { color: var(--neon); }
+.le-status.bad { color: var(--danger); }
+.btn-neon:disabled { opacity: .4; cursor: default; filter: grayscale(.4); box-shadow: none; }
+@media (max-width: 980px) { .le-main { grid-template-columns: 1fr; } .le-side { grid-template-columns: 1fr 1fr; } }
 .soon h2 { font-family: var(--display); font-weight: 400; font-size: 28px; margin: 0 0 12px; }
 .soon p { color: var(--muted); line-height: 1.6; }
 .soon ul { text-align: left; color: var(--muted); line-height: 1.9; margin: 18px auto 0; display: inline-block; }
@@ -502,7 +622,6 @@ main { flex: 1; display: flex; flex-direction: column; position: relative; min-h
 .scan-search { height: 38px; width: 200px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line-strong); background: rgba(0, 0, 0, .3); outline: none; }
 .scan-search:focus { border-color: rgba(60, 240, 96, .6); }
 .pc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 14px; max-height: 48vh; overflow: auto; padding: 2px; }
-.pc-grid { scrollbar-width: thin; scrollbar-color: rgba(60, 240, 96, .35) transparent; }
 .pc-card { position: relative; text-align: left; border-radius: 14px; overflow: hidden; background: #101411; border: 2px solid transparent; transition: border-color .2s, transform .2s; }
 .pc-card:not(:disabled):hover { transform: translateY(-2px); border-color: var(--line-strong); }
 .pc-card.on { border-color: var(--lime); }
@@ -529,7 +648,7 @@ main { flex: 1; display: flex; flex-direction: column; position: relative; min-h
 .seg-btn { height: 32px; padding: 0 16px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--muted); display: inline-flex; align-items: center; gap: 8px; }
 .seg-btn.on { color: var(--neon); background: rgba(60, 240, 96, .12); }
 .seg-count { font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px; background: rgba(255, 255, 255, .08); }
-.lib-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 50vh; overflow: auto; scrollbar-width: thin; scrollbar-color: rgba(60, 240, 96, .35) transparent; }
+.lib-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 50vh; overflow: auto; }
 .lib-row { display: grid; grid-template-columns: 14px 28px 42px 1fr auto auto; align-items: center; gap: 12px; padding: 8px 10px 8px 12px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255, 255, 255, .025); cursor: grab; transition: border-color .2s, background .2s; }
 .lib-row:hover, .lib-row:focus-visible { border-color: var(--line-strong); background: rgba(255, 255, 255, .045); outline: none; }
 .lib-row.dragging { opacity: .45; }
@@ -872,50 +991,31 @@ main { perspective: 1800px; }
         </div>
       </section>
 
-      <!-- EM BREVE -->
       <section class="view" id="view-controls">
-        <div class="pane">
-          <div class="pane-col">
-            <div class="pane-card">
-              <h3>Conectados agora</h3>
-              <p class="pane-sub">Controles, celulares e teclados que o Hub está vendo.</p>
-              <div class="found" id="devList"></div>
-            </div>
-          </div>
-          <div class="pane-col">
-            <div class="pane-card">
-              <h3>Controle do celular</h3>
-              <p class="pane-sub">Cada pessoa escolhe o seu no celular, <b>segurando o botão Menu</b>.</p>
-              <div class="found" id="layoutRows"></div>
-              <button class="btn-ghost" id="newLayout" style="margin-top:14px"><span data-icon="plus"></span>Criar layout</button>
-            </div>
-          </div>
-        </div>
+        <div class="pane"><div class="pane-in wide">
+          <header class="pane-head"><h2>Controles</h2><p>Quem o Hub está vendo agora e como fica o controle no celular.</p></header>
+          <div class="group-label"><span>Conectados agora</span><small id="devCount"></small></div>
+          <div class="group" id="devList"></div>
+          <div class="group-label"><span>Controle do celular</span><small>Cada pessoa escolhe o seu no celular, <b>segurando o botão Menu</b>.</small></div>
+          <div class="lay-grid" id="layoutRows"></div>
+        </div></div>
       </section>
       <section class="view" id="view-settings">
-        <div class="pane">
-          <div class="pane-col">
-            <div class="pane-card">
-              <h3>Entrar no lobby</h3>
-              <button class="setting" id="setJoin"><span><b>Entrar só ao apertar um botão</b><small>Controles ligados ficam esperando até alguém apertar algo. Bom quando há controles parados na sala.</small></span><span class="sw"></span></button>
-            </div>
-            <div class="pane-card">
-              <h3>Celulares</h3>
-              <p class="pane-sub">O endereço que vai no QR. Se o celular não conecta, tente outro.</p>
-              <div class="found" id="addrList"></div>
-            </div>
+        <div class="pane"><div class="pane-in">
+          <header class="pane-head"><h2>Ajustes</h2><p>Tudo funciona sem mexer aqui. Mude só se precisar.</p></header>
+          <div class="group-label"><span>Lobby</span></div>
+          <div class="group">
+            <button class="row" id="setJoin"><span class="row-ic"><span data-icon="pad"></span></span><span class="row-t"><b>Entrar só ao apertar um botão</b><small>Controles ligados esperam alguém apertar algo. Bom quando há controles parados na sala.</small></span><span class="sw"></span></button>
           </div>
-          <div class="pane-col">
-            <div class="pane-card">
-              <h3>Jogos comuns (Modo Universal)</h3>
-              <div id="virtualBox"></div>
-            </div>
-            <div class="pane-card">
-              <h3>Atualizações</h3>
-              <div class="setting static"><span><b id="verTxt">Party Anywhere</b><small id="verSub">O Hub procura sozinho ao abrir e a cada 6 horas.</small></span><button class="btn-ghost sm" id="checkUpd">Procurar agora</button></div>
-            </div>
+          <div class="group-label"><span>Endereço do QR</span><small>Se o celular não conecta, tente outro.</small></div>
+          <div class="group" id="addrList"></div>
+          <div class="group-label"><span>Jogos comuns</span><small>Steam, Epic ou qualquer .exe.</small></div>
+          <div class="group" id="virtualBox"></div>
+          <div class="group-label"><span>Sobre</span></div>
+          <div class="group">
+            <div class="row"><span class="row-ic"><span data-icon="sparkle"></span></span><span class="row-t"><b id="verTxt">Party Anywhere</b><small id="verSub">O Hub procura atualizações sozinho ao abrir e a cada 6 horas.</small></span><span class="row-act"><button class="btn-ghost sm" id="checkUpd">Procurar agora</button></span></div>
           </div>
-        </div>
+        </div></div>
       </section>
     </main>
   </div>
@@ -1349,8 +1449,9 @@ const overlay = document.getElementById('overlay');
 const modal = document.getElementById('modal');
 let modalCleanup = null;
 
-function openModal(html, onOpen) {
+function openModal(html, onOpen, cls = '') {
   if (modalCleanup) { modalCleanup(); modalCleanup = null; }
+  modal.className = 'modal' + (cls ? ' ' + cls : '');
   modal.innerHTML = html;
   overlay.classList.add('open');
   if (onOpen) modalCleanup = onOpen() || null;
@@ -1359,7 +1460,7 @@ function closeModal() {
   if (modalCleanup) { modalCleanup(); modalCleanup = null; }
   overlay.classList.remove('open');
 }
-overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+overlay.addEventListener('click', (e) => { if (e.target === overlay && !modal.classList.contains('sticky')) closeModal(); });
 modal.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) closeModal(); });
 
 function head(title, sub, back) {
@@ -2517,22 +2618,48 @@ const coverAttrs = (src) => `${/^https?:/.test(src) ? 'crossorigin="anonymous" '
 // Controles e Ajustes. `hubData` é a fonte dos dados: no navegador, demonstração; no app, bridge.js troca
 // pelo núcleo. As telas são as mesmas nos dois.
 // ===================================================================================
-const PIECES = [
-  ['Analógicos e setas', [['stickL', 'Analógico esquerdo'], ['stickR', 'Analógico direito'], ['dpad', 'Setas']]],
-  ['Botões', [['A', 'A'], ['B', 'B'], ['X', 'X'], ['Y', 'Y']]],
-  ['Ombros e gatilhos', [['LB', 'LB'], ['RB', 'RB'], ['LT', 'LT'], ['RT', 'RT']]],
-  ['Centro', [['BACK', 'Voltar'], ['START', 'Start'], ['LS', 'L3'], ['RS', 'R3']]],
+// Peças do controle do celular. Tela de referência deitada com proporção CANVAS; tamanhos em unidades da
+// altura dela. Os mesmos números de apps/hub/src-tauri/src/settings.rs (quem valida de verdade é o núcleo).
+const CANVAS = 2.17;
+const FACE = { A: '#22c55e', B: '#ef4444', X: '#3b82f6', Y: '#eab308' };
+const PIECE_DEF = {
+  stickL: { w: .5, h: .5, type: 'stick', label: 'Analógico esquerdo', short: 'L' },
+  stickR: { w: .36, h: .36, type: 'stick', label: 'Analógico direito', short: 'R' },
+  dpad: { w: .36, h: .36, type: 'dpad', label: 'Setas' },
+  A: { w: .2, h: .2, type: 'face', label: 'A' },
+  B: { w: .2, h: .2, type: 'face', label: 'B' },
+  X: { w: .2, h: .2, type: 'face', label: 'X' },
+  Y: { w: .2, h: .2, type: 'face', label: 'Y' },
+  LB: { w: .36, h: .14, type: 'sh', label: 'LB' },
+  RB: { w: .36, h: .14, type: 'sh', label: 'RB' },
+  LT: { w: .36, h: .14, type: 'sh', label: 'LT' },
+  RT: { w: .36, h: .14, type: 'sh', label: 'RT' },
+  BACK: { w: .2, h: .11, type: 'sm', label: 'Voltar', short: 'VOLTAR' },
+  START: { w: .2, h: .11, type: 'sm', label: 'Start', short: 'START' },
+  LS: { w: .2, h: .11, type: 'sm', label: 'L3 (apertar o analógico)', short: 'L3' },
+  RS: { w: .2, h: .11, type: 'sm', label: 'R3 (apertar o analógico)', short: 'R3' },
+};
+const PIECE_GROUPS = [['Analógicos e setas', ['stickL', 'stickR', 'dpad']], ['Botões', ['A', 'B', 'X', 'Y']], ['Ombros e gatilhos', ['LB', 'RB', 'LT', 'RT']], ['Centro', ['BACK', 'START', 'LS', 'RS']]];
+const SIZES = [['P', .8], ['M', 1], ['G', 1.25]];
+const GRID = .02;
+const P = (kind, xu, y, s = 1) => ({ kind, x: xu / CANVAS, y, s });
+const ADVANCED_PIECES = [
+  P('LT', .24, .09), P('LB', .64, .09), P('RB', 1.53, .09), P('RT', 1.93, .09),
+  P('stickL', .36, .44), P('dpad', .8, .8),
+  P('BACK', 1.085, .3), P('START', 1.085, .43), P('LS', 1.085, .62), P('RS', 1.085, .75),
+  P('Y', 1.62, .28), P('X', 1.42, .48), P('B', 1.82, .48), P('A', 1.62, .68), P('stickR', 1.91, .8),
 ];
+const SIMPLE_PIECES = [P('stickL', .5, .52, 1.25), P('START', 1.085, .52), P('Y', 1.7, .29, 1.25), P('X', 1.44, .55, 1.25), P('B', 1.96, .55, 1.25), P('A', 1.7, .81, 1.25)];
 const demoLayouts = [
-  { id: 'simple', name: 'Simples', controls: ['stickL', 'A', 'B', 'START'], builtin: true },
-  { id: 'advanced', name: 'Avançado', controls: PIECES.flatMap(([, g]) => g.map(([id]) => id)), builtin: true },
+  { id: 'simple', name: 'Simples', modes: [{ name: 'Padrão', pieces: SIMPLE_PIECES }], builtin: true },
+  { id: 'advanced', name: 'Avançado', modes: [{ name: 'Padrão', pieces: ADVANCED_PIECES }], builtin: true },
 ];
 const demoSettings = { joinOnButton: false, preferredIp: null, joinUrl: JOIN_URL, virtualPads: false, version: '0.1.0' };
 const hubData = {
   devices: async () => seats.filter(Boolean).map((x) => ({ key: x.deviceKey, kind: x.kind, deviceName: x.deviceName, via: x.via, battery: x.battery, ping: typeof x.ping === 'number' ? x.ping : null, seat: x.index, layout: x.kind === 'phone' ? 'advanced' : null })),
   layouts: async () => demoLayouts,
-  saveLayout: async (id, name, controls) => {
-    const l = { id: id || 'custom-' + Date.now(), name, controls, builtin: false };
+  saveLayout: async (id, name, modes) => {
+    const l = { id: id || 'custom-' + Date.now(), name, modes, builtin: false };
     const i = demoLayouts.findIndex((x) => x.id === l.id);
     if (i >= 0) demoLayouts[i] = l; else demoLayouts.push(l);
     return l;
@@ -2547,71 +2674,375 @@ const hubData = {
   checkUpdate: async () => { updatePill.click(); },
 };
 
-const describePieces = (c) => {
-  const names = { stickL: 'analógico', stickR: '2º analógico', dpad: 'setas', LT: 'gatilhos', LB: 'ombros' };
-  return [['A', 'B', 'X', 'Y'].filter((b) => c.includes(b)).join(' '), ...Object.keys(names).filter((k) => c.includes(k)).map((k) => names[k])].filter(Boolean).join(' · ');
+const pieceBox = (p) => {
+  const d = PIECE_DEF[p.kind], w = d.w * p.s, h = d.h * p.s, cx = p.x * CANVAS;
+  return { x0: cx - w / 2, y0: p.y - h / 2, x1: cx + w / 2, y1: p.y + h / 2, w, h };
+};
+const overlaps = (a, b) => {
+  const A = pieceBox(a), B = pieceBox(b), t = .005;
+  return A.x0 < B.x1 - t && B.x0 < A.x1 - t && A.y0 < B.y1 - t && B.y0 < A.y1 - t;
+};
+const posStyle = (p) => {
+  const b = pieceBox(p);
+  return `left:${(b.x0 / CANVAS) * 100}%;top:${b.y0 * 100}%;width:${(b.w / CANVAS) * 100}%;height:${b.h * 100}%;--s:${p.s}`;
+};
+// uma peça desenhada como no celular; `tag` = button no editor, span na miniatura
+function pieceHtml(p, i, tag = 'span') {
+  const d = PIECE_DEF[p.kind];
+  const inner = d.type === 'dpad' ? '<i style="grid-area:1/2"></i><i style="grid-area:2/1"></i><i style="grid-area:2/3"></i><i style="grid-area:3/2"></i>'
+    : d.type === 'stick' ? `<i>${d.short}</i>` : escapeHtml(d.short || d.label);
+  const c = FACE[p.kind] ? `;--c:${FACE[p.kind]}` : '';
+  const attrs = tag === 'button' ? ` type="button" data-i="${i}" aria-label="${escapeHtml(d.label)}" title="${escapeHtml(d.label)}"` : '';
+  return `<${tag} class="pz ${d.type}"${attrs} style="${posStyle(p)}${c}">${inner}</${tag}>`;
+}
+// a barra de cima do celular (bolinha do jogador, nome, modos, menu), em miniatura
+const phoneBar = (modes, current = 0) => `<div class="phone-bar"><i></i><em></em>${modes.length > 1 ? `<span class="lseg mini">${modes.map((m, i) => `<span class="${i === current ? 'on' : ''}">${escapeHtml(m.name)}</span>`).join('')}</span>` : ''}<u></u></div>`;
+const miniPhone = (l) => `<div class="phone">${phoneBar(l.modes)}<div class="phone-screen">${(l.modes[0]?.pieces || []).map((p, i) => pieceHtml(p, i)).join('')}</div></div>`;
+
+const describeLayout = (l) => {
+  if (l.modes.length > 1) return `${l.modes.length} modos: ${l.modes.map((m) => m.name).join(', ')}`;
+  const n = l.modes[0]?.pieces.length || 0;
+  return `${n} ${n === 1 ? 'peça' : 'peças'}`;
 };
 
 async function renderControls() {
   const [devs, layouts] = await Promise.all([hubData.devices(), hubData.layouts()]);
-  const devList = document.getElementById('devList');
   const kindIcon = { phone: 'phone', keyboard: 'keyboard', gamepad: 'pad' };
-  devList.innerHTML = devs.length ? devs.map((d) => {
+  const inSeat = devs.filter((d) => d.seat != null).length;
+  document.getElementById('devCount').textContent = devs.length ? `${inSeat} jogando${devs.length > inSeat ? ` · ${devs.length - inSeat} esperando` : ''}` : '';
+  document.getElementById('devList').innerHTML = devs.length ? devs.map((d) => {
     const seat = d.seat != null ? seats[d.seat] : null;
-    const color = seat ? seat.color : COLORS[d.seat] || '#666';
+    const color = seat ? seat.color : COLORS[d.seat] || '#9b9ca5';
     const layout = d.layout ? layouts.find((l) => l.id === d.layout) : null;
-    const info = [d.via, d.battery != null ? `${d.battery}%` : '', d.ping != null ? `${d.ping} ms` : '', layout ? `controle ${layout.name}` : ''].filter(Boolean).join(' · ');
+    const info = [d.via, d.battery != null ? `bateria ${d.battery}%` : '', d.ping != null ? `${d.ping} ms` : '', layout ? `controle ${layout.name}` : ''].filter(Boolean).join(' · ');
     const act = d.seat != null
-      ? `<span class="seat-tag" style="--c:${color}">P${d.seat + 1}</span><button class="btn-ghost sm" data-identify-seat="${d.seat}">Identificar</button>`
-      : `<span class="wait">${d.kind === 'keyboard' ? 'Adicionar jogador → Teclado' : 'Esperando um botão'}</span>`;
-    return `<div class="dev"><span class="ic kind">${icon(kindIcon[d.kind] || 'pad')}</span><div class="t"><b>${escapeHtml(d.deviceName || 'Aparelho')}</b><small>${escapeHtml(info)}</small></div><div class="act" style="display:flex;gap:8px;align-items:center">${act}</div></div>`;
-  }).join('') : '<div class="found-empty">Nenhum aparelho ainda. Ligue um controle ou escaneie o QR no Lobby.</div>';
-  document.getElementById('layoutRows').innerHTML = layouts.map((l) => `
-    <div class="dev"><div class="t"><b>${escapeHtml(l.name)}${l.builtin ? '<span class="tag-mini">PRONTO</span>' : ''}</b><small>${escapeHtml(describePieces(l.controls))}</small></div>
-    <div class="act" style="display:flex;gap:6px">${l.builtin ? '' : `<button class="btn-ghost sm" data-edit-layout="${escapeHtml(l.id)}">Editar</button><button class="icon-btn sm" data-del-layout="${escapeHtml(l.id)}" title="Apagar" aria-label="Apagar ${escapeHtml(l.name)}">${icon('close')}</button>`}</div></div>`).join('');
+      ? `<button class="btn-ghost sm" data-identify-seat="${d.seat}">Identificar</button><span class="seat-tag sm" style="--c:${color}">P${d.seat + 1}</span>`
+      : `<span class="pill off plain">${d.kind === 'keyboard' ? 'Adicionar jogador → Teclado' : 'Esperando um botão'}</span>`;
+    return `<div class="row"><span class="row-ic${seat ? ' seat' : ''}" style="--c:${color}">${icon(kindIcon[d.kind] || 'pad')}</span><span class="row-t"><b>${escapeHtml(d.deviceName || 'Aparelho')}</b><small>${escapeHtml(info)}</small></span><span class="row-act">${act}</span></div>`;
+  }).join('') : '<div class="row empty">Nenhum aparelho ainda. Ligue um controle ou escaneie o QR no Lobby.</div>';
+  const usedBy = (id) => devs.filter((d) => d.layout === id && d.seat != null).map((d) => `P${d.seat + 1}`);
+  document.getElementById('layoutRows').innerHTML = layouts.map((l) => {
+    const users = usedBy(l.id);
+    const acts = l.builtin
+      ? `<button class="btn-ghost sm" data-dup-layout="${escapeHtml(l.id)}">Duplicar</button>`
+      : `<button class="btn-ghost sm" data-edit-layout="${escapeHtml(l.id)}">Editar</button><button class="icon-btn sm" data-del-layout="${escapeHtml(l.id)}" title="Apagar" aria-label="Apagar ${escapeHtml(l.name)}">${icon('close')}</button>`;
+    return `<div class="lay-card">${miniPhone(l)}<div class="lay-meta"><span class="row-t"><b>${escapeHtml(l.name)}${l.builtin ? '<span class="tag-mini">PRONTO</span>' : ''}</b><small>${escapeHtml(describeLayout(l))}${users.length ? ` · em uso: ${users.join(', ')}` : ''}</small></span><span class="row-act">${acts}</span></div></div>`;
+  }).join('') + `<button class="lay-card new" data-new-layout><span class="plus">${icon('plus')}</span><b>Criar layout</b><small>Monte o controle arrastando as peças para a tela do celular.</small></button>`;
 }
 document.getElementById('view-controls').addEventListener('click', async (e) => {
   const idf = e.target.closest('[data-identify-seat]');
   if (idf) { identify(+idf.dataset.identifySeat); return; }
-  const ed = e.target.closest('[data-edit-layout]');
-  if (ed) { const l = (await hubData.layouts()).find((x) => x.id === ed.dataset.editLayout); if (l) openLayoutEditor(l); return; }
+  if (e.target.closest('[data-new-layout]')) { openLayoutEditor(null, (await hubData.layouts()).find((l) => l.id === 'simple')); return; }
+  const ed = e.target.closest('[data-edit-layout], [data-dup-layout]');
+  if (ed) {
+    const id = ed.dataset.editLayout || ed.dataset.dupLayout;
+    const l = (await hubData.layouts()).find((x) => x.id === id);
+    if (l) openLayoutEditor(ed.dataset.editLayout ? l : null, l);
+    return;
+  }
   const del = e.target.closest('[data-del-layout]');
   if (del) {
     const l = (await hubData.layouts()).find((x) => x.id === del.dataset.delLayout);
     if (l && (await hubData.deleteLayout(l.id))) { toast(`Layout ${l.name} apagado. Quem usava volta para o Avançado.`, null, 'ok'); renderControls(); }
   }
 });
-document.getElementById('newLayout').addEventListener('click', () => openLayoutEditor(null));
 
-function openLayoutEditor(layout) {
-  const picked = new Set(layout ? layout.controls : ['stickL', 'A', 'B', 'START']);
-  openModal(`${head(layout ? 'Editar layout' : 'Criar layout', 'Escolha as peças do controle do celular. Elas se ajustam sozinhas na tela, sem sobrepor.')}
-    <form id="layoutForm">
-      <div class="edit-fields"><label>Nome<input name="name" maxlength="24" required value="${escapeHtml(layout ? layout.name : '')}" placeholder="Ex.: Corrida, Luta, Tiro"></label></div>
-      ${PIECES.map(([group, list]) => `<div class="chip-group">${group}</div><div class="chips">${list.map(([id, label]) => `<button type="button" class="chip-t${picked.has(id) ? ' on' : ''}" data-piece="${id}">${label}</button>`).join('')}</div>`).join('')}
-      <div class="edit-actions"><button class="btn-neon" type="submit">${icon('check')}Salvar</button><button type="button" class="btn-ghost" data-close>Cancelar</button><span id="layoutErr" style="color:var(--danger);font-size:13px"></span></div>
-    </form>`, () => {
-    const form = document.getElementById('layoutForm');
-    form.addEventListener('click', (e) => {
-      const c = e.target.closest('[data-piece]');
-      if (!c) return;
-      if (picked.has(c.dataset.piece)) picked.delete(c.dataset.piece); else picked.add(c.dataset.piece);
-      c.classList.toggle('on', picked.has(c.dataset.piece));
+// O que falta para o modo poder ir aos celulares (o núcleo confere de novo ao salvar).
+function modeProblems(m) {
+  const out = [], bad = new Set();
+  m.pieces.forEach((a, i) => m.pieces.slice(i + 1).forEach((b, k) => {
+    if (overlaps(a, b)) { bad.add(i); bad.add(i + 1 + k); out.push(`${PIECE_DEF[a.kind].label} e ${PIECE_DEF[b.kind].label} estão uma em cima da outra`); }
+  }));
+  const kinds = m.pieces.map((p) => p.kind);
+  if (!kinds.some((k) => k === 'stickL' || k === 'stickR' || k === 'dpad')) out.push('falta um analógico ou as setas');
+  if (!kinds.some((k) => FACE[k])) out.push('falta ao menos um botão (A, B, X ou Y)');
+  if (!m.name.trim()) out.push('dê um nome a este modo');
+  return { out, bad };
+}
+
+// Editor: a tela do celular com as peças; arrastar da lista para a tela, arrastar para mover, arrastar
+// para fora para tirar. Modos (ex.: A pé e Veículo) para jogos que mudam os comandos.
+function openLayoutEditor(layout, base) {
+  const clone = (x) => JSON.parse(JSON.stringify(x));
+  const src = layout || base;
+  const st = {
+    name: layout ? layout.name : base && !base.builtin ? `${base.name} (cópia)`.slice(0, 24) : '',
+    modes: src ? clone(src.modes) : [{ name: 'Padrão', pieces: clone(SIMPLE_PIECES) }],
+    m: 0,
+    sel: null,
+  };
+  if (!layout && base && base.builtin && base.id !== 'simple') st.name = `Meu ${base.name}`.slice(0, 24);
+  const cur = () => st.modes[st.m];
+  const title = layout ? 'Editar layout' : 'Criar layout';
+  openModal(`${head(title, 'Arraste as peças para a tela do celular. Para tirar uma peça, arraste para fora da tela.')}
+    <div class="le" id="le">
+      <div class="le-top">
+        <label class="le-field"><span class="le-cap">Nome do layout</span><input id="leName" maxlength="24" placeholder="Ex.: GTA, Corrida, Luta" value="${escapeHtml(st.name)}"></label>
+        <div class="le-modes"><span class="le-cap">Modos</span><div id="leModes"></div></div>
+      </div>
+      <div class="le-main">
+        <div class="le-stage">
+          <div class="phone"><div id="leBar"></div><div class="phone-screen edit" id="leScreen"></div></div>
+          <div class="le-tools" id="leTools"></div>
+        </div>
+        <aside class="le-side">
+          <div><span class="le-cap">Peças</span><div id="lePalette"></div></div>
+          <div><span class="le-cap">Começar de um modelo</span><div class="le-tpl">
+            <button class="btn-ghost sm" data-tpl="simple">Simples</button><button class="btn-ghost sm" data-tpl="advanced">Avançado</button><button class="btn-ghost sm" data-tpl="clear">Limpar</button>
+          </div></div>
+        </aside>
+      </div>
+      <div class="le-foot"><span class="le-status" id="leStatus"></span><button class="btn-ghost" data-close>Cancelar</button><button class="btn-neon" id="leSave">${icon('check')}Salvar</button></div>
+    </div>`, () => {
+    const root = document.getElementById('le');
+    const screen = document.getElementById('leScreen');
+    const nameIn = document.getElementById('leName');
+    let drag = null, skipClick = false;
+
+    const drawModes = () => {
+      const many = st.modes.length > 1;
+      document.getElementById('leModes').innerHTML = `<div class="lseg">${st.modes.map((m, i) => `<button type="button" class="${i === st.m ? 'on' : ''}" data-mode="${i}">${escapeHtml(m.name || 'Sem nome')}</button>`).join('')}${st.modes.length < 6 ? `<button type="button" class="mode-add" data-add-mode>${icon('plus')}Modo</button>` : ''}</div>` +
+        (many
+          ? `<div class="le-mode-row"><input id="leModeName" maxlength="20" value="${escapeHtml(cur().name)}" aria-label="Nome do modo"><button type="button" class="btn-ghost sm" data-del-mode>Apagar modo</button></div>`
+          : '<div class="le-hint">Jogo que muda os comandos (a pé e no carro, por exemplo)? Crie um modo para cada: no celular, troca com um toque no topo.</div>');
+      document.getElementById('leBar').innerHTML = phoneBar(st.modes, st.m);
+      const mi = document.getElementById('leModeName');
+      if (mi) mi.addEventListener('input', () => { cur().name = mi.value; drawModesTabsOnly(); drawStatus(); });
+    };
+    const drawModesTabsOnly = () => {
+      root.querySelectorAll('#leModes [data-mode]').forEach((b) => { b.textContent = st.modes[+b.dataset.mode].name || 'Sem nome'; });
+      document.getElementById('leBar').innerHTML = phoneBar(st.modes, st.m);
+    };
+    const drawScreen = () => {
+      screen.innerHTML = cur().pieces.map((p, i) => pieceHtml(p, i, 'button')).join('');
+      flags();
+    };
+    const flags = () => {
+      const { bad } = modeProblems(cur());
+      screen.querySelectorAll('.pz[data-i]').forEach((el) => {
+        const i = +el.dataset.i;
+        el.classList.toggle('sel', i === st.sel);
+        el.classList.toggle('bad', bad.has(i));
+      });
+    };
+    const drawPalette = () => {
+      const used = new Set(cur().pieces.map((p) => p.kind));
+      const dot = (k) => {
+        const d = PIECE_DEF[k];
+        return d.type === 'face' ? `<span class="dot" style="--c:${FACE[k]}"></span>` : `<span class="dot${d.type === 'stick' ? '' : ' sq'}"></span>`;
+      };
+      document.getElementById('lePalette').innerHTML = PIECE_GROUPS.map(([g, list], gi) => `${gi ? `<span class="le-cap" style="margin-top:12px">${g}</span>` : ''}<div class="pal-group">${list.map((k) => `<button type="button" class="pal${used.has(k) ? ' used' : ''}" data-add="${k}" title="${used.has(k) ? 'Já está na tela' : 'Arraste para a tela ou toque para pôr'}">${dot(k)}${escapeHtml({ BACK: 'Voltar', START: 'Start', LS: 'L3', RS: 'R3' }[k] || PIECE_DEF[k].label)}</button>`).join('')}</div>`).join('');
+    };
+    const drawTools = () => {
+      const p = st.sel != null ? cur().pieces[st.sel] : null;
+      document.getElementById('leTools').innerHTML = p
+        ? `<b>${escapeHtml(PIECE_DEF[p.kind].label)}</b><span>Tamanho</span><span class="lseg">${SIZES.map(([n, v]) => `<button type="button" class="${Math.abs(p.s - v) < .01 ? 'on' : ''}" data-size="${v}">${n}</button>`).join('')}</span><button type="button" class="btn-ghost sm" data-remove>Tirar da tela</button>`
+        : '<span>Toque numa peça para mudar o tamanho. Com uma peça escolhida, <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> movem e <kbd>Delete</kbd> tira.</span>';
+    };
+    const drawStatus = () => {
+      const el = document.getElementById('leStatus');
+      const save = document.getElementById('leSave');
+      let msg = null;
+      for (const m of st.modes) {
+        const { out } = modeProblems(m);
+        if (out.length) { msg = (st.modes.length > 1 ? `${m.name || 'Modo sem nome'}: ` : '') + out[0][0].toUpperCase() + out[0].slice(1) + '.'; break; }
+      }
+      const noName = !nameIn.value.trim();
+      // falta de nome não é erro: é só o próximo passo
+      el.className = 'le-status ' + (msg ? 'bad' : noName ? '' : 'ok');
+      el.innerHTML = msg ? `${icon('warn')}${escapeHtml(msg)}` : noName ? 'Dê um nome ao layout para salvar.' : `${icon('check')}Tudo certo: nada se sobrepõe e cabe em qualquer celular.`;
+      save.disabled = !!msg || noName;
+    };
+    const drawAll = () => { drawModes(); drawScreen(); drawPalette(); drawTools(); drawStatus(); };
+
+    // centro da peça em unidades: grade de 0,02 e sempre inteira dentro da tela
+    const place = (p, xu, y) => {
+      const d = PIECE_DEF[p.kind], w = d.w * p.s, h = d.h * p.s;
+      xu = Math.min(CANVAS - w / 2, Math.max(w / 2, Math.round(xu / GRID) * GRID));
+      y = Math.min(1 - h / 2, Math.max(h / 2, Math.round(y / GRID) * GRID));
+      p.x = xu / CANVAS; p.y = y;
+    };
+    const applyPos = (el, p) => { el.style.cssText = posStyle(p) + (FACE[p.kind] ? `;--c:${FACE[p.kind]}` : ''); };
+    // lugar livre mais perto de onde a peça fica no Avançado
+    const freeSpot = (kind) => {
+      const home = ADVANCED_PIECES.find((p) => p.kind === kind);
+      const d = PIECE_DEF[kind];
+      let best = null, bestD = Infinity;
+      for (let y = d.h / 2; y <= 1 - d.h / 2 + 1e-6; y += GRID * 2) {
+        for (let xu = d.w / 2; xu <= CANVAS - d.w / 2 + 1e-6; xu += GRID * 2) {
+          const c = { kind, x: xu / CANVAS, y, s: 1 };
+          if (cur().pieces.some((q) => overlaps(c, q))) continue;
+          const dist = Math.hypot(xu - home.x * CANVAS, y - home.y);
+          if (dist < bestD) { best = c; bestD = dist; }
+        }
+      }
+      return best;
+    };
+    const addPiece = (kind, at) => {
+      if (cur().pieces.some((p) => p.kind === kind)) return;
+      let p = { kind, x: .5, y: .5, s: 1 };
+      if (at) place(p, at[0], at[1]);
+      else {
+        p = freeSpot(kind);
+        if (!p) { toast('Não cabe mais nada: diminua ou tire uma peça.', null, 'warn'); return; }
+      }
+      cur().pieces.push(p);
+      st.sel = cur().pieces.length - 1;
+      drawScreen(); drawPalette(); drawTools(); drawStatus();
+    };
+    const removeSel = () => {
+      if (st.sel == null) return;
+      cur().pieces.splice(st.sel, 1);
+      st.sel = null;
+      drawScreen(); drawPalette(); drawTools(); drawStatus();
+    };
+    const toUnits = (e) => {
+      const r = screen.getBoundingClientRect();
+      return { xu: ((e.clientX - r.left) / r.width) * CANVAS, y: (e.clientY - r.top) / r.height, inside: e.clientX > r.left - 24 && e.clientX < r.right + 24 && e.clientY > r.top - 24 && e.clientY < r.bottom + 24, r };
+    };
+
+    root.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      const pz = e.target.closest('#leScreen .pz[data-i]');
+      const add = e.target.closest('[data-add]');
+      if (pz) {
+        e.preventDefault();
+        const i = +pz.dataset.i, p = cur().pieces[i], u = toUnits(e);
+        st.sel = i; flags(); drawTools();
+        drag = { type: 'move', el: pz, i, dx: u.xu - p.x * CANVAS, dy: u.y - p.y, sx: e.clientX, sy: e.clientY, moved: false, out: false };
+        try { pz.setPointerCapture(e.pointerId); } catch (_) {}
+      } else if (add && !add.classList.contains('used')) {
+        e.preventDefault();
+        const r = screen.getBoundingClientRect(), d = PIECE_DEF[add.dataset.add];
+        const ghost = document.createElement('div');
+        ghost.innerHTML = pieceHtml({ kind: add.dataset.add, x: 0, y: 0, s: 1 }, 0, 'span');
+        const g = ghost.firstChild;
+        g.classList.add('ghost', 'out');
+        g.style.cssText = `width:${d.w * r.height}px;height:${d.h * r.height}px;left:${e.clientX}px;top:${e.clientY}px;--u:${r.height}px${FACE[add.dataset.add] ? `;--c:${FACE[add.dataset.add]}` : ''};--s:1`;
+        drag = { type: 'add', kind: add.dataset.add, g, sx: e.clientX, sy: e.clientY, moved: false };
+        try { add.setPointerCapture(e.pointerId); } catch (_) {}
+      }
     });
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const name = new FormData(form).get('name').trim();
+    root.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      if (!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 5) return;
+      if (!drag.moved) { drag.moved = true; if (drag.type === 'add') document.body.appendChild(drag.g); }
+      const u = toUnits(e);
+      if (drag.type === 'move') {
+        const p = cur().pieces[drag.i];
+        drag.out = !u.inside;
+        drag.el.classList.toggle('leaving', drag.out);
+        if (!drag.out) { place(p, u.xu - drag.dx, u.y - drag.dy); applyPos(drag.el, p); flags(); }
+        if (drag.out !== !!drag.shownOut) {
+          drag.shownOut = drag.out;
+          if (drag.out) document.getElementById('leTools').innerHTML = '<span style="color:var(--danger)">Solte aqui para tirar da tela.</span>';
+          else drawTools();
+        }
+      } else {
+        drag.g.style.left = e.clientX + 'px';
+        drag.g.style.top = e.clientY + 'px';
+        const over = e.clientX > u.r.left && e.clientX < u.r.right && e.clientY > u.r.top && e.clientY < u.r.bottom;
+        drag.g.classList.toggle('out', !over);
+        screen.classList.toggle('drop', over);
+      }
+    });
+    const end = (e) => {
+      if (!drag) return;
+      const d = drag;
+      drag = null;
+      screen.classList.remove('drop');
+      if (d.moved) skipClick = true;
+      if (d.type === 'move') {
+        // vale onde o dedo soltou (o último movimento pode não ter chegado)
+        if (d.moved && e.type === 'pointerup' && !toUnits(e).inside) removeSel();
+        else { drawTools(); drawStatus(); }
+      } else if (d.moved) {
+        d.g.remove();
+        const u = toUnits(e);
+        if (e.type === 'pointerup' && e.clientX > u.r.left && e.clientX < u.r.right && e.clientY > u.r.top && e.clientY < u.r.bottom) addPiece(d.kind, [u.xu, u.y]);
+      }
+    };
+    root.addEventListener('pointerup', end);
+    root.addEventListener('pointercancel', end);
+
+    root.addEventListener('click', (e) => {
+      if (skipClick) { skipClick = false; if (e.target.closest('[data-add], .pz')) return; }
+      const add = e.target.closest('[data-add]');
+      if (add) { if (!add.classList.contains('used')) addPiece(add.dataset.add); return; }
+      const pz = e.target.closest('#leScreen .pz[data-i]');
+      if (pz) { st.sel = +pz.dataset.i; flags(); drawTools(); return; }
+      if (e.target === screen) { st.sel = null; flags(); drawTools(); return; }
+      const size = e.target.closest('[data-size]');
+      if (size && st.sel != null) {
+        const p = cur().pieces[st.sel];
+        p.s = +size.dataset.size;
+        place(p, p.x * CANVAS, p.y);
+        drawScreen(); drawTools(); drawStatus();
+        return;
+      }
+      if (e.target.closest('[data-remove]')) { removeSel(); return; }
+      const mode = e.target.closest('[data-mode]');
+      if (mode) { st.m = +mode.dataset.mode; st.sel = null; drawAll(); return; }
+      if (e.target.closest('[data-add-mode]')) {
+        // o novo modo começa igual ao atual: costuma mudar só uma parte (no carro: acelerar e frear)
+        if (st.modes.length === 1 && st.modes[0].name === 'Padrão') st.modes[0].name = 'A pé';
+        const names = st.modes.map((m) => m.name);
+        const name = !names.includes('Veículo') ? 'Veículo' : `Modo ${st.modes.length + 1}`;
+        st.modes.push({ name, pieces: clone(cur().pieces) });
+        st.m = st.modes.length - 1;
+        st.sel = null;
+        drawAll();
+        return;
+      }
+      if (e.target.closest('[data-del-mode]') && st.modes.length > 1) {
+        st.modes.splice(st.m, 1);
+        st.m = Math.max(0, st.m - 1);
+        if (st.modes.length === 1 && st.modes[0].name === 'A pé') st.modes[0].name = 'Padrão';
+        st.sel = null;
+        drawAll();
+        return;
+      }
+      const tpl = e.target.closest('[data-tpl]');
+      if (tpl) {
+        hubData.layouts().then((ls) => {
+          const from = tpl.dataset.tpl === 'clear' ? [] : clone((ls.find((l) => l.id === tpl.dataset.tpl) || demoLayouts.find((l) => l.id === tpl.dataset.tpl)).modes[0].pieces);
+          cur().pieces = from;
+          st.sel = null;
+          drawScreen(); drawPalette(); drawTools(); drawStatus();
+        });
+      }
+    });
+    const key = (e) => {
+      if (st.sel == null || e.target.closest('input')) return;
+      const p = cur().pieces[st.sel];
+      const step = { ArrowLeft: [-GRID, 0], ArrowRight: [GRID, 0], ArrowUp: [0, -GRID], ArrowDown: [0, GRID] }[e.key];
+      if (step) {
+        e.preventDefault();
+        place(p, p.x * CANVAS + step[0], p.y + step[1]);
+        const el = screen.querySelector(`.pz[data-i="${st.sel}"]`);
+        if (el) applyPos(el, p);
+        flags(); drawStatus();
+      } else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeSel(); }
+    };
+    document.addEventListener('keydown', key);
+    nameIn.addEventListener('input', drawStatus);
+    document.getElementById('leSave').addEventListener('click', async () => {
+      const name = nameIn.value.trim();
       try {
-        await hubData.saveLayout(layout ? layout.id : null, name, [...picked]);
+        await hubData.saveLayout(layout ? layout.id : null, name, st.modes.map((m) => ({ name: m.name.trim(), pieces: m.pieces })));
         closeModal();
         toast(`Layout ${name} salvo. Já aparece no menu dos celulares.`, null, 'ok');
         renderControls();
       } catch (err) {
-        document.getElementById('layoutErr').textContent = String(err && err.message ? err.message : err);
+        const el = document.getElementById('leStatus');
+        el.className = 'le-status bad';
+        el.innerHTML = `${icon('warn')}${escapeHtml(String(err && err.message ? err.message : err))}`;
       }
     });
-    setTimeout(() => form.querySelector('input').focus(), 50);
-  });
+    drawAll();
+    if (!layout) setTimeout(() => nameIn.focus(), 60);
+    return () => document.removeEventListener('keydown', key);
+  }, 'wide sticky');
 }
 
 async function renderSettings() {
@@ -2619,16 +3050,16 @@ async function renderSettings() {
   document.getElementById('setJoin').classList.toggle('on', !!st.joinOnButton);
   const addrs = await hubData.addresses();
   const auto = !st.preferredIp;
-  document.getElementById('addrList').innerHTML = `<button class="setting addr${auto ? ' ok' : ''}" data-ip=""><span><b>Automático</b><small>O Hub escolhe a rede mais provável</small></span>${auto ? icon('check') : ''}</button>` +
+  const radioRow = (ip, on, ic, title, sub, mono) => `<button class="row${on ? ' on' : ''}" data-ip="${escapeHtml(ip)}" role="radio" aria-checked="${on}"><span class="row-ic">${icon(ic)}</span><span class="row-t"><b${mono ? ' class="addr-txt"' : ''}>${title}</b><small>${sub}</small></span><span class="radio"></span></button>`;
+  document.getElementById('addrList').innerHTML = radioRow('', auto, 'sparkle', 'Automático', 'O Hub escolhe a rede mais provável (recomendado).') +
     addrs.map((a) => {
       const ip = a.url.replace(/^https?:\/\//, '').split(':')[0];
-      const on = st.preferredIp === ip;
-      return `<button class="setting addr${on ? ' ok' : ''}" data-ip="${escapeHtml(ip)}"><span><b>${escapeHtml(a.url.replace('http://', ''))}</b><small>${escapeHtml(a.interface)}${a.current ? ' · no QR agora' : ''}</small></span>${on ? icon('check') : ''}</button>`;
+      return radioRow(ip, st.preferredIp === ip, 'wifi', escapeHtml(a.url.replace(/^https?:\/\//, '').split('/')[0]), `${escapeHtml(a.interface)}${a.current ? ' · <span style="color:var(--neon)">no QR agora</span>' : ''}`, true);
     }).join('');
   document.getElementById('virtualBox').innerHTML = st.virtualPads
-    ? `<div class="setting static"><span><b>Pronto</b><small>Celulares e teclados aparecem como controles de Xbox para qualquer jogo.</small></span>${icon('check')}</div>`
-    : `<p class="pane-sub">Para jogos comuns (Steam, Epic, qualquer .exe) verem os celulares e teclados como controles, o Windows precisa de um componente de controle virtual (ViGEmBus, gratuito). Jogos feitos com o SDK funcionam sem ele.</p>
-       <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn-neon" id="vInstall">${icon('download')}Instalar componente</button><button class="btn-ghost" id="vRetry">Já instalei: conferir</button></div>`;
+    ? `<div class="row"><span class="row-ic">${icon('shield')}</span><span class="row-t"><b>Controle virtual</b><small>Celulares e teclados aparecem como controles de Xbox para qualquer jogo.</small></span><span class="pill ok">Instalado</span></div>`
+    : `<div class="row"><span class="row-ic">${icon('shield')}</span><span class="row-t"><b>Controle virtual</b><small>Para jogos comuns verem celulares e teclados como controles, o Windows precisa deste componente gratuito (ViGEmBus). Jogos feitos com o SDK não precisam.</small></span><span class="pill off">Não instalado</span></div>
+       <div class="row"><span class="row-t"><small>Leva menos de um minuto. O instalador do Windows abre e pede sua confirmação.</small></span><span class="row-act"><button class="btn-ghost sm" id="vRetry">Já instalei: conferir</button><button class="btn-neon sm" id="vInstall">${icon('download')}Instalar</button></span></div>`;
   document.getElementById('verTxt').textContent = `Party Anywhere ${st.version}`;
   document.getElementById('vInstall')?.addEventListener('click', async () => {
     try { await hubData.installVirtual(); toast('O instalador abriu: siga na tela e depois toque em "Já instalei: conferir".', null, 'ok'); } catch (err) { toast(String(err), null, 'warn'); }
@@ -2646,7 +3077,7 @@ document.getElementById('setJoin').addEventListener('click', async () => {
 });
 document.getElementById('addrList').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-ip]');
-  if (!b) return;
+  if (!b || b.classList.contains('on')) return;
   const url = await hubData.setJoinIp(b.dataset.ip || null);
   if (url) { JOIN_URL = url; lobbyArc.querySelectorAll('.card.add').forEach((c) => { c.dataset.sig = ''; }); renderLobby(); }
   toast('Endereço do QR trocado.', null, 'ok');

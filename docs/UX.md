@@ -206,8 +206,9 @@ O Hub lê nome e ícone do próprio executável, procura a capa pelo nome e, se 
 ## O controle no celular
 
 - Tela em paisagem e sempre acesa (Wake Lock); analógico **flutuante** (nasce onde o dedo toca).
-- **Layouts**: Simples (analógico, A, B, Start), Avançado (tudo) e os criados na aba Controles. Cada peça
-  tem a sua zona fixa: nada se sobrepõe, em nenhum celular. O Hub lembra o layout de cada celular.
+- **Layouts**: Simples (analógico, A, B, X, Y grandes e Start), Avançado (tudo) e os criados na aba
+  Controles. Nada se sobrepõe, em nenhum celular. O Hub lembra o layout de cada celular.
+- **Modos**: um layout pode ter vários (ex.: A pé e Veículo). Os nomes ficam no topo; um toque troca na hora.
 - Topo: número e cor do jogador, conexão (verde, amarelo, vermelho) e o botão **Menu**.
 - **Menu**: abre **segurando** o botão por meio segundo (um anel enche; um toque rápido só mostra a dica),
   para não abrir sem querer no meio do jogo. No menu: escolher o layout, trocar o nome, vibrar ao tocar,
@@ -229,11 +230,19 @@ O Hub lê nome e ícone do próprio executável, procura a capa pelo nome e, se 
 
 ## Abas Controles e Ajustes
 
-- **Controles**: os aparelhos conectados agora (com a vaga ou "esperando"), com Identificar; e os layouts
-  do controle do celular: os prontos e os seus (criar com nome e peças, editar, apagar; quem usava um layout
-  apagado volta para o Avançado).
-- **Ajustes**: "Entrar só ao apertar um botão"; o endereço do QR (automático ou uma rede específica); o
-  componente dos jogos comuns (Modo Universal) com instalar e conferir; versão e procurar atualização.
+- Uma coluna centrada, com grupos de linhas (título, explicação curta e o controle à direita), como os
+  ajustes de um console. A barra de rolagem é a mesma em todo o Hub: fina e discreta, verde ao passar o mouse.
+- **Controles**: os aparelhos conectados agora (com a vaga ou "esperando"), com Identificar; e os layouts do
+  celular em cartões com a **tela do celular em miniatura** (prontos: Duplicar; seus: Editar e Apagar; quem
+  usava um layout apagado volta para o Avançado).
+- **Criar layout**: a tela de um celular deitado e a lista de peças ao lado. **Arrastar** da lista para a tela
+  põe a peça (um toque põe no lugar livre mais perto); arrastar move (com grade); **arrastar para fora tira**.
+  Peça escolhida: tamanho P, M ou G e "Tirar da tela"; setas do teclado movem. Modos (A pé, Veículo...): o
+  novo começa igual ao atual. Modelos: Simples, Avançado, Limpar. Peças sobrepostas ficam vermelhas e o
+  rodapé diz o que ajustar; Salvar fica sempre à vista. Tocar fora da janela não fecha (não perde o trabalho).
+- **Ajustes**: "Entrar só ao apertar um botão"; o endereço do QR (escolha única: automático ou uma rede);
+  o controle virtual dos jogos comuns (instalado ou não, com instalar e conferir); versão e procurar
+  atualização.
 
 ## Textos (tom de voz)
 

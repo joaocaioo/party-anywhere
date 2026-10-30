@@ -288,13 +288,20 @@ Regras:
 
 ## Controle do celular: layouts e menu
 
-- Um layout é uma lista de peças (`stickL`, `stickR`, `dpad`, `A`, `B`, `X`, `Y`, `LB`, `RB`, `LT`, `RT`,
-  `BACK`, `START`, `LS`, `RS`). A página desenha cada peça numa zona fixa (esquerda: analógico e setas;
-  centro: Voltar/Start/L3/R3; direita: A B X Y e o analógico direito; ombros em cima), com tamanhos relativos
-  à tela: nada se sobrepõe em nenhum celular.
-- Prontos: **Simples** (analógico, A, B, Start) e **Avançado** (tudo). Personalizados: criados na aba
-  Controles. Guardados em `settings.json`, com o layout que cada celular escolheu (pela chave do token).
-- Protocolo (aditivo, v1): `layouts` (Hub → celular: lista e o atual), `layout` e `rename` (celular → Hub).
+- Um layout tem de 1 a 6 **modos** (ex.: "A pé" e "Veículo", para jogos que mudam os comandos) e cada modo,
+  **peças posicionadas** (`stickL`, `stickR`, `dpad`, `A`, `B`, `X`, `Y`, `LB`, `RB`, `LT`, `RT`, `BACK`,
+  `START`, `LS`, `RS`): `{ kind, x, y, s }`, com o centro em 0..1 numa **tela de referência** deitada de
+  proporção 2,17 (`CANVAS`) e `s` multiplicando o tamanho base da peça (medido na altura dessa tela).
+- O núcleo (`settings.rs`) confere cada modo ao salvar: peça dentro da tela, sem repetir, sem sobrepor, com um
+  analógico ou as setas e ao menos um de A/B/X/Y. O editor da aba Controles mostra os mesmos erros ao vivo.
+- O celular encaixa a tela de referência na sua: a altura encolhe junto (`u = min(altura, largura / 2,17)`) e
+  as posições horizontais esticam na largura toda (só afastam as peças). O que não se sobrepõe no editor não se
+  sobrepõe em nenhum celular. Com mais de um modo, os nomes ficam no topo e um toque troca (solta tudo antes).
+- Prontos: **Simples** (analógico, A, B, X, Y grandes e Start) e **Avançado** (tudo). Personalizados: criados
+  na aba Controles. Guardados em `settings.json`, com o layout que cada celular escolheu (pela chave do
+  token). Layouts no formato antigo (só a lista `controls`) viram um modo com as posições do Avançado.
+- Protocolo (aditivo, v1): `layouts` (Hub → celular: lista com os modos e o atual), `layout` e `rename`
+  (celular → Hub). O modo em uso fica só no celular.
 - O menu abre **segurando** o botão do topo por 0,5 s (um anel enche): sem abrir sem querer no meio do jogo.
   Abrir o menu ou trocar de layout solta todos os botões (nada fica preso no jogo).
 
