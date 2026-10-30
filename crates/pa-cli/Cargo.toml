@@ -1,0 +1,21 @@
+[package]
+name = "pa-cli"
+description = "pa: ferramenta de quem cria jogos para o Party Anywhere (new, validate, pack) e servidor MCP para agentes."
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "pa"
+path = "src/main.rs"
+
+[dependencies]
+pa-library.workspace = true
+pa-manifest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+png.workspace = true
+zip.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

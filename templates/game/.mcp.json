@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "party-anywhere": {
+      "command": "pa",
+      "args": ["mcp"]
+    }
+  }
+}

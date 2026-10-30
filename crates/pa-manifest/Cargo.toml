@@ -1,0 +1,13 @@
+[package]
+name = "pa-manifest"
+description = "Manifesto de jogo (party-anywhere.json) e de release: tipos, validação e referências de repositório. Sem I/O."
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+semver.workspace = true
+sha2.workspace = true
+imagesize.workspace = true

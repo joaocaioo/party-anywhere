@@ -4,14 +4,19 @@ Todo jogo ou mod feito para o Party Anywhere tem **um arquivo `party-anywhere.js
 repositório** e **uma imagem de capa**. Com isso, qualquer pessoa cola o link do repositório no Hub
 e o jogo aparece na Biblioteca, pronto para instalar.
 
-O modelo está em [`templates/game/`](../templates/game/). Os agentes de IA (skills em `.claude/skills/`)
-devem criar este arquivo e **pedir a capa ao criador** sempre que começarem um jogo novo.
+Cada **release** do jogo carrega um segundo arquivo, `party-anywhere.release.json`, gerado pela ferramenta
+`pa`: é dele que o Hub tira o pacote, o hash e o aviso de versão nova.
+
+O jeito fácil de começar é `pa new` (ou a ferramenta `create_game` do servidor MCP, para agentes de IA):
+o projeto já nasce válido, com capa provisória, workflow de release e a skill para agentes. O modelo cru
+está em [`templates/game/`](../templates/game/), e o esquema JSON em
+[`schema/game-manifest.v1.json`](../schema/game-manifest.v1.json) (autocompletar no editor).
 
 ## Exemplo completo
 
 ```jsonc
 {
-  "$schema": "https://party-anywhere.dev/schema/game-manifest.v1.json",
+  "$schema": "https://raw.githubusercontent.com/joaocaioo/party-anywhere/main/schema/game-manifest.v1.json",
   "manifestVersion": 1,
 
   "id": "com.exemplo.sa-party",          // único, minúsculas, pontos e hífens; nunca muda
@@ -44,8 +49,7 @@ devem criar este arquivo e **pedir a capa ao criador** sempre que começarem um 
 
   "install": {
     "source": "github-release",           // v1: só releases do GitHub
-    "asset": "sa-party-{version}.zip",    // pacote do release
-    "sha256": "…",                        // hash do pacote; o Hub recusa se não bater
+    "asset": "sa-party-{version}.zip",    // pacote do release (.zip)
     "target": "baseGame",                 // "baseGame" (copia para a pasta do jogo) ou "self"
     "files": [ { "from": "SAParty.asi", "to": "SAParty.asi" } ]
   },
@@ -54,7 +58,9 @@ devem criar este arquivo e **pedir a capa ao criador** sempre que começarem um 
     "exe": "gta_sa.exe",                  // relativo ao target
     "args": [],
     "workingDir": "."
-  }
+  },
+
+  "minHubVersion": "0.2.0"                // opcional: Hub mínimo
 }
 ```
 
@@ -71,7 +77,8 @@ devem criar este arquivo e **pedir a capa ao criador** sempre que começarem um 
 | `players` | sim | `1 ≤ min ≤ max ≤ 10`. |
 | `sdk.abi` | sim | Versão maior do SDK. |
 | `requires.baseGame` | não | Use quando o mod precisa do jogo original. O Hub procura na Steam e confere o hash. |
-| `install` | sim | v1 aceita só `github-release` e cópia de arquivos. **Sem scripts de instalação.** |
+| `install` | sim | v1 aceita só `github-release` e cópia de arquivos. **Sem scripts de instalação.** `asset` é um `.zip`; `target: "baseGame"` exige `requires.baseGame` e `files`. Caminhos sempre relativos, sem `..`. |
+| `minHubVersion` | não | Hub mínimo, se o jogo usa algo recente do SDK. |
 | `launch` | sim | Como abrir o jogo depois de instalado. |
 
 ## A capa
@@ -83,13 +90,51 @@ A capa é a primeira impressão na Biblioteca, então vale caprichar:
 - Nada de arte do jogo-base que você não tem direito de usar como "capa oficial". Prefira arte própria.
 - Sem capa, o Hub recusa o manifesto e explica como criar uma (o template tem uma capa modelo editável).
 
+## `party-anywhere.release.json` (anexo de cada release)
+
+Gerado pelo `pa pack` a partir da pasta de build. O hash não fica no repositório porque só existe depois
+do pacote pronto.
+
+```json
+{
+  "manifestVersion": 1,
+  "id": "com.exemplo.sa-party",
+  "version": "0.3.0",
+  "asset": "sa-party-0.3.0.zip",
+  "sha256": "9f2c…",
+  "size": 4815162,
+  "sdkAbi": 1
+}
+```
+
+O Hub confere: mesmo `id` do repositório, `version` igual à tag, o pacote anexado com o mesmo tamanho e,
+depois de baixar, o mesmo SHA-256. Qualquer diferença: nada é instalado e a mensagem diz o porquê.
+
 ## Publicar uma versão
 
-1. Atualize `version` no manifesto.
-2. Gere o pacote e calcule o SHA-256 (o template traz um script e um workflow do GitHub Actions que fazem
-   isso e preenchem `install.sha256`).
-3. Crie o release com a tag igual à versão e anexe o pacote.
-4. Quem já instalou recebe a atualização no Hub.
+1. Suba `version` no manifesto.
+2. Crie a tag igual (`v0.3.0`). O workflow do template (`.github/workflows/release.yml`) compila, roda
+   `pa validate` e `pa pack` e publica o release com o pacote e o `party-anywhere.release.json`.
+3. Quem já instalou vê o aviso de atualização no Hub (o Hub consulta o último release com ETag: sem
+   novidade, a consulta nem conta no limite do GitHub).
+
+Sem o workflow: `pa pack --from build --tag v0.3.0` e anexe os dois arquivos de `release/` ao release.
+
+## Ferramentas para quem cria
+
+| Ferramenta | O que faz |
+|---|---|
+| `pa new <pasta> --name "Jogo"` | Projeto pronto: manifesto, capa provisória 900×1200, workflow, `.mcp.json` e skill para agentes. |
+| `pa validate` | Confere manifesto e capa, com o que fazer em cada problema. |
+| `pa pack --from build --tag vX.Y.Z` | Pacote `.zip` reproduzível + `party-anywhere.release.json`. |
+| `pa inspect dono/repo` | Lê o jogo publicado como o Hub lê e diz se instala. |
+| `pa mcp` | As mesmas ferramentas para agentes de IA (Model Context Protocol, local, por stdio). Também serve a documentação do SDK e do manifesto. |
+
+## Ser encontrado ("Descobrir")
+
+Adicione o tópico **`party-anywhere-game`** ao repositório no GitHub. A aba "Descobrir" da Biblioteca
+lista os repositórios públicos com esse tópico (os mais estrelados primeiro, sem arquivados). O selo
+**Verificado** continua vindo do catálogo revisado.
 
 ## Do link à Biblioteca (o que o Hub faz)
 

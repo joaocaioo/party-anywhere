@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/joaocaioo/party-anywhere/main/schema/game-manifest.v1.json",
+  "title": "Party Anywhere: manifesto de jogo (party-anywhere.json)",
+  "description": "Faz o jogo aparecer na Biblioteca do Party Anywhere. Especificação: docs/GAME-MANIFEST.md.",
+  "type": "object",
+  "required": ["manifestVersion", "id", "name", "tagline", "version", "art", "players", "sdk", "install", "launch"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "manifestVersion": { "const": 1 },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(\\.[a-z0-9]+(-[a-z0-9]+)*)+$",
+      "maxLength": 100,
+      "description": "Identidade do jogo para sempre: com.seu-usuario.nome-do-jogo."
+    },
+    "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+    "tagline": { "type": "string", "minLength": 1, "maxLength": 90, "description": "Uma frase que aparece embaixo da capa." },
+    "description": { "type": "string", "description": "Texto longo, ou o caminho de um .md (normalmente README.md)." },
+    "authors": { "type": "array", "items": { "type": "string" } },
+    "license": { "type": "string" },
+    "version": {
+      "type": "string",
+      "pattern": "^v?(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$",
+      "description": "Semver, igual à tag do release."
+    },
+    "minHubVersion": { "type": "string" },
+    "art": {
+      "type": "object",
+      "required": ["cover"],
+      "properties": {
+        "cover": { "$ref": "#/$defs/image", "description": "Obrigatória: retrato 3:4, mínimo 600x800, até 2 MB." },
+        "hero": { "$ref": "#/$defs/image", "description": "Opcional: 16:9, fundo da tela do jogo." },
+        "logo": { "$ref": "#/$defs/image", "description": "Opcional: PNG transparente." }
+      }
+    },
+    "players": {
+      "type": "object",
+      "required": ["min", "max"],
+      "properties": {
+        "min": { "type": "integer", "minimum": 1, "maximum": 10 },
+        "max": { "type": "integer", "minimum": 1, "maximum": 10 },
+        "recommended": { "type": "integer", "minimum": 1, "maximum": 10 }
+      }
+    },
+    "sdk": {
+      "type": "object",
+      "required": ["abi"],
+      "properties": { "abi": { "const": 1 } }
+    },
+    "tags": { "type": "array", "items": { "type": "string", "pattern": "^[^A-Z\\s]{1,24}$" } },
+    "requires": {
+      "type": "object",
+      "properties": {
+        "baseGame": {
+          "type": "object",
+          "required": ["name", "exe"],
+          "properties": {
+            "name": { "type": "string" },
+            "steamAppId": { "type": "integer" },
+            "exe": { "$ref": "#/$defs/relativePath" },
+            "acceptedSha256": { "type": "array", "items": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" } },
+            "help": { "type": "string" }
+          }
+        }
+      }
+    },
+    "install": {
+      "type": "object",
+      "required": ["source", "asset", "target"],
+      "properties": {
+        "source": { "const": "github-release" },
+        "asset": { "type": "string", "pattern": "^[^/\\\\]+\\.[zZ][iI][pP]$", "description": "Pacote do release; {version} vira a versão." },
+        "target": { "enum": ["self", "baseGame"] },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["from", "to"],
+            "properties": { "from": { "$ref": "#/$defs/relativePath" }, "to": { "$ref": "#/$defs/relativePath" } }
+          }
+        },
+        "sha256": { "deprecated": true, "description": "Não é mais usado: o hash vai no party-anywhere.release.json." }
+      }
+    },
+    "launch": {
+      "type": "object",
+      "required": ["exe"],
+      "properties": {
+        "exe": { "$ref": "#/$defs/relativePath" },
+        "args": { "type": "array", "items": { "type": "string" } },
+        "workingDir": { "type": "string" }
+      }
+    }
+  },
+  "$defs": {
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "not": { "pattern": "(^[/\\\\])|:|(^|[/\\\\])\\.\\.([/\\\\]|$)" },
+      "description": "Caminho relativo, sem .. e sem unidade (C:)."
+    },
+    "image": {
+      "allOf": [{ "$ref": "#/$defs/relativePath" }, { "pattern": "\\.([pP][nN][gG]|[jJ][pP][eE]?[gG]|[wW][eE][bB][pP])$" }]
+    }
+  }
+}
