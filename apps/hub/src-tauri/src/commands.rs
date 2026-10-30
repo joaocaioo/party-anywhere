@@ -654,8 +654,10 @@ pub fn check_game_updates(libs: &LibraryState) -> Vec<GameUpdate> {
 }
 
 #[tauri::command]
-pub fn game_play(app: tauri::AppHandle, libs: Libs, id: String) -> Result<(), String> {
+pub fn game_play(app: tauri::AppHandle, hub: Hubs, libs: Libs, id: String, players: Option<Vec<usize>>) -> Result<(), String> {
     let entry = libs.lib.lock().unwrap().get(&id).cloned().ok_or("jogo não encontrado na biblioteca")?;
+    // mais gente do que o jogo aceita: só quem foi escolhido aparece para ele
+    hub.set_players(players.as_deref());
     match (&entry.source, &entry.installed) {
         (Source::Pc { launch, .. }, _) => {
             if launch.contains("://") {
@@ -670,6 +672,12 @@ pub fn game_play(app: tauri::AppHandle, libs: Libs, id: String) -> Result<(), St
         }
         (Source::Repo { .. }, None) => Err(format!("{} ainda não está instalado.", entry.name)),
     }
+}
+
+/// Voltou do jogo para o Hub: todo mundo volta a contar.
+#[tauri::command]
+pub fn game_stopped(hub: Hubs) {
+    hub.set_players(None);
 }
 
 fn spawn(exe: &std::path::Path, args: &[String], cwd: Option<PathBuf>) -> Result<(), String> {

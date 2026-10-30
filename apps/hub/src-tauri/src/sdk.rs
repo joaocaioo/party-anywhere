@@ -107,7 +107,7 @@ pub fn write_seats(hub: &Hub) {
     let lobby = hub.lobby.lock().unwrap();
     for (i, color) in SEAT_COLORS.iter().enumerate() {
         let rgb = hex_rgb(color);
-        match lobby.seat(i) {
+        match lobby.seat(i).filter(|_| !hub.is_benched(i)) {
             Some(s) => shm.write_seat(
                 i,
                 match s.state {

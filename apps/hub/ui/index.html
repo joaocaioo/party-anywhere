@@ -485,12 +485,14 @@ button.row:hover { background: rgba(255, 255, 255, .035); }
    Uma tela de referência deitada, proporção CANVAS (2,17). Peças: centro (x, y) em 0..1 e tamanho em
    unidades da altura (--u), os mesmos números de settings.rs. */
 .phone { padding: 7px 12px; border-radius: 18px; background: #08090b; border: 1px solid var(--line-strong); box-shadow: inset 0 0 0 3px #111216; }
-.phone-bar { display: flex; align-items: center; gap: 6px; height: 14px; padding: 0 2px 4px; }
-.phone-bar i { width: 10px; height: 10px; border-radius: 50%; background: var(--neon); opacity: .8; }
-.phone-bar em { width: 40px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .12); }
-.phone-bar .lseg { margin-left: auto; }
-.phone-bar u { margin-left: auto; width: 30px; height: 9px; border-radius: 5px; border: 1px solid rgba(255, 255, 255, .16); }
-.phone-bar .lseg + u { margin-left: 0; }
+/* a pílula do topo do celular (jogador, conexão, Menu): no meio, por cima da tela */
+.screen-wrap { position: relative; container-type: inline-size; }
+.phone-pill { position: absolute; z-index: 3; top: 1.2%; left: 50%; transform: translateX(-50%); min-width: 20.3%; height: 11%; display: flex; align-items: center; gap: 1cqw; padding: 0 .9cqw; border-radius: 999px; background: rgba(21, 22, 26, .92); border: 1px solid rgba(255, 255, 255, .12); pointer-events: none; }
+.phone-pill i { width: 3.4cqw; height: 3.4cqw; border-radius: 50%; background: var(--neon); flex: none; }
+.phone-pill em { flex: 1; min-width: 3cqw; height: .9cqw; border-radius: 1cqw; background: rgba(255, 255, 255, .14); }
+.phone-pill u { width: 6.5cqw; height: 3.4cqw; border-radius: 2cqw; background: rgba(255, 255, 255, .1); flex: none; }
+.phone-pill .lseg.mini { padding: 0; border: 0; background: none; gap: .3cqw; }
+.phone-pill .lseg.mini span { height: 3.4cqw; padding: 0 1cqw; font-size: 1.5cqw; }
 .phone-screen { position: relative; width: 100%; aspect-ratio: 2.17; container-type: inline-size; }
 .pz {
   --u: calc(100cqw / 2.17);
@@ -503,7 +505,7 @@ button.row:hover { background: rgba(255, 255, 255, .035); }
 .pz.stick { border-radius: 50%; border: max(1px, calc(var(--u) * .006)) dashed rgba(255, 255, 255, .2); background: rgba(255, 255, 255, .025); }
 .pz.stick i { width: 44%; height: 44%; border-radius: 50%; background: color-mix(in srgb, var(--neon) 55%, #15161a); box-shadow: 0 0 calc(var(--u) * .06) rgba(60, 240, 96, .35); display: grid; place-items: center; font-style: normal; font-size: calc(var(--u) * .05 * var(--s)); color: rgba(0, 0, 0, .7); }
 .pz.dpad { display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); gap: 4%; }
-.pz.dpad i { border-radius: 18%; background: #1a1b20; border: 1px solid rgba(255, 255, 255, .12); }
+.pz.dpad i { border-radius: 18%; background: #26282f; border: 1px solid rgba(255, 255, 255, .22); }
 
 
 /* ---------- editor de layout ---------- */
@@ -531,12 +533,6 @@ button.row:hover { background: rgba(255, 255, 255, .035); }
 .le-main { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 22px; align-items: start; }
 .le-stage { display: grid; gap: 12px; min-width: 0; }
 .le-stage .phone { width: min(100%, max(420px, calc((100vh - 510px) * 2.17 + 52px))); justify-self: center; padding: 14px 26px; border-radius: 34px; box-shadow: inset 0 0 0 5px #111216, 0 20px 60px rgba(0, 0, 0, .45); }
-.le-stage .phone-bar { height: 26px; gap: 10px; padding-bottom: 8px; }
-.le-stage .phone-bar i { width: 18px; height: 18px; }
-.le-stage .phone-bar em { width: 90px; height: 8px; }
-.le-stage .phone-bar u { width: 60px; height: 18px; border-radius: 9px; }
-.le-stage .phone-bar .lseg.mini span { height: 18px; padding: 0 10px; font-size: 10px; }
-.le-stage .phone-bar .lseg.mini { padding: 3px; }
 .phone-screen.edit { border-radius: 10px; background-color: rgba(255, 255, 255, .012); background-image: radial-gradient(rgba(255, 255, 255, .07) 1px, transparent 1.4px); background-size: calc(100% / 27.125) calc(100% / 12.5); touch-action: none; }
 .phone-screen.edit .pz { cursor: grab; touch-action: none; transition: box-shadow .15s, opacity .15s; }
 .phone-screen.edit .pz:active { cursor: grabbing; }
@@ -860,6 +856,26 @@ main { perspective: 1800px; }
 .game-run .gr-players { display: flex; gap: 8px; justify-content: center; }
 .game-run .gr-players i { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 12px; font-weight: 800; color: rgba(0, 0, 0, .75); }
 .game-run button { justify-self: center; margin-top: 10px; }
+/* antes do jogo abrir (na tela do fliperama): quantos o jogo aceita, componente dos celulares, quem joga */
+.game-run.picking #grPlayers, .game-run.picking #grText, .game-run.picking #grExit { display: none; }
+.game-run.picking h2 { font-size: clamp(40px, 6vw, 84px); }
+.gr-step:empty { display: none; }
+.gr-step { display: grid; gap: 14px; justify-items: center; max-width: 720px; padding: 0 24px; }
+.gr-step h3 { margin: 0; font-size: 22px; font-weight: 700; color: #f4f4f5; }
+.gr-kicker { font-size: 12px !important; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: #c6f55a !important; }
+.gr-help { font-size: 14px !important; line-height: 1.55; max-width: 560px; }
+.gr-help b { color: #f4f4f5; }
+.gr-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.gr-chips button { margin: 0; width: 52px; height: 52px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, .16); background: rgba(255, 255, 255, .04); font-family: var(--display); font-size: 24px; color: #f4f4f5; }
+.gr-chips button:hover { border-color: rgba(198, 245, 90, .7); color: #d8fc72; }
+.gr-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.gr-actions button { margin: 0; }
+.gr-seats { display: flex; flex-wrap: wrap; justify-content: center; gap: 18px; margin: 8px 0; }
+.gr-seat { margin: 0 !important; display: grid; justify-items: center; gap: 8px; width: 84px; opacity: .38; filter: grayscale(.7); transition: opacity .2s, filter .2s, transform .2s; }
+.gr-seat i { width: 60px; height: 60px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-family: var(--dots); font-weight: 900; font-size: 22px; background: var(--c); color: rgba(0, 0, 0, .75); }
+.gr-seat span { font-size: 13px; font-weight: 600; color: #c9cacf; max-width: 84px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gr-seat.on { opacity: 1; filter: none; transform: translateY(-3px); }
+.gr-seat.on i { box-shadow: 0 0 0 3px rgba(0, 0, 0, .6), 0 0 0 5px var(--c), 0 0 28px var(--c); }
 
 /* janelas baixas: o Hub tem altura fixa, então o lobby se compacta em vez de cortar o rodapé */
 .add { container-type: inline-size; }
@@ -1031,6 +1047,7 @@ main { perspective: 1800px; }
 
 <div class="game-run" id="gameRun" role="dialog" aria-label="Jogo rodando">
   <h2 id="grTitle"></h2>
+  <div class="gr-step" id="grStep"></div>
   <div class="gr-players" id="grPlayers"></div>
   <p id="grText">O jogo está rodando (protótipo). <b>Esc</b>, <b>B</b> ou <b>Start</b> volta para a biblioteca.</p>
   <button class="btn-ghost" id="grExit">Sair do jogo</button>
@@ -1330,6 +1347,13 @@ function addCardHTML(count) {
 }
 
 function renderLobby(newSeatIndex) {
+  if (pre && pre.refresh) pre.refresh();
+  // quem navegava com o controle saiu do lobby: o contorno na cor dele some junto
+  if (navColor && !seats.some((x) => x && x.color === navColor)) {
+    navColor = null;
+    document.documentElement.style.removeProperty('--focus-c');
+    setNavFocus(null);
+  }
   const items = lobbyItems();
   const existing = new Map([...lobbyArc.children].filter((el) => !el.classList.contains('leaving')).map((el) => [el.dataset.key, el]));
   const order = [];
@@ -1793,16 +1817,137 @@ async function playGame(g) {
   shellEl.classList.add('launching');
   await arcade.launch();
   document.getElementById('grTitle').textContent = g.name;
-  const active = seats.filter((s) => s && s.state === 'active');
-  document.getElementById('grPlayers').innerHTML = active.map((s) => `<i style="background:${s.color}">${s.index + 1}</i>`).join('');
   const run = document.getElementById('gameRun');
   run.classList.add('on');
   requestAnimationFrame(() => run.classList.add('show'));
+  // na tela do fliperama, antes de abrir: quantos o jogo aceita, o componente dos celulares, quem joga
+  const picked = await preGame(g);
+  if (!picked) { exitGame(); return; }
+  try { await startGame(g, picked.players); } catch (e) { toast(String(e && e.message ? e.message : e), null, 'warn'); exitGame(); return; }
+  const playing = seats.filter((s) => s && s.state === 'active' && (!picked.players || picked.players.includes(s.index)));
+  document.getElementById('grPlayers').innerHTML = playing.map((s) => `<i style="background:${s.color}">${s.index + 1}</i>`).join('');
+}
+// Abre o jogo de verdade (no app, bridge.js troca). `players`: as vagas escolhidas, ou null para todos.
+async function startGame(g, players) {
+  const n = players ? players.length : seats.filter((s) => s && s.state === 'active').length;
+  toast(`Abrindo ${g.name} com ${n} ${n === 1 ? 'jogador' : 'jogadores'} (demonstração)`, null, 'ok');
+}
+// Voltou do jogo: todo mundo volta a contar (no app, bridge.js avisa o núcleo).
+function gameStopped() {}
+
+// Quantos o jogo aceita: o último número de "1 a 8 jogadores" ou "Até 4 jogadores". Sem número: não se sabe.
+const maxPlayers = (g) => {
+  const m = String(g.players || '').match(/(\d+)(?!.*\d)/);
+  return m ? Math.min(MAX, +m[1]) : null;
+};
+const playersText = (n) => `Até ${n} ${n === 1 ? 'jogador' : 'jogadores'}`;
+const isPcGame = (g) => g.badge === 'pc' || !!g.store;
+
+// Antes do jogo abrir. Resolve com { players: null | [vagas] }, ou null se a pessoa voltou.
+let pre = null;
+function preGame(g) {
+  const step = document.getElementById('grStep');
+  const run = document.getElementById('gameRun');
+  const active = () => seats.filter((x) => x && x.state === 'active');
+  return new Promise((resolve) => {
+    run.classList.add('picking');
+    const finish = (v) => { pre = null; run.classList.remove('picking'); step.innerHTML = ''; setNavFocus(null); resolve(v); };
+    const back = () => finish(null);
+    const show = (html, extra) => { step.innerHTML = html; pre = { back, ...extra }; setNavFocus(null); };
+
+    const askMax = () => new Promise((done) => {
+      show(`<p class="gr-kicker">Primeira vez com este jogo</p><h3>Quantas pessoas jogam juntas nele?</h3>
+        <div class="gr-chips">${Array.from({ length: MAX }, (_, i) => `<button data-max="${i + 1}">${i + 1}</button>`).join('')}</div>
+        <p class="gr-help">O Hub lembra para as próximas vezes.</p>
+        <div class="gr-actions"><button class="btn-ghost" data-pre="back">Voltar</button></div>`, { step: 'max', choose: (n) => {
+        g.players = playersText(n);
+        saveLibrary();
+        renderGameInfo();
+        done();
+      } });
+    });
+
+    const warnVirtual = () => new Promise((done) => {
+      show(`<p class="gr-kicker">Falta um passo para os celulares</p><h3>Celulares e teclados ainda não funcionam neste jogo</h3>
+        <p class="gr-help">Jogos comuns só enxergam controles. Para eles verem celulares e teclados como controles de Xbox, o Windows precisa de um componente gratuito (ViGEmBus). Leva menos de um minuto, uma vez só. Controles de verdade já funcionam.</p>
+        <div class="gr-actions"><button class="btn-neon" data-pre="install">${icon('download')}Instalar componente</button><button class="btn-ghost" data-pre="check">Já instalei: conferir</button><button class="btn-ghost" data-pre="skip">Jogar só com os controles</button><button class="btn-ghost" data-pre="back">Voltar</button></div>`, { step: 'virtual', skip: done, recheck: async () => {
+        if (await hubData.retryVirtual()) { toast('Pronto: celulares e teclados já são controles.', null, 'ok'); done(); }
+        else toast('O componente ainda não está instalado. Se acabou de instalar, reinicie o PC.', null, 'warn');
+      } });
+    });
+
+    const pick = (max) => new Promise((done) => {
+      const chosen = new Set();
+      const draw = () => {
+        const list = active();
+        [...chosen].forEach((i) => { if (!list.some((x) => x.index === i)) chosen.delete(i); });
+        const k = chosen.size;
+        step.innerHTML = `<p class="gr-kicker">Este jogo aceita até ${max} ${max === 1 ? 'jogador' : 'jogadores'}</p><h3>Quem vai jogar?</h3>
+          <div class="gr-seats">${list.map((x) => `<button class="gr-seat${chosen.has(x.index) ? ' on' : ''}" data-seat="${x.index}" style="--c:${x.color}" aria-pressed="${chosen.has(x.index)}"><i>${x.index + 1}</i><span>${escapeHtml(x.name)}</span></button>`).join('')}</div>
+          <p class="gr-help">Quem vai jogar aperta <b>A</b> no controle ou no celular: a bolinha acende. Mudou de ideia? <b>B</b> apaga. Também dá para clicar na bolinha. <b>Start</b> começa.</p>
+          <div class="gr-actions"><button class="btn-neon" data-pre="go"${k ? '' : ' disabled'}>${icon('play')}${k ? `Jogar com ${k}` : `Escolha até ${max}`}</button><button class="btn-ghost" data-pre="back">Voltar</button></div>`;
+      };
+      const toggle = (i, on) => {
+        if (!active().some((x) => x.index === i)) return;
+        if (on && !chosen.has(i) && chosen.size >= max) { toast(`Já tem ${max}. Alguém aperta B para dar a vez.`, null, 'warn'); return; }
+        if (on) chosen.add(i); else chosen.delete(i);
+        draw();
+      };
+      pre = { back, step: 'pick', toggle, refresh: draw, go: () => { if (chosen.size) done([...chosen].sort((a, b) => a - b)); } };
+      draw();
+    });
+
+    (async () => {
+      const n = active().length;
+      let max = maxPlayers(g);
+      if (max == null && n > 1) { await askMax(); max = maxPlayers(g); }
+      if (isPcGame(g) && active().some((x) => x.kind !== 'gamepad')) {
+        const st = await hubData.settings();
+        if (!st.virtualPads) await warnVirtual();
+      }
+      if (max != null && active().length > max) {
+        const players = await pick(max);
+        finish({ players });
+      } else finish({ players: null });
+    })();
+  });
+}
+document.getElementById('gameRun').addEventListener('click', async (e) => {
+  if (!pre) return;
+  const seat = e.target.closest('[data-seat]');
+  if (seat && pre.toggle) { pre.toggle(+seat.dataset.seat, !seat.classList.contains('on')); return; }
+  const max = e.target.closest('[data-max]');
+  if (max && pre.choose) { pre.choose(+max.dataset.max); return; }
+  const a = e.target.closest('[data-pre]')?.dataset.pre;
+  if (a === 'back') pre.back();
+  else if (a === 'go') pre.go();
+  else if (a === 'skip') pre.skip();
+  else if (a === 'check') pre.recheck();
+  else if (a === 'install') {
+    try { await hubData.installVirtual(); toast('O instalador abriu: siga na tela e depois toque em "Já instalei: conferir".', null, 'ok'); } catch (err) { toast(String(err), null, 'warn'); }
+  }
+});
+// controle e celular na tela de antes do jogo: A e B escolhem quem joga; o resto anda pelos botões
+function preNav(action, seat) {
+  if (pre.step === 'pick') {
+    if (seat != null && (action === 'a' || action === 'b')) { pre.toggle(seat, action === 'a'); return; }
+    if (action === 'start') { pre.go(); return; }
+    return;
+  }
+  if (action === 'b') { pre.back(); return; }
+  const cands = navCandidates(document.getElementById('grStep'));
+  const cur = navEl && cands.includes(navEl) ? navEl : null;
+  if (action === 'a') { if (cur) cur.click(); else setNavFocus(cands[0]); return; }
+  if (!['up', 'down', 'left', 'right'].includes(action)) return;
+  if (!cur) { setNavFocus(cands[0]); return; }
+  const next = spatial(cur, action, cands);
+  if (next) setNavFocus(next);
 }
 let exiting = false;
 async function exitGame() {
   if (!gameRunning || exiting) return;
   exiting = true;
+  gameStopped();
   const run = document.getElementById('gameRun');
   run.classList.remove('show');
   await sleep(360);
@@ -1863,6 +2008,28 @@ function addToLibrary(list) {
   closeModal();
   if (currentView === 'library') { if (!arcade) renderLibrary(); } else switchView('library');
   toast(list.length === 1 ? `${list[0].name} está na sua biblioteca` : `${list.length} jogos adicionados à biblioteca`, null, 'ok');
+  askPlayers(list.filter((g) => maxPlayers(g) == null));
+}
+// Jogos sem o número de jogadores (os do PC): pergunta um por um; "Depois" pergunta na hora de jogar.
+function askPlayers(list) {
+  const g = list[0];
+  if (!g) return;
+  openModal(`${head('Quantas pessoas jogam juntas?', `Em <b>${escapeHtml(g.name)}</b>. Se tiver mais gente no lobby, o Hub pergunta quem vai jogar antes de abrir.`)}
+    <div class="gr-chips" style="justify-content:flex-start">${Array.from({ length: MAX }, (_, i) => `<button class="btn-ghost" style="width:52px;padding:0;justify-content:center" data-max="${i + 1}">${i + 1}</button>`).join('')}</div>
+    <div class="edit-actions" style="margin-top:20px"><button class="btn-ghost" data-later>Depois</button></div>`, () => {
+    const h = (e) => {
+      const b = e.target.closest('[data-max]');
+      if (b) {
+        g.players = playersText(+b.dataset.max);
+        saveLibrary();
+        if (currentView === 'library') renderGameInfo();
+      } else if (!e.target.closest('[data-later]')) return;
+      closeModal();
+      setTimeout(() => askPlayers(list.slice(1)), 120);
+    };
+    modal.addEventListener('click', h);
+    return () => modal.removeEventListener('click', h);
+  });
 }
 
 // Biblioteca: as duas abas do mesmo lugar. "Adicionar" traz jogos; "Organizar" edita, remove e reordena
@@ -2365,6 +2532,7 @@ function activateFocus() {
 }
 document.addEventListener('keydown', (e) => {
   if (e.target.matches('input, [contenteditable="true"]')) return;
+  if (pre) { if (e.key === 'Escape') pre.back(); return; }
   if (gameRunning) { if (e.key === 'Escape' || e.key === 'Backspace') exitGame(); return; }
   if (e.key === 'Escape') closeModal();
   if (overlay.classList.contains('open')) return;
@@ -2441,8 +2609,9 @@ function spatial(from, dir, cands) {
   }
   return best;
 }
-function navAction(action, color) {
+function navAction(action, color, seat) {
   if (color) setNavColor(color);
+  if (pre) { preNav(action, seat); return; }
   if (gameRunning) { if (action === 'b' || action === 'start') exitGame(); return; }
   const modalOpen = overlay.classList.contains('open');
   const cardsView = !modalOpen && (currentView === 'lobby' || currentView === 'library');
@@ -2503,11 +2672,11 @@ function pollPads(t) {
     else if (down(12) || gp.axes[1] < -0.6) dir = 'up';
     else if (down(13) || gp.axes[1] > 0.6) dir = 'down';
     if (dir && (dir !== st.dir || t >= st.next)) {
-      navAction(dir, color);
+      navAction(dir, color, owner && owner.index);
       st.next = t + (dir !== st.dir ? 380 : 170);
     }
     st.dir = dir;
-    for (const [i, action] of [[0, 'a'], [1, 'b'], [3, 'y'], [4, 'lb'], [5, 'rb'], [9, 'start']]) if (hit(i)) navAction(action, color);
+    for (const [i, action] of [[0, 'a'], [1, 'b'], [3, 'y'], [4, 'lb'], [5, 'rb'], [9, 'start']]) if (hit(i)) navAction(action, color, owner && owner.index);
     st.b = gp.buttons.map((b) => b.pressed);
   }
   requestAnimationFrame(pollPads);
@@ -2650,12 +2819,14 @@ const SIZES = [['P', .8], ['M', 1], ['G', 1.25]];
 const GRID = .02;
 const P = (kind, xu, y, s = 1) => ({ kind, x: xu / CANVAS, y, s });
 const ADVANCED_PIECES = [
-  P('LT', .24, .09), P('LB', .64, .09), P('RB', 1.53, .09), P('RT', 1.93, .09),
-  P('stickL', .36, .44), P('dpad', .8, .8),
-  P('BACK', 1.085, .3), P('START', 1.085, .43), P('LS', 1.085, .62), P('RS', 1.085, .75),
-  P('Y', 1.62, .28), P('X', 1.42, .48), P('B', 1.82, .48), P('A', 1.62, .68), P('stickR', 1.91, .8),
+  P('LT', .22, .1, 1.15), P('LB', .66, .1, 1.15), P('RB', 1.51, .1, 1.15), P('RT', 1.95, .1, 1.15),
+  P('stickL', .3, .44), P('dpad', .76, .78, 1.1),
+  P('BACK', 1.085, .33, 1.1), P('START', 1.085, .47, 1.1), P('LS', 1.085, .66, 1.1), P('RS', 1.085, .8, 1.1),
+  P('Y', 1.6, .35, 1.25), P('X', 1.35, .6, 1.25), P('B', 1.85, .6, 1.25), P('A', 1.6, .85, 1.25), P('stickR', 1.98, .87, .7),
 ];
-const SIMPLE_PIECES = [P('stickL', .5, .52, 1.25), P('START', 1.085, .52), P('Y', 1.7, .29, 1.25), P('X', 1.44, .55, 1.25), P('B', 1.96, .55, 1.25), P('A', 1.7, .81, 1.25)];
+const SIMPLE_PIECES = [P('stickL', .5, .52, 1.25), P('START', 1.085, .52), P('Y', 1.72, .25, 1.5), P('X', 1.42, .55, 1.5), P('B', 2.02, .55, 1.5), P('A', 1.72, .85, 1.5)];
+// pílula do topo (jogador, conexão, Menu): meia largura e altura reservadas no meio do topo (settings.rs)
+const TOP_PILL = [.22, .14];
 const demoLayouts = [
   { id: 'simple', name: 'Simples', modes: [{ name: 'Padrão', pieces: SIMPLE_PIECES }], builtin: true },
   { id: 'advanced', name: 'Avançado', modes: [{ name: 'Padrão', pieces: ADVANCED_PIECES }], builtin: true },
@@ -2714,8 +2885,8 @@ function pieceHtml(p, i, tag = 'span') {
   return `<${tag} class="pz ${d.type}"${attrs} style="${posStyle(p)}${c}">${inner}</${tag}>`;
 }
 // a barra de cima do celular (bolinha do jogador, nome, modos, menu), em miniatura
-const phoneBar = (modes, current = 0) => `<div class="phone-bar"><i></i><em></em>${modes.length > 1 ? `<span class="lseg mini">${modes.map((m, i) => `<span class="${i === current ? 'on' : ''}">${escapeHtml(m.name)}</span>`).join('')}</span>` : ''}<u></u></div>`;
-const miniPhone = (l) => `<div class="phone">${phoneBar(l.modes)}<div class="phone-screen">${(l.modes[0]?.pieces || []).map((p, i) => pieceHtml(p, i)).join('')}</div></div>`;
+const phoneBar = (modes, current = 0) => `<div class="phone-pill"><i></i>${modes.length > 1 ? `<span class="lseg mini">${modes.map((m, i) => `<span class="${i === current ? 'on' : ''}">${escapeHtml(m.name)}</span>`).join('')}</span>` : '<em></em>'}<u></u></div>`;
+const miniPhone = (l) => `<div class="phone"><div class="screen-wrap"><div class="phone-screen">${(l.modes[0]?.pieces || []).map((p, i) => pieceHtml(p, i)).join('')}</div>${phoneBar(l.modes)}</div></div>`;
 
 const describeLayout = (l) => {
   if (l.modes.length > 1) return `${l.modes.length} modos: ${l.modes.map((m) => m.name).join(', ')}`;
@@ -2771,6 +2942,10 @@ function modeProblems(m) {
   m.pieces.forEach((a, i) => m.pieces.slice(i + 1).forEach((b, k) => {
     if (overlaps(a, b)) { bad.add(i); bad.add(i + 1 + k); out.push(`${PIECE_DEF[a.kind].label} e ${PIECE_DEF[b.kind].label} estão uma em cima da outra`); }
   }));
+  m.pieces.forEach((p, i) => {
+    const b = pieceBox(p), mid = CANVAS / 2;
+    if (b.x0 < mid + TOP_PILL[0] - .005 && b.x1 > mid - TOP_PILL[0] + .005 && b.y0 < TOP_PILL[1] - .005) { bad.add(i); out.push(`${PIECE_DEF[p.kind].label} está embaixo do Menu, no meio do topo`); }
+  });
   const kinds = m.pieces.map((p) => p.kind);
   if (!kinds.some((k) => k === 'stickL' || k === 'stickR' || k === 'dpad')) out.push('falta um analógico ou as setas');
   if (!kinds.some((k) => FACE[k])) out.push('falta ao menos um botão (A, B, X ou Y)');
@@ -2800,7 +2975,7 @@ function openLayoutEditor(layout, base) {
       </div>
       <div class="le-main">
         <div class="le-stage">
-          <div class="phone"><div id="leBar"></div><div class="phone-screen edit" id="leScreen"></div></div>
+          <div class="phone"><div class="screen-wrap"><div class="phone-screen edit" id="leScreen"></div><div id="leBar"></div></div></div>
           <div class="le-tools" id="leTools"></div>
         </div>
         <aside class="le-side">

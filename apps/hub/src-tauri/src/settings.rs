@@ -2,9 +2,11 @@
 //! (os prontos e os que a pessoa monta na aba Controles) e o layout que cada celular escolheu.
 //!
 //! Layout: um ou mais **modos** (ex.: "A pé" e "Veículo", para jogos que mudam os comandos), cada um com
-//! peças posicionadas numa tela de referência de proporção fixa (`CANVAS`, a dos celulares atuais). O
-//! celular encaixa essa tela inteira na dele (encolhendo junto), então o que não se sobrepõe no editor não
-//! se sobrepõe em nenhum celular.
+//! peças posicionadas numa tela de referência de proporção fixa (`CANVAS`, a tela inteira de um celular
+//! atual, deitado). O celular encaixa essa tela inteira na dele (encolhendo junto), então o que não se
+//! sobrepõe no editor não se sobrepõe em nenhum celular. No meio do topo fica a pílula do jogador e do Menu
+//! (`TOP_PILL`): nenhuma peça vai ali. Os analógicos são "livres": no celular, o esquerdo nasce onde o dedo
+//! tocar na metade da tela em que ele está (o direito, na dele), fora das outras peças.
 
 use std::collections::HashMap;
 use std::fs;
@@ -18,6 +20,8 @@ pub const DEFAULT_LAYOUT: &str = "advanced";
 /// Proporção da tela de referência (largura ÷ altura), a área do controle abaixo da barra do topo.
 pub const CANVAS: f32 = 2.17;
 pub const MAX_MODES: usize = 6;
+/// Área reservada à pílula do topo (jogador, conexão, Menu): meia largura e altura, em unidades da altura.
+pub const TOP_PILL: (f32, f32) = (0.22, 0.14);
 
 /// Peças e o tamanho base (largura, altura) em unidades da altura da tela de referência.
 pub const PIECES: [(&str, f32, f32); 15] = [
@@ -79,21 +83,21 @@ fn p(kind: &str, x_units: f32, y: f32, s: f32) -> Piece {
 /// O Avançado, peça por peça (posições em unidades da altura; x é convertido para 0..1 da largura).
 fn advanced_pieces() -> Vec<Piece> {
     vec![
-        p("LT", 0.24, 0.09, 1.0),
-        p("LB", 0.64, 0.09, 1.0),
-        p("RB", 1.53, 0.09, 1.0),
-        p("RT", 1.93, 0.09, 1.0),
-        p("stickL", 0.36, 0.44, 1.0),
-        p("dpad", 0.8, 0.8, 1.0),
-        p("BACK", 1.085, 0.3, 1.0),
-        p("START", 1.085, 0.43, 1.0),
-        p("LS", 1.085, 0.62, 1.0),
-        p("RS", 1.085, 0.75, 1.0),
-        p("Y", 1.62, 0.28, 1.0),
-        p("X", 1.42, 0.48, 1.0),
-        p("B", 1.82, 0.48, 1.0),
-        p("A", 1.62, 0.68, 1.0),
-        p("stickR", 1.91, 0.8, 1.0),
+        p("LT", 0.22, 0.1, 1.15),
+        p("LB", 0.66, 0.1, 1.15),
+        p("RB", 1.51, 0.1, 1.15),
+        p("RT", 1.95, 0.1, 1.15),
+        p("stickL", 0.3, 0.44, 1.0),
+        p("dpad", 0.76, 0.78, 1.1),
+        p("BACK", 1.085, 0.33, 1.1),
+        p("START", 1.085, 0.47, 1.1),
+        p("LS", 1.085, 0.66, 1.1),
+        p("RS", 1.085, 0.8, 1.1),
+        p("Y", 1.6, 0.35, 1.25),
+        p("X", 1.35, 0.6, 1.25),
+        p("B", 1.85, 0.6, 1.25),
+        p("A", 1.6, 0.85, 1.25),
+        p("stickR", 1.98, 0.87, 0.7),
     ]
 }
 
@@ -106,10 +110,10 @@ pub fn builtins() -> Vec<Layout> {
             modes: one_mode(vec![
                 p("stickL", 0.5, 0.52, 1.25),
                 p("START", 1.085, 0.52, 1.0),
-                p("Y", 1.7, 0.29, 1.25),
-                p("X", 1.44, 0.55, 1.25),
-                p("B", 1.96, 0.55, 1.25),
-                p("A", 1.7, 0.81, 1.25),
+                p("Y", 1.72, 0.25, 1.5),
+                p("X", 1.42, 0.55, 1.5),
+                p("B", 2.02, 0.55, 1.5),
+                p("A", 1.72, 0.85, 1.5),
             ]),
             controls: vec![],
             builtin: true,
@@ -154,6 +158,10 @@ pub fn check_mode(m: &Mode) -> Result<(), String> {
         let (x0, y0, x1, y1) = rect(piece).ok_or_else(|| format!("peça desconhecida: {}", piece.kind))?;
         if x0 < -0.001 || y0 < -0.001 || x1 > CANVAS + 0.001 || y1 > 1.001 {
             return Err(format!("{} passa da borda da tela no modo {name}.", piece.kind));
+        }
+        let mid = CANVAS / 2.0;
+        if x0 < mid + TOP_PILL.0 - 0.005 && x1 > mid - TOP_PILL.0 + 0.005 && y0 < TOP_PILL.1 - 0.005 {
+            return Err(format!("{} está embaixo do Menu (no meio do topo) no modo {name}.", piece.kind));
         }
     }
     let has_dir = seen.iter().any(|k| k == "stickL" || k == "stickR" || k == "dpad");
@@ -308,6 +316,8 @@ mod tests {
         assert!(s.upsert_layout(None, "X", vec![no_button]).unwrap_err().contains("botão"));
         let out = mode("A pé", vec![p("stickL", 0.1, 0.5, 1.0), p("A", 1.5, 0.5, 1.0)]);
         assert!(s.upsert_layout(None, "X", vec![out]).unwrap_err().contains("borda"));
+        let pill = mode("A pé", vec![p("stickL", 0.4, 0.5, 1.0), p("A", 1.085, 0.1, 1.0)]);
+        assert!(s.upsert_layout(None, "X", vec![pill]).unwrap_err().contains("Menu"));
         let overlap = mode("A pé", vec![p("stickL", 0.4, 0.5, 1.0), p("A", 0.45, 0.5, 1.0)]);
         assert!(s.upsert_layout(None, "X", vec![overlap]).unwrap_err().contains("uma em cima da outra"));
         let walk = mode("A pé", vec![p("stickL", 0.4, 0.5, 1.0), p("A", 1.6, 0.6, 1.0), p("B", 1.85, 0.4, 1.0)]);

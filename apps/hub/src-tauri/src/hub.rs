@@ -57,6 +57,9 @@ pub struct Hub {
     /// Desligado, não custa nada no caminho da entrada.
     pub watch_input: AtomicBool,
     last_activity: Mutex<HashMap<DeviceKey, Instant>>,
+    /// Vagas que ficaram de fora do jogo aberto agora (havia mais gente do que o jogo aceita): o jogo não
+    /// as vê (SDK: vaga vazia; Modo Universal: sem controle virtual). Volta tudo ao sair do jogo.
+    benched: Mutex<[bool; MAX_SEATS]>,
 }
 
 #[derive(Clone, Serialize)]
@@ -116,6 +119,7 @@ impl Hub {
             game_connected: AtomicBool::new(false),
             watch_input: AtomicBool::new(false),
             last_activity: Mutex::new(HashMap::new()),
+            benched: Mutex::new([false; MAX_SEATS]),
         })
     }
 
@@ -263,6 +267,9 @@ impl Hub {
 
     /// Celulares e teclados viram controles de Xbox virtuais (os jogos já veem os controles físicos).
     pub fn plug(&self, seat: usize) {
+        if self.is_benched(seat) {
+            return;
+        }
         let guard = self.virtual_pads.lock().unwrap();
         let (Some(v), true) = (guard.as_ref(), seat < MAX_SEATS) else { return };
         if self.game_connected.load(Ordering::Acquire) {
@@ -287,6 +294,23 @@ impl Hub {
             v.update(seat as u8, Pad::NEUTRAL);
             v.unplug(seat as u8);
         }
+    }
+
+    pub fn is_benched(&self, seat: usize) -> bool {
+        seat < MAX_SEATS && self.benched.lock().unwrap()[seat]
+    }
+
+    /// Quem joga o jogo que vai abrir. `None`: todo mundo (e ao sair do jogo).
+    pub fn set_players(&self, players: Option<&[usize]>) {
+        let bench: [bool; MAX_SEATS] = std::array::from_fn(|i| players.is_some_and(|p| !p.contains(&i)));
+        *self.benched.lock().unwrap() = bench;
+        for (i, out) in bench.iter().enumerate() {
+            if *out {
+                self.unplug(i);
+            }
+        }
+        self.replug_all();
+        self.emit_lobby();
     }
 
     pub fn snapshot(&self) -> LobbyView {

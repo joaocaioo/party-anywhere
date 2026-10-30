@@ -60,7 +60,7 @@
   // navegar o Hub com controle ou celular: as ações vêm do núcleo (qualquer jogador); a Gamepad API do
   // navegador fica desligada para o mesmo controle não navegar duas vezes
   window.__padNavExternal = true;
-  listen('nav', (e) => navAction(e.payload.action, e.payload.color));
+  listen('nav', (e) => navAction(e.payload.action, e.payload.color, e.payload.seat));
   listen('device-activity', (e) => deviceActivity(e.payload));
 
   // controles chegam pelo núcleo (gilrs)
@@ -343,12 +343,9 @@
   };
 
   // Jogar: abre o jogo de verdade; a animação do fliperama só roda se ele abriu
-  const playCinematic = playGame;
-  window.playGame = async (g) => {
-    if (!g || gameRunning || switching) return;
-    try { await invoke('game_play', { id: g.id }); } catch (e) { warn(e); return; }
-    return playCinematic(g);
-  };
+  // (a escolha de quem joga acontece antes, na tela do fliperama; ver preGame)
+  window.startGame = (g, players) => invoke('game_play', { id: g.id, players });
+  window.gameStopped = () => { invoke('game_stopped').catch(() => {}); };
   window.launch = (g) => invoke('game_play', { id: g.id }).then(() => toast(`Abrindo ${g.name}...`, null, 'ok')).catch(warn);
 
   // ------------------------------------------------------------------ atualizações

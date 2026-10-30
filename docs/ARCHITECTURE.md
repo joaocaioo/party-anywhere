@@ -296,11 +296,19 @@ Regras:
   **peças posicionadas** (`stickL`, `stickR`, `dpad`, `A`, `B`, `X`, `Y`, `LB`, `RB`, `LT`, `RT`, `BACK`,
   `START`, `LS`, `RS`): `{ kind, x, y, s }`, com o centro em 0..1 numa **tela de referência** deitada de
   proporção 2,17 (`CANVAS`) e `s` multiplicando o tamanho base da peça (medido na altura dessa tela).
-- O núcleo (`settings.rs`) confere cada modo ao salvar: peça dentro da tela, sem repetir, sem sobrepor, com um
-  analógico ou as setas e ao menos um de A/B/X/Y. O editor da aba Controles mostra os mesmos erros ao vivo.
+- A tela de referência é a tela inteira do celular deitado. No meio do topo fica a **pílula** (jogador, modos,
+  conexão, Menu): nenhuma peça vai ali (`TOP_PILL`, meia largura 0,22 e altura 0,14), os cantos ficam para os
+  ombros e gatilhos.
+- O núcleo (`settings.rs`) confere cada modo ao salvar: peça dentro da tela e fora da pílula, sem repetir, sem
+  sobrepor, com um analógico ou as setas e ao menos um de A/B/X/Y. O editor mostra os mesmos erros ao vivo.
 - O celular encaixa a tela de referência na sua: a altura encolhe junto (`u = min(altura, largura / 2,17)`) e
   as posições horizontais esticam na largura toda (só afastam as peças). O que não se sobrepõe no editor não se
-  sobrepõe em nenhum celular. Com mais de um modo, os nomes ficam no topo e um toque troca (solta tudo antes).
+  sobrepõe em nenhum celular. Com mais de um modo, os nomes ficam na pílula e um toque troca (solta tudo antes).
+- **Analógicos livres**: o esquerdo nasce onde o dedo tocar na metade da tela em que ele está, fora das outras
+  peças (o direito, na outra metade). Se os dois estão na mesma metade, cada um fica no seu retângulo. A posição
+  no editor vira só a dica (um círculo fraco), que some no primeiro uso.
+- iPhone: o Safari ignora `user-scalable=no`; a página bloqueia o toque duplo e a pinça e, se mesmo assim a tela
+  ficar com zoom, volta ao normal sozinha.
 - Prontos: **Simples** (analógico, A, B, X, Y grandes e Start) e **Avançado** (tudo). Personalizados: criados
   na aba Controles. Guardados em `settings.json`, com o layout que cada celular escolheu (pela chave do
   token). Layouts no formato antigo (só a lista `controls`) viram um modo com as posições do Avançado.
@@ -308,6 +316,18 @@ Regras:
   (celular → Hub). O modo em uso fica só no celular.
 - O menu abre **segurando** o botão do topo por 0,5 s (um anel enche): sem abrir sem querer no meio do jogo.
   Abrir o menu ou trocar de layout solta todos os botões (nada fica preso no jogo).
+
+## Antes do jogo abrir: quem joga
+
+- Depois do zoom na tela do fliperama e antes de abrir o jogo (`preGame` na UI):
+  1. O jogo não diz quantos aceita (jogos do PC)? O Hub pergunta (1 a 10) e guarda em `players` ("Até 4
+     jogadores"). Também pergunta ao adicionar o jogo (dá para deixar para depois).
+  2. Jogo comum, com celular ou teclado no lobby e sem o controle virtual (ViGEmBus)? Avisa e oferece instalar,
+     conferir ou jogar só com os controles.
+  3. Mais gente do que o jogo aceita? "Quem vai jogar?": cada um aperta **A** no seu controle ou celular e a
+     bolinha acende; **B** apaga; clique também vale; **Start** começa.
+- `game_play(id, players)`: as vagas de fora ficam no banco (`Hub::set_players`): sem controle virtual e, no
+  SDK, como vaga vazia. `game_stopped` (ao voltar para a biblioteca) devolve todo mundo.
 
 ## Tela do jogo no celular (desenho; fase 7)
 

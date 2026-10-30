@@ -14,7 +14,9 @@
   mais modos (ex.: A pé e Veículo) e cada modo, peças posicionadas numa tela de referência deitada de
   proporção CANVAS (ver apps/hub/src-tauri/src/settings.rs). Esta página encaixa essa tela na do celular:
   a altura encolhe junto e a largura só estica, então o que não se sobrepõe no editor não se sobrepõe aqui.
-  Com mais de um modo, os nomes aparecem no topo e um toque troca.
+  Com mais de um modo, os nomes aparecem no topo e um toque troca. A pílula do topo (jogador, conexão, Menu)
+  fica no meio, por cima da tela; os cantos ficam para os controles. Analógicos livres: o esquerdo nasce onde
+  o dedo tocar na metade da tela dele, fora das outras peças (o direito, na outra metade).
   O menu abre segurando o botão do topo (evita abrir sem querer no meio do jogo).
   Cada mudança vai como STATE_T com o instante do toque, para o Hub medir a latência.
 -->
@@ -47,42 +49,43 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 
 .pad {
   position: fixed; inset: 0;
-  display: grid;
-  grid-template-rows: 44px minmax(0, 1fr);
-  padding: max(8px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
   background: radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, var(--seat) 14%, transparent), transparent 70%), var(--bg);
 }
 
-/* topo: quem eu sou, conexão, menu */
-.bar { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; }
-.who { display: flex; align-items: center; gap: 8px; font-weight: 800; min-width: 0; }
-.who i { width: 30px; height: 30px; border-radius: 50%; flex: none; display: grid; place-items: center; font-style: normal; font-size: 13px; background: var(--seat); color: rgba(0, 0, 0, .78); box-shadow: 0 0 16px var(--seat); }
-.who span { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.net { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--muted); flex: none; }
-.net b { width: 8px; height: 8px; border-radius: 50%; background: var(--neon); }
+/* pílula do topo, no meio: quem eu sou, modos, conexão, Menu (os cantos ficam para os controles) */
+.pill {
+  position: absolute; z-index: 5; top: max(6px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 6px; padding: 4px; border-radius: 999px; max-width: 70vw;
+  background: rgba(21, 22, 26, .88); border: 1px solid var(--line);
+}
+.pill .me { width: 26px; height: 26px; border-radius: 50%; flex: none; display: grid; place-items: center; font-style: normal; font-weight: 900; font-size: 12px; background: var(--seat); color: rgba(0, 0, 0, .78); box-shadow: 0 0 12px var(--seat); }
+.net { display: flex; align-items: center; gap: 5px; padding: 0 4px; font-size: 11px; font-weight: 800; color: var(--muted); flex: none; font-variant-numeric: tabular-nums; }
+.net b { width: 7px; height: 7px; border-radius: 50%; background: var(--neon); }
 .net.warn b { background: #facc15; } .net.bad b { background: #ef4444; }
 /* menu: segurar ~0,5 s; o anel enche enquanto segura */
 .menu-btn {
-  position: relative; flex: none; height: 34px; padding: 0 14px 0 12px; border-radius: 999px;
-  display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--muted); border: 1px solid var(--line); background: rgba(255, 255, 255, .03);
+  position: relative; flex: none; height: 26px; padding: 0 10px 0 6px; border-radius: 999px;
+  display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--muted); background: rgba(255, 255, 255, .06);
 }
-.menu-btn .ring { width: 18px; height: 18px; border-radius: 50%; background: conic-gradient(var(--seat) calc(var(--p, 0) * 1turn), rgba(255, 255, 255, .14) 0); -webkit-mask: radial-gradient(circle, transparent 5px, #000 6px); mask: radial-gradient(circle, transparent 5px, #000 6px); }
-.menu-btn.holding { color: var(--text); border-color: color-mix(in srgb, var(--seat) 60%, transparent); }
+.menu-btn .ring { width: 16px; height: 16px; border-radius: 50%; background: conic-gradient(var(--seat) calc(var(--p, 0) * 1turn), rgba(255, 255, 255, .18) 0); -webkit-mask: radial-gradient(circle, transparent 4px, #000 5px); mask: radial-gradient(circle, transparent 4px, #000 5px); }
+.menu-btn.holding { color: var(--text); background: color-mix(in srgb, var(--seat) 20%, transparent); }
 
 /* modos (A pé, Veículo...): um toque troca */
-.modes { display: flex; gap: 3px; padding: 3px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, .03); min-width: 0; overflow-x: auto; }
+.modes { display: flex; gap: 2px; min-width: 0; overflow-x: auto; }
 .modes:empty { display: none; }
-.modes button { height: 28px; padding: 0 12px; border-radius: 999px; font-size: 12px; font-weight: 800; color: var(--muted); white-space: nowrap; }
+.modes button { height: 26px; padding: 0 10px; border-radius: 999px; font-size: 11px; font-weight: 800; color: var(--muted); white-space: nowrap; }
 .modes button.on { background: color-mix(in srgb, var(--seat) 22%, transparent); color: var(--text); }
 
 /* área do controle: cada peça na sua posição (render) */
-.area { position: relative; min-height: 0; margin-top: 6px; }
-.area > * { position: absolute; }
+.area { position: absolute; inset: env(safe-area-inset-top) max(8px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(8px, env(safe-area-inset-left)); }
+.area > * { position: absolute; z-index: 2; }
+.area > .stick { z-index: 1; }
 .sh { border-radius: calc(var(--u) * .04); background: var(--panel); border: 1px solid var(--line); font-weight: 800; font-size: calc(var(--u) * .05 * var(--s)); color: var(--muted); }
 .small { border-radius: 999px; background: var(--panel); border: 1px solid var(--line); font-size: calc(var(--u) * .036 * var(--s)); font-weight: 800; color: var(--muted); }
-.stick { border-radius: 50%; border: 2px dashed rgba(255, 255, 255, .1); background: rgba(255, 255, 255, .02); }
-.stick .hint { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 12px; color: rgba(255, 255, 255, .25); text-align: center; pointer-events: none; white-space: nowrap; }
+/* analógico livre: a área toda é tocável; a dica (um círculo fraco) some no primeiro toque */
+.stick .hint { position: absolute; transform: translate(-50%, -50%); border-radius: 50%; border: 2px dashed rgba(255, 255, 255, .12); display: grid; place-items: center; font-size: 12px; line-height: 1.35; color: rgba(255, 255, 255, .3); text-align: center; pointer-events: none; transition: opacity .4s; }
+.stick.used .hint { opacity: 0; }
 .base, .knob { position: absolute; border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); }
 .base { border: 2px solid rgba(255, 255, 255, .14); background: rgba(255, 255, 255, .04); }
 .knob { background: color-mix(in srgb, var(--seat) 70%, white 10%); box-shadow: 0 0 24px color-mix(in srgb, var(--seat) 60%, transparent); }
@@ -159,18 +162,18 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 </head>
 <body>
 <div class="pad" id="pad">
-  <div class="bar">
-    <div class="who"><i id="seatNum">·</i><span id="seatName">Conectando...</span></div>
+  <div class="area" id="area"></div>
+  <div class="pill">
+    <i class="me" id="seatNum">·</i>
     <div class="modes" id="modes"></div>
     <div class="net" id="net"><b></b><span id="netTxt">--</span></div>
     <button class="menu-btn" id="menuBtn" aria-label="Menu (segure)"><span class="ring"></span>Menu</button>
   </div>
-  <div class="area" id="area"></div>
 </div>
 
 <div class="sheet" id="sheet">
   <div class="in">
-    <div class="top"><i id="sheetSeat" style="width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-weight:800;font-size:12px;background:var(--seat);color:rgba(0,0,0,.78)">·</i><b>Menu</b><button class="close" id="closeMenu">Voltar ao jogo</button></div>
+    <div class="top"><i id="sheetSeat" style="width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-weight:800;font-size:12px;background:var(--seat);color:rgba(0,0,0,.78)">·</i><b id="seatName">Conectando...</b><button class="close" id="closeMenu">Voltar ao jogo</button></div>
     <h3>Controle</h3>
     <div id="layoutList"></div>
     <h3>Seu nome</h3>
@@ -207,12 +210,13 @@ const HOLD_MS = 500;
 const CANVAS = 2.17;
 const SIZE = { stickL: [.5, .5], stickR: [.36, .36], dpad: [.36, .36], A: [.2, .2], B: [.2, .2], X: [.2, .2], Y: [.2, .2], LB: [.36, .14], RB: [.36, .14], LT: [.36, .14], RT: [.36, .14], BACK: [.2, .11], START: [.2, .11], LS: [.2, .11], RS: [.2, .11] };
 // sem o Hub responder ainda: o Avançado
-const P = (kind, xu, y) => ({ kind, x: xu / CANVAS, y, s: 1 });
+const P = (kind, xu, y, s = 1) => ({ kind, x: xu / CANVAS, y, s });
 const FALLBACK = [{ id: 'advanced', name: 'Avançado', modes: [{ name: 'Padrão', pieces: [
-  P('LT', .24, .09), P('LB', .64, .09), P('RB', 1.53, .09), P('RT', 1.93, .09), P('stickL', .36, .44), P('dpad', .8, .8),
-  P('BACK', 1.085, .3), P('START', 1.085, .43), P('LS', 1.085, .62), P('RS', 1.085, .75),
-  P('Y', 1.62, .28), P('X', 1.42, .48), P('B', 1.82, .48), P('A', 1.62, .68), P('stickR', 1.91, .8),
+  P('LT', .22, .1, 1.15), P('LB', .66, .1, 1.15), P('RB', 1.51, .1, 1.15), P('RT', 1.95, .1, 1.15), P('stickL', .3, .44), P('dpad', .76, .78, 1.1),
+  P('BACK', 1.085, .33, 1.1), P('START', 1.085, .47, 1.1), P('LS', 1.085, .66, 1.1), P('RS', 1.085, .8, 1.1),
+  P('Y', 1.6, .35, 1.25), P('X', 1.35, .6, 1.25), P('B', 1.85, .6, 1.25), P('A', 1.6, .85, 1.25), P('stickR', 1.98, .87, .7),
 ] }] }];
+let U = 300; // altura da tela de referência, em px
 
 const pad = { buttons: 0, lx: 0, ly: 0, rx: 0, ry: 0, lt: 0, rt: 0 };
 let ws = null;
@@ -243,7 +247,7 @@ function render() {
   const arrows = { UP: '▲', LEFT: '◀', RIGHT: '▶', DOWN: '▼' };
   $('area').innerHTML = layout.modes[modeIdx].pieces.filter((p) => SIZE[p.kind]).map((p, i) => {
     const k = p.kind, at = `data-i="${i}"`;
-    if (k === 'stickL' || k === 'stickR') return `<div class="stick" ${at} data-stick="${k === 'stickL' ? 'l' : 'r'}"><div class="hint">${k === 'stickL' ? 'Analógico' : 'Analógico 2'}</div></div>`;
+    if (k === 'stickL' || k === 'stickR') return `<div class="stick${prefs.stickSeen ? ' used' : ''}" ${at} data-stick="${k === 'stickL' ? 'l' : 'r'}"><div class="hint">Toque e<br>arraste</div></div>`;
     if (k === 'dpad') return `<div class="dpad" ${at}>${Object.keys(arrows).map((d) => `<button data-b="${d}">${arrows[d]}</button>`).join('')}</div>`;
     if ('ABXY'.includes(k) && k.length === 1) return `<button class="fb" ${at} data-b="${k}" style="--c:var(--${k.toLowerCase()})">${k}</button>`;
     if (label[k]) return `<button class="small" ${at} data-b="${k}">${label[k]}</button>`;
@@ -261,20 +265,36 @@ function place() {
   const W = area.clientWidth, H = area.clientHeight;
   if (!W || !H) return;
   const u = Math.min(H, W / CANVAS), top = (H - u) / 2;
+  U = u;
   area.style.setProperty('--u', u + 'px');
   const pieces = currentLayoutObj().modes[modeIdx].pieces.filter((p) => SIZE[p.kind]);
+  // analógico livre: a metade da tela em que ele está (se o outro analógico não está na mesma metade)
+  const half = (p) => (p.x < 0.5 ? 'l' : 'r');
+  const sticks = pieces.filter((p) => p.kind === 'stickL' || p.kind === 'stickR');
+  const free = (p) => sticks.filter((q) => half(q) === half(p)).length === 1;
   area.querySelectorAll(':scope > [data-i]').forEach((el) => {
     const p = pieces[+el.dataset.i];
     const w = SIZE[p.kind][0] * p.s * u, h = SIZE[p.kind][1] * p.s * u;
-    el.style.left = p.x * W - w / 2 + 'px';
-    el.style.top = top + p.y * u - h / 2 + 'px';
+    const cx = p.x * W, cy = top + p.y * u;
+    if (el.classList.contains('stick') && free(p)) {
+      const x0 = half(p) === 'l' ? 0 : W / 2;
+      Object.assign(el.style, { left: x0 + 'px', top: '0px', width: W / 2 + 'px', height: H + 'px' });
+      const hint = el.querySelector('.hint');
+      Object.assign(hint.style, { left: cx - x0 + 'px', top: cy + 'px', width: Math.min(w, h) * 0.9 + 'px', height: Math.min(w, h) * 0.9 + 'px' });
+      return;
+    }
+    el.style.left = cx - w / 2 + 'px';
+    el.style.top = cy - h / 2 + 'px';
     el.style.width = w + 'px';
     el.style.height = h + 'px';
     el.style.setProperty('--s', p.s);
+    const hint = el.querySelector('.hint');
+    if (hint) Object.assign(hint.style, { left: '50%', top: '50%', width: '90%', height: '90%' });
   });
 }
-let placeTimer = 0;
-addEventListener('resize', () => { clearTimeout(placeTimer); placeTimer = setTimeout(place, 60); });
+// encaixa de novo sempre que a área muda de tamanho (girar, barra do navegador, primeira pintura)
+if (window.ResizeObserver) new ResizeObserver(() => place()).observe($('area'));
+else addEventListener('resize', () => setTimeout(place, 60));
 
 // trocar de modo (a pé ↔ veículo): na hora, no toque
 $('modes').addEventListener('pointerdown', (e) => {
@@ -477,7 +497,7 @@ function stick(zone, [ax, ay]) {
     id = e.pointerId;
     const r = zone.getBoundingClientRect();
     ox = e.clientX - r.left; oy = e.clientY - r.top;
-    R = Math.max(36, Math.min(64, r.width * 0.3));
+    R = Math.max(40, Math.min(72, U * 0.17));
     base = document.createElement('div'); base.className = 'base';
     knob = document.createElement('div'); knob.className = 'knob';
     base.style.width = base.style.height = R * 2 + 'px';
@@ -485,8 +505,8 @@ function stick(zone, [ax, ay]) {
     base.style.left = knob.style.left = ox + 'px';
     base.style.top = knob.style.top = oy + 'px';
     zone.append(base, knob);
-    const hint = zone.querySelector('.hint');
-    if (hint) hint.style.display = 'none';
+    zone.classList.add('used');
+    if (!prefs.stickSeen) { prefs.stickSeen = true; try { localStorage.setItem('pa.prefs', JSON.stringify(prefs)); } catch (_) {} }
     keepAwake();
   });
   zone.addEventListener('pointermove', (e) => {
@@ -669,6 +689,26 @@ function vibrate(ms) {
 }
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// iPhone: o Safari ignora user-scalable=no. Dois toques rápidos davam zoom, e sem gesto para sair dele.
+// Bloqueia o toque duplo e a pinça; se mesmo assim a tela ficar com zoom, volta ao normal sozinha.
+let lastTouchEnd = 0;
+document.addEventListener('touchend', (e) => {
+  const now = Date.now();
+  if (now - lastTouchEnd < 350 && !e.target.closest('input')) e.preventDefault();
+  lastTouchEnd = now;
+}, { passive: false });
+document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
+['gesturestart', 'gesturechange'].forEach((t) => document.addEventListener(t, (e) => e.preventDefault(), { passive: false }));
+if (window.visualViewport) {
+  visualViewport.addEventListener('resize', () => {
+    if (visualViewport.scale <= 1.01) return;
+    const meta = document.querySelector('meta[name=viewport]');
+    const content = meta.content;
+    meta.content = content.replace('maximum-scale=1', 'maximum-scale=1.0001');
+    setTimeout(() => { meta.content = content; }, 60);
+  });
 }
 
 // Em segundo plano o celular fecha a conexão; ao voltar, reconecta (docs/ARCHITECTURE.md).

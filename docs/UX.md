@@ -142,6 +142,9 @@ em modo de pareamento. O nosso:
   longa e macia e um leve desfoque radial de movimento. Ao sair, um recuo curto e macio (0,5 s) com
   esmaecimento; a outra aba entra logo depois.
 - **Jogar**: a câmera entra na tela do fliperama, a tela apaga (com um clarão de CRT) e o jogo abre.
+  Antes de abrir, na própria tela do fliperama, quando precisa: quantas pessoas o jogo aceita (só na primeira
+  vez de um jogo do PC), o aviso do componente dos celulares e, se houver mais gente do que o jogo aceita,
+  **"Quem vai jogar?"**: cada um aperta A e a sua bolinha acende; B apaga; Start começa.
   **Sair do jogo** faz o caminho contrário: a tela religa e a câmera volta para a posição normal.
 - O enquadramento usa só a área livre entre o cabeçalho e os botões de baixo, em qualquer tamanho de janela.
 - Sem WebGL ou sem internet para carregar o 3D, a Biblioteca cai para o **carrossel de capas** abaixo.
@@ -205,11 +208,14 @@ O Hub lê nome e ícone do próprio executável, procura a capa pelo nome e, se 
 
 ## O controle no celular
 
-- Tela em paisagem e sempre acesa (Wake Lock); analógico **flutuante** (nasce onde o dedo toca).
+- Tela em paisagem e sempre acesa (Wake Lock). Analógico **livre**: nasce onde o dedo tocar na metade da
+  tela dele (esquerda), fora dos botões; não fica parado num lugar.
 - **Layouts**: Simples (analógico, A, B, X, Y grandes e Start), Avançado (tudo) e os criados na aba
   Controles. Nada se sobrepõe, em nenhum celular. O Hub lembra o layout de cada celular.
 - **Modos**: um layout pode ter vários (ex.: A pé e Veículo). Os nomes ficam no topo; um toque troca na hora.
-- Topo: número e cor do jogador, conexão (verde, amarelo, vermelho) e o botão **Menu**.
+- Topo: uma **pílula no meio** com o número e a cor do jogador, os modos, a conexão (verde, amarelo,
+  vermelho) e o **Menu**. Os cantos ficam livres para os controles; os botões são grandes.
+- Sem zoom sem querer: dois toques rápidos ou pinça não aumentam a tela (no iPhone também).
 - **Menu**: abre **segurando** o botão por meio segundo (um anel enche; um toque rápido só mostra a dica),
   para não abrir sem querer no meio do jogo. No menu: escolher o layout, trocar o nome, vibrar ao tocar,
   tela cheia e, em Diagnóstico, medir a conexão. Abrir o menu solta todos os botões.
