@@ -1,151 +1,232 @@
-# Party Anywhere
+<p align="center">
+  <img src="assets/brand/mascot.png" alt="Quatro camaleões jogando juntos no sofá" width="280">
+</p>
 
-**Qualquer jogo. Qualquer controle. Até 10 pessoas no mesmo sofá.**
+<h1 align="center">Party Anywhere</h1>
 
-Party Anywhere junta todo mundo num lobby só, no PC com Windows. Pode ser controle com fio ou Bluetooth,
-celular (escaneando um QR, sem instalar app) ou teclado: cada pessoa vira um jogador, de **P1 a P10**.
+<p align="center"><b>Qualquer jogo. Qualquer controle. Até 10 pessoas no mesmo sofá.</b></p>
 
-São três peças que conversam entre si:
+<p align="center">
+  <a href="#jogar">Jogar</a> ·
+  <a href="#criar-um-jogo-co-op">Criar um jogo</a> ·
+  <a href="#perguntas-rápidas">Perguntas</a> ·
+  <a href="#colaborar">Colaborar</a>
+</p>
 
-| | O que é | Para quem |
-|---|---|---|
-| 🎮 **Hub** | O app que reúne os controles e abre os jogos. | Quem joga |
-| 🧩 **SDK** | Um arquivo (`party_anywhere.h`) que deixa um jogo ou mod ler os jogadores do Hub. | Quem cria |
-| 📚 **Biblioteca** | Jogos co-op publicados no GitHub. Cole o link e o jogo instala, com capa e atualizações. | Os dois |
+---
 
-```mermaid
-flowchart LR
-  C[Controles USB e Bluetooth] --> H((Hub<br/>P1 a P10))
-  F[Celulares pelo QR] --> H
-  T[Teclados] --> H
-  H -->|controles de Xbox virtuais| J[Qualquer jogo do PC]
-  H -->|SDK| M[Jogos e mods co-op]
-  G[(Repositórios no GitHub)] -->|Biblioteca: instala e atualiza| M
-```
+## O que é
+
+Juntar a galera para jogar no PC costuma dar trabalho: falta controle, um não conecta, o jogo só aceita
+dois. O **Party Anywhere** resolve isso. É um app para Windows que coloca todo mundo num lobby só:
+
+- 🎮 **Controle** com fio ou Bluetooth: liga e já entra.
+- 📱 **Celular**: escaneia um QR e vira controle. Sem instalar nada.
+- ⌨️ **Teclado**: até o do notebook vale.
+
+Cada pessoa vira um jogador, de **P1 a P10**, com a sua cor. Depois é só escolher o jogo.
 
 ## Jogar
 
-1. Baixe e instale o `PartyAnywhere-X.Y.Z-setup.exe` da página de **Releases**.
-2. Ligue os controles ou escaneie o QR com o celular (no mesmo Wi-Fi do PC). Cada um vira um jogador.
-3. Na **Biblioteca**, escolha o jogo e aperte **Jogar**.
+1. Baixe e instale o **`PartyAnywhere-X.Y.Z-setup.exe`** (a versão mais nova) na página de [Releases](../../releases).
+2. Abra o app. Ligue os controles ou escaneie o QR com o celular (no mesmo Wi-Fi do PC).
+3. Vá em **Biblioteca**, escolha o jogo e aperte **Jogar**.
 
-Só isso. O Hub se atualiza sozinho e avisa quando um jogo instalado ganha versão nova.
+Pronto. O app se atualiza sozinho e avisa quando um jogo ganha versão nova.
 
-- **Jogos comuns** (Steam, Epic, qualquer `.exe`): celulares e teclados aparecem como controles de Xbox.
-  Na primeira vez o Hub pede para instalar um componente gratuito do Windows (ViGEmBus).
-- **Jogos feitos para o Party Anywhere**: cada jogador chega pronto, com nome e cor, sem configurar nada.
-- **Um jogo co-op que alguém publicou**: Biblioteca → Adicionar → cole o link do repositório.
+| Que tipo de jogo | Como funciona |
+|---|---|
+| Jogos que você já tem (Steam, Epic, qualquer `.exe`) | Celulares e teclados aparecem para o jogo como controles de Xbox. Na primeira vez o app pede para instalar um componente gratuito do Windows. |
+| Jogos e mods feitos para o Party Anywhere | Cada jogador chega pronto, com nome e cor. Nada para configurar. |
+| Um jogo que alguém publicou no GitHub | Biblioteca → **Adicionar** → cole o link. Ele instala com capa e se atualiza sozinho. |
+
+---
 
 ## Criar um jogo co-op
 
-Você pode criar um jogo novo ou transformar um jogo que já tem no PC em co-op (um mod). Nos dois casos o
-jogo lê os jogadores pelo SDK e o Hub cuida de controles, celulares, lobby, instalação e atualização.
+### A ideia em uma frase
 
-### Com um agente de IA (o jeito mais fácil)
+> **O Party Anywhere cuida das pessoas e dos controles. O seu jogo só pergunta: "o que o jogador 3 está apertando?"**
 
-A ferramenta `pa` traz um servidor **MCP**: um programinha que roda no seu computador e dá ao agente
-(Claude Code, Cursor e outros) as ferramentas do Party Anywhere. Não tem servidor na internet nem custo.
+Você não escreve nada de controle, Bluetooth, celular ou lobby. O app faz isso. O seu jogo usa um arquivo
+pronto (o **SDK**) para ler os jogadores, e o **GitHub** guarda e distribui o jogo.
 
-1. Baixe o `pa.exe` da página de **Releases** e coloque numa pasta do `PATH`.
-2. Ligue o `pa` ao seu agente. No Claude Code:
+```mermaid
+flowchart LR
+  P[Pessoas com controles,<br/>celulares e teclados] --> H[App Party Anywhere]
+  H -- "jogador 1 apertou A" --> J[Seu jogo]
+  J -- "vibra o controle do jogador 1" --> H
+  G[(Seu repositório<br/>no GitHub)] -- instala e atualiza --> H
+```
 
-   ```bash
-   claude mcp add --scope user party-anywhere -- pa mcp
-   ```
+Dá para fazer de dois jeitos:
 
-   Em outros agentes, a configuração é sempre a mesma: comando `pa`, argumento `mcp`.
-3. Peça em palavras, por exemplo: *"transforme o jogo X em co-op para o Party Anywhere"*.
+- **Um jogo novo**, do zero.
+- **Um mod co-op de um jogo que você já tem** (por exemplo, colocar 4 pessoas num jogo que era de 1).
+  O mod usa a cópia do jogo que cada pessoa já tem no PC. Você nunca distribui o jogo original.
 
-O agente confere se o Hub está instalado e atualizado (e instala, se precisar), acha o jogo no seu PC
-(Steam e Epic), cria o projeto já preenchido, lê a documentação do SDK, valida e prepara a publicação.
+### Do zero à Biblioteca em 5 passos
 
-| Ferramenta do MCP | O que faz |
-|---|---|
-| `hub_status`, `install_hub` | O Hub está instalado e atualizado? Instala ou atualiza. |
-| `find_installed_games` | Jogos do PC que podem virar co-op (avisa os que têm anti-cheat). |
-| `create_game` | Cria o projeto: manifesto, capa provisória, SDK com exemplo, workflow de publicação. |
-| `get_sdk_docs`, `get_manifest_spec` | A documentação, para o agente escrever o código certo. |
-| `validate_game`, `pack_release` | Confere tudo e gera o pacote da versão. |
-| `inspect_published_game` | Lê o jogo publicado como o Hub vai ler e diz se instala. |
+#### 1. Pegue a ferramenta `pa`
 
-### Na mão, pelo terminal
+Baixe o **`pa.exe`** na página de [Releases](../../releases) e coloque numa pasta que esteja no `PATH`
+(ou na pasta onde você vai trabalhar). Ela cria, confere e empacota o jogo para você.
+
+#### 2. Crie o projeto
+
+Jogo novo:
 
 ```bash
 pa new meu-jogo --name "Meu Jogo"
 ```
 
-Para o mod de um jogo instalado: `pa new meu-mod --name "Meu Mod" --base-game "nome do jogo"`.
-Depois: `pa validate` confere, `pa pack --from build --tag v0.1.0` gera a versão e `pa inspect dono/repo`
-mostra como o Hub lê o que você publicou. `pa games` lista os jogos do PC e `pa hub` confere o Hub.
+Mod de um jogo que está no seu PC (a ferramenta acha o jogo na Steam ou na Epic):
 
-### O código do jogo
+```bash
+pa new meu-mod --name "Meu Mod" --base-game "nome do jogo"
+```
+
+Você ganha uma pasta já pronta para publicar:
+
+| Arquivo | Para que serve |
+|---|---|
+| `party-anywhere.json` | A "ficha" do jogo: nome, frase curta, quantos jogadores, como instalar e abrir. É o que o app lê. |
+| `assets/cover.png` | A capa na Biblioteca. Vem uma provisória; troque pela sua (retrato 3:4). |
+| `sdk/party_anywhere.h` | O SDK: o arquivo que o seu jogo inclui para ler os jogadores. |
+| `sdk/examples/arena_console.c` | Um jogo de exemplo, pequeno, para copiar e adaptar. |
+| `.github/workflows/release.yml` | Publica cada versão sozinho quando você cria uma tag. |
+| `.mcp.json` e `.claude/` | Atalhos para agentes de IA (veja abaixo). |
+
+#### 3. Escreva o jogo
+
+O SDK é **um arquivo só**, em C, que funciona em C e C++. O essencial cabe aqui:
 
 ```c
 #define PARTY_ANYWHERE_IMPLEMENTATION
 #include "party_anywhere.h"
 
+// 1. Conecte ao app, uma vez, quando o jogo abre
 pa_game_info info = { sizeof info, "com.voce.meu-jogo", "Meu Jogo", 1, 10 };
 pa_client *pa;
 pa_connect(&info, &pa);
 
-/* a cada frame */
+// 2. A cada frame, leia os jogadores
 pa_poll(pa);
-for (int seat = 0; seat < PA_MAX_SEATS; seat++) {
+for (int jogador = 0; jogador < PA_MAX_SEATS; jogador++) {
     pa_pad pad;
-    if (pa_get_pad(pa, seat, &pad) && (pad.pressed & PA_BTN_A)) {
-        pa_rumble(pa, seat, 0.8f, 0.8f, 80); /* o jogador seat + 1 apertou A: o controle dele vibra */
+    if (pa_get_pad(pa, jogador, &pad) && (pad.pressed & PA_BTN_A)) {
+        // o jogador apertou A: faça ele pular
+        pa_rumble(pa, jogador, 0.8f, 0.8f, 80); // e o controle dele vibra
     }
 }
 ```
 
-Um arquivo só, em C, para C e C++ (x86 e x64). Sem o Hub aberto, `pa_connect` avisa e o jogo segue com os próprios controles.
-Tudo em [docs/SDK.md](docs/SDK.md).
+Também dá para: saber quem entrou ou saiu, o nome e a cor de cada um, mandar um aviso para o celular de
+alguém e pausar quando um jogador cai. Tudo explicado em [docs/SDK.md](docs/SDK.md).
 
-## Regras para o Hub achar, instalar e atualizar o seu jogo
+#### 4. Teste com o app aberto
 
-O Hub lê o repositório sozinho. Para isso funcionar, o jogo segue este contrato (o `pa new` já cria assim e
-o `pa validate` avisa o que faltar):
+Abra o Party Anywhere, entre com um controle e um celular e rode o seu jogo. Os jogadores do lobby
+aparecem no jogo na hora. Antes de publicar, rode:
 
-- [ ] **`party-anywhere.json` na raiz do repositório**: nome, frase curta, número de jogadores (1 a 10),
-      como instalar e como abrir. Especificação: [docs/GAME-MANIFEST.md](docs/GAME-MANIFEST.md).
-- [ ] **Uma capa** em retrato (3:4, a partir de 600×800). Arte sua, sem a arte oficial de outro jogo.
-- [ ] **Cada versão é um release do GitHub** com a tag igual à `version` (ex.: `v0.1.0`), o pacote `.zip`
-      e o `party-anywhere.release.json` que o `pa pack` gera (com o hash do pacote).
-- [ ] **Repositório público**, para qualquer pessoa instalar pelo link.
-- [ ] **Tópico `party-anywhere-game`** no repositório, para aparecer em "Descobrir" no Hub.
-- [ ] **Sem arquivos do jogo original** no repositório nem no pacote: o mod usa a cópia que a pessoa já tem.
-- [ ] **Sem jogos com anti-cheat**: contornar anti-cheat está fora do projeto e pode banir quem joga.
-
-Como o Hub lê um jogo:
-
-```mermaid
-flowchart LR
-  L[Link do repositório] --> A[Lê party-anywhere.json e a capa]
-  A --> B[Último release e party-anywhere.release.json]
-  B --> C[Baixa o pacote e confere o hash]
-  C --> D[Instala e mostra na Biblioteca]
-  D -.->|versão nova no GitHub| E[Avisa e atualiza]
+```bash
+pa validate
 ```
 
-Se algo não bater (sem capa, hash diferente, versão errada), nada é instalado e o Hub explica o que fazer.
+Ele confere a ficha e a capa e diz, em português, o que ajustar.
+
+#### 5. Publique
+
+1. Suba o projeto para um repositório **público** no GitHub.
+2. No `release.yml`, troque o passo **Build** pelo jeito de compilar o seu jogo.
+3. Crie a tag da versão, igual à `version` da ficha:
+
+   ```bash
+   git tag v0.1.0
+   git push --tags
+   ```
+
+4. Adicione o tópico **`party-anywhere-game`** ao repositório (na página dele, em "About").
+
+O GitHub publica a versão sozinho. A partir daí, qualquer pessoa cola o link na Biblioteca e instala, e o
+seu jogo aparece em **Descobrir**. Versão nova? Suba a `version`, crie a tag nova e quem já instalou recebe
+o aviso de atualização.
+
+### Com um agente de IA
+
+Prefere pedir em vez de fazer? A `pa` traz um servidor **MCP**, que entrega ao seu agente (Claude Code,
+Cursor e outros) as ferramentas do Party Anywhere. Ele roda no seu computador: **sem servidor na internet
+e sem custo**.
+
+Ligue uma vez. No Claude Code:
+
+```bash
+claude mcp add --scope user party-anywhere -- pa mcp
+```
+
+Em outros agentes, configure um servidor MCP com o comando `pa` e o argumento `mcp`.
+
+Depois é só pedir, por exemplo:
+
+- *"Transforme o jogo X em co-op para o Party Anywhere."*
+- *"Crie um jogo de corrida para até 8 pessoas usando o Party Anywhere."*
+- *"Meu jogo está pronto para publicar?"*
+
+O agente confere se o app está instalado e atualizado, acha o jogo no seu PC, cria o projeto, lê a
+documentação do SDK, valida e prepara a publicação. Ele pede sua permissão antes de instalar qualquer coisa.
+
+### O que o app exige para achar e instalar o seu jogo
+
+O app lê o seu repositório sozinho, então o jogo segue estas regras. O `pa new` já cria tudo assim e o
+`pa validate` avisa o que faltar.
+
+- [ ] `party-anywhere.json` na raiz do repositório ([como preencher](docs/GAME-MANIFEST.md)).
+- [ ] Capa em retrato (3:4, a partir de 600×800), com arte sua.
+- [ ] Cada versão é um release do GitHub com a tag igual à `version` (ex.: `v0.1.0`).
+- [ ] O release tem o pacote `.zip` e o `party-anywhere.release.json` (o workflow gera os dois).
+- [ ] Repositório público, com o tópico `party-anywhere-game`.
+- [ ] Nenhum arquivo do jogo original no repositório ou no pacote.
+- [ ] Nada de jogos com anti-cheat (contornar anti-cheat pode banir quem joga).
+
+Na hora de instalar, o app confere tudo. Se algo não bater (sem capa, pacote diferente do publicado,
+versão errada), nada é instalado e a mensagem diz o que fazer.
+
+---
+
+## Perguntas rápidas
+
+**Preciso pagar ou manter um servidor?** Não. O app, a `pa` e o MCP rodam no seu PC, e o GitHub hospeda
+os jogos de graça.
+
+**Funciona pela internet?** Não. É co-op local: todo mundo no mesmo lugar, celulares no mesmo Wi-Fi do PC.
+
+**Quantos jogadores?** De 1 a 10. O seu jogo diz quantos aceita na ficha.
+
+**Que linguagem posso usar?** C ou C++ hoje. Outras linguagens e motores (Unity, Godot) estão nos planos.
+
+**Meu jogo funciona sem o app aberto?** Funciona: o `pa_connect` avisa que o app não está aberto e o jogo
+segue com os próprios controles.
+
+**Os celulares têm atraso?** Pouco: na rede de casa, o toque chega ao PC em cerca de 25 ms.
+
+**Posso fazer mod de qualquer jogo?** De jogos sem anti-cheat, e sem distribuir arquivos do jogo original.
+
+---
 
 ## Colaborar
 
-Ideias, bugs e jogos novos são bem-vindos.
+Toda ajuda é bem-vinda, de quem joga e de quem programa.
 
-- **Publicou um jogo?** Abra uma issue com o link: ele pode entrar no catálogo com o selo **Verificado**.
+- **Publicou um jogo?** Abra uma issue com o link. Ele pode entrar no catálogo com o selo **Verificado**.
 - **Achou um problema?** Abra uma issue contando o que fez, o que esperava e o que aconteceu.
-- **Quer mexer no código?** Faça um fork, crie um branch e abra um pull request. Antes, rode:
+- **Tem uma ideia?** Abra uma issue: as próximas prioridades saem do que as pessoas pedem.
+- **Quer mexer no código?** Faça um fork, crie um branch e abra um pull request.
 
-  ```bash
-  cargo test --workspace
-  cargo clippy --workspace --all-targets -- -D warnings
-  ```
+Combinados: textos do app e docs em português do Brasil; código e commits em inglês. Mudou o protocolo do
+celular, o SDK ou a ficha do jogo? Atualize o doc no mesmo pull request.
 
-  Combinados: textos da interface e docs em português do Brasil; código e commits em inglês. Mudou o
-  protocolo do celular, o SDK ou o manifesto? Atualize o doc no mesmo pull request.
-
-## Desenvolver o Hub
+<details>
+<summary><b>Desenvolver o app</b></summary>
 
 Requisitos: Windows 10 ou 11, Rust estável e Node 22 (só para gerar o instalador).
 
@@ -153,13 +234,24 @@ Requisitos: Windows 10 ou 11, Rust estável e Node 22 (só para gerar o instalad
 cargo run -p party-anywhere-hub
 ```
 
-A interface (`apps/hub/ui`) também abre no navegador, em modo demonstração, com o painel "Demo":
+A interface também abre no navegador, em modo demonstração (com o painel "Demo" para simular celulares e
+controles):
 
 ```bash
 python -m http.server 5173 --directory apps/hub/ui
 ```
 
-A ferramenta `pa`, direto do código:
+Testes, antes de abrir um pull request:
+
+```bash
+cargo test --workspace
+```
+
+```bash
+cargo clippy --workspace --all-targets -- -D warnings
+```
+
+A `pa` direto do código:
 
 ```bash
 cargo install --path crates/pa-cli
@@ -171,15 +263,18 @@ Gerar o instalador (sai em `target/release/bundle/nsis/`), dentro de `apps/hub/s
 npx --yes @tauri-apps/cli@2 build
 ```
 
-Uma tag `vX.Y.Z` publica o instalador e o `pa.exe` pelo workflow `.github/workflows/release.yml`.
+Uma tag `vX.Y.Z` publica o instalador e a `pa` pelo workflow `.github/workflows/release.yml`.
 
 | Pasta | O que tem |
 |---|---|
 | `apps/hub` | O app (Tauri 2): `src-tauri` em Rust, `ui` em HTML e JS |
-| `crates/` | Lobby, celular, controles virtuais, SDK, manifesto, Biblioteca e a ferramenta `pa` |
-| `sdk/c` | `party_anywhere.h` e um exemplo |
+| `crates/` | Lobby, celular, controles virtuais, SDK, ficha do jogo, Biblioteca e a `pa` |
+| `sdk/c` | O `party_anywhere.h` e o exemplo |
 | `templates/game` | O projeto modelo que o `pa new` cria |
-| `schema/` | O esquema JSON do manifesto (autocompletar no editor) |
+| `schema/` | O esquema da ficha (autocompletar no editor) |
+| `assets/brand` | Mascote e ícone do app |
+
+</details>
 
 ## Licença
 
