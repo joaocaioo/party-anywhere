@@ -205,19 +205,35 @@ O Hub lê nome e ícone do próprio executável, procura a capa pelo nome e, se 
 
 ## O controle no celular
 
-- Tela em paisagem, tela cheia e tela sempre acesa (Wake Lock).
-- **Layouts**: `gamepad` (completo, estilo Xbox), `simple` (direcional + 2 botões), `driving`,
-  `menu` (setas + confirmar/voltar). O jogo SDK escolhe o layout e dá nome aos botões ("Correr", "Atirar").
-- Analógico **flutuante** (nasce onde o dedo toca), botões grandes e vibração ao tocar.
-- Topo: número e cor do jogador, latência (verde, amarelo ou vermelho) e o botão de menu.
-- Perdeu a conexão: tela "Reconectando..." que tenta sozinha; ao voltar para a mesma vaga, vibra.
+- Tela em paisagem e sempre acesa (Wake Lock); analógico **flutuante** (nasce onde o dedo toca).
+- **Layouts**: Simples (analógico, A, B, Start), Avançado (tudo) e os criados na aba Controles. Cada peça
+  tem a sua zona fixa: nada se sobrepõe, em nenhum celular. O Hub lembra o layout de cada celular.
+- Topo: número e cor do jogador, conexão (verde, amarelo, vermelho) e o botão **Menu**.
+- **Menu**: abre **segurando** o botão por meio segundo (um anel enche; um toque rápido só mostra a dica),
+  para não abrir sem querer no meio do jogo. No menu: escolher o layout, trocar o nome, vibrar ao tocar,
+  tela cheia e, em Diagnóstico, medir a conexão. Abrir o menu solta todos os botões.
+- Identificar: a tela pisca na cor do jogador (e vibra no Android).
+- Perdeu a conexão: tela "Reconectando..." que tenta sozinha e volta para a mesma vaga.
+- Planejado: o jogo do SDK escolhe o layout e dá nome aos botões ("Correr", "Atirar"); e a **tela do jogo
+  no celular** (fase 7, ver ARCHITECTURE.md).
 
 ## Navegação por controle no Hub
 
-- Direcional/analógico move o foco entre as cartas e os botões; **A** confirma, **B** volta,
-  **Start** é "Jogar", **Y** é "Adicionar jogador".
-- O foco é sempre visível: anel na cor do jogador que está navegando.
-- Qualquer jogador pode navegar; ações destrutivas (remover jogador) pedem confirmação.
+- Qualquer jogador navega o Hub pelo controle ou pelo celular (teclado não: é para escrever). O mouse
+  continua valendo; um clique de mouse tira o contorno do controle.
+- **LB/RB** trocam de aba. **Direcional ou analógico** andam: nas cartas (Lobby, Biblioteca) esquerda e
+  direita, para cima as abas, para baixo o rodapé; nas janelas e nas abas Controles e Ajustes, o item mais
+  perto na direção. **A** confirma, **B** volta ou fecha, **Y** adiciona, **Start** alterna Lobby e Biblioteca.
+- O item escolhido ganha um contorno **na cor de quem está navegando**.
+- Durante uma partida (jogo do SDK) ou com o Hub fora de foco, os botões são do jogo.
+
+## Abas Controles e Ajustes
+
+- **Controles**: os aparelhos conectados agora (com a vaga ou "esperando"), com Identificar; e os layouts
+  do controle do celular: os prontos e os seus (criar com nome e peças, editar, apagar; quem usava um layout
+  apagado volta para o Avançado).
+- **Ajustes**: "Entrar só ao apertar um botão"; o endereço do QR (automático ou uma rede específica); o
+  componente dos jogos comuns (Modo Universal) com instalar e conferir; versão e procurar atualização.
 
 ## Textos (tom de voz)
 

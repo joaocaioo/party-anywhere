@@ -275,6 +275,61 @@ Regras:
 - Aplicados hoje pelo Hub: `rumble` (controle Xbox pelo XInput; celular Android) e `toast` (celular). `label`, `layout` e `light`
   já fazem parte da ABI e chegam ao Hub; o protocolo do celular ganha os layouts na próxima versão.
 
+## Navegar o Hub com controle ou celular
+
+- Qualquer jogador ativo navega (menos teclados: o teclado do PC é para escrever). O mouse continua valendo.
+- O núcleo lê o estado das vagas a 60 Hz (`nav.rs`), acha as bordas (apertou agora) e a direção do
+  analógico/direcional com repetição (380 ms, depois 170 ms) e manda ações à UI (`nav`): cima, baixo,
+  esquerda, direita, A, B, Y, LB, RB, Start.
+- Só com a janela do Hub em foco e sem jogo do SDK conectado: enquanto alguém joga, os botões são do jogo.
+- A UI (`navAction`): nas telas de cartas, esquerda/direita andam nas cartas, cima vai para as abas, baixo
+  para o rodapé; nas janelas e telas de opções, o elemento mais próximo dentro de um cone na direção. A
+  confirma, B volta, LB/RB trocam de aba. No navegador (modo demonstração) a mesma função recebe a Gamepad API.
+
+## Controle do celular: layouts e menu
+
+- Um layout é uma lista de peças (`stickL`, `stickR`, `dpad`, `A`, `B`, `X`, `Y`, `LB`, `RB`, `LT`, `RT`,
+  `BACK`, `START`, `LS`, `RS`). A página desenha cada peça numa zona fixa (esquerda: analógico e setas;
+  centro: Voltar/Start/L3/R3; direita: A B X Y e o analógico direito; ombros em cima), com tamanhos relativos
+  à tela: nada se sobrepõe em nenhum celular.
+- Prontos: **Simples** (analógico, A, B, Start) e **Avançado** (tudo). Personalizados: criados na aba
+  Controles. Guardados em `settings.json`, com o layout que cada celular escolheu (pela chave do token).
+- Protocolo (aditivo, v1): `layouts` (Hub → celular: lista e o atual), `layout` e `rename` (celular → Hub).
+- O menu abre **segurando** o botão do topo por 0,5 s (um anel enche): sem abrir sem querer no meio do jogo.
+  Abrir o menu ou trocar de layout solta todos os botões (nada fica preso no jogo).
+
+## Tela do jogo no celular (desenho; fase 7)
+
+Ideia: o jogador vê a própria parte da tela (ou o jogo inteiro) no celular, com os controles por cima, como
+um jogo de celular. Serve para jogos em que um não pode ver a tela do outro (prop hunt, esconde-esconde) ou
+para quem prefere olhar para o celular em vez da TV.
+
+**Latência realista**: não existe "zero". Capturar, codificar em vídeo (H.264 na placa de vídeo), mandar
+pela rede local e decodificar no celular soma **50 a 100 ms** num Wi-Fi 5 GHz bom (Steam Link e Moonlight
+ficam nessa faixa). Ótimo para festa e esconde-esconde, perceptível em jogo de reflexo. A primeira etapa é
+um spike medindo exatamente isso, como fizemos com o toque.
+
+**Como, por tipo de jogo**:
+
+| | Jogos do SDK (os nossos) | Jogos comuns (Steam, Epic, .exe) |
+|---|---|---|
+| O que vai para o celular | A **visão daquele jogador**, que o jogo desenha separada (`pa_set_private_view`) | Um recorte da janela do jogo (a tela dividida daquele jogador) ou o jogo inteiro |
+| Some da TV? | **Sim**: o jogo deixa de desenhar aquela parte na tela principal (privacidade de verdade) | **Não**: o jogo continua desenhando tudo na TV; o Hub só copia |
+| Serve para esconde-esconde | Sim | Não (o outro vê na TV) |
+| Como o Hub captura | Textura compartilhada que o jogo entrega (sem cópia extra) | Windows.Graphics.Capture da janela + recorte |
+
+**Pipeline**: captura (textura do jogo ou WGC) → codificador de hardware (Media Foundation: NVENC, AMF ou
+Quick Sync), H.264 baixa latência, sem quadros B, 720p a 60 fps → **WebRTC** para o navegador do celular (o
+navegador já decodifica H.264 no hardware; sem app) → `<video>` em tela cheia com os controles do layout por
+cima. O controle continua indo pelo WebSocket de hoje.
+
+**SDK (proposta para a ABI 2, não implementada)**: `pa_set_private_view(pa, seat, texture, w, h)` para o jogo
+entregar a visão do jogador; `PA_EVENT_SCREEN_ON/OFF` quando o jogador liga ou desliga a tela no menu do
+celular, para o jogo parar de desenhar aquela parte na TV.
+
+**Ordem**: (1) spike de latência WGC + Media Foundation + WebRTC em 1 celular; (2) jogos comuns com o recorte
+escolhido no menu do celular; (3) a visão privada do SDK.
+
 ## Biblioteca: jogos do PC
 
 Qualquer jogo instalado entra na Biblioteca e roda no **Modo Universal** (controles virtuais). Nada é
@@ -303,7 +358,7 @@ exatamente como estavam.
 | `library.json` | jogos na ordem da Biblioteca: id, origem (Steam, Epic, GOG, Xbox, exe, link), como abrir, nome, jogadores, descrição, capa e o que a pessoa editou |
 | `covers\<id>.<ext>` | capas escolhidas pela pessoa, **copiadas** para cá (apagar o arquivo original não quebra nada) |
 | `devices.json` | aparelhos conhecidos: nome dado a cada um ("Júlio" volta como Júlio), controles pareados |
-| `settings.json` | Ajustes |
+| `settings.json` | Ajustes (entrar ao apertar um botão, endereço do QR), layouts do celular criados pela pessoa e o layout que cada celular escolheu |
 
 - Cada arquivo tem `version`; versão antiga é migrada ao abrir, nunca descartada.
 - Gravação atômica: escreve num temporário, força para o disco e troca (`ReplaceFile`), mantendo o último
