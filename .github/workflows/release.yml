@@ -1,0 +1,54 @@
+# Uma tag vX.Y.Z publica:
+#   - PartyAnywhere-X.Y.Z-setup.exe: o instalador do Hub (o aviso de atualização do Hub procura este nome);
+#   - pa-windows-x64.exe: a ferramenta dos criadores (o workflow do template de jogo baixa este nome).
+# A versão da tag precisa ser igual à de apps/hub/src-tauri/tauri.conf.json.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Conferir a versão
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}".TrimStart("v")
+          $conf = (Get-Content apps/hub/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          if ($tag -ne $conf) { Write-Error "A tag é $tag, mas o tauri.conf.json diz $conf."; exit 1 }
+
+      - name: Testes
+        run: cargo test --workspace --locked
+
+      - name: Ferramenta pa
+        shell: pwsh
+        run: |
+          cargo build --release --locked -p pa-cli
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item target/release/pa.exe dist/pa-windows-x64.exe
+
+      - name: Instalador do Hub
+        shell: pwsh
+        working-directory: apps/hub/src-tauri
+        run: |
+          npx --yes @tauri-apps/cli@2 build
+          $setup = Get-ChildItem ../../../target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
+          Copy-Item $setup.FullName "../../../dist/PartyAnywhere-${{ github.ref_name }}-setup.exe".Replace("-v", "-")
+
+      - name: Publicar
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" (Get-ChildItem dist).FullName --generate-notes

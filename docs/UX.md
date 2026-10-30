@@ -10,6 +10,9 @@ A UI está em [`apps/hub/ui/index.html`](../apps/hub/ui/index.html): no navegado
 Referência: o fliperama verde da Biblioteca (CRT verde-limão, luz difusa, tipografia condensada).
 
 - **Fundo** grafite quase preto, num painel com bordas arredondadas e um brilho verde sutil.
+- **No app, a janela é o painel**: sem a moldura do Windows, cantos arredondados de verdade, arrastada pelo
+  topo, com minimizar, maximizar e fechar discretos no canto. Abre do tamanho da área útil da tela (nunca
+  embaixo da barra de tarefas); mínimo 860×560.
 - **Tipografia display**: Anton (condensada, caixa alta), a mesma da tela do fliperama. Texto corrido em Inter.
 - **Um verde só** na interface (`#3cf060`, o mesmo dos botões). O verde-limão fica só na tela do fliperama.
   Sem degradês coloridos.
@@ -92,6 +95,9 @@ P1 a P4 seguem a convenção dos consoles. A cor sempre aparece junto do número
    - Rede de convidados com isolamento de clientes → explicar em uma frase e sugerir a rede principal.
 
 ## Fluxo 4: adicionar jogador → Controle Bluetooth (melhor que o do Windows)
+
+> Até a fase 3, a tela explica como colocar o controle em modo de pareamento (por marca) e abre o
+> Bluetooth do Windows; depois de pareado, o controle entra sozinho no lobby.
 
 O pareamento do Windows mostra tudo (fones, TVs, teclados), sem dizer como colocar cada controle
 em modo de pareamento. O nosso:

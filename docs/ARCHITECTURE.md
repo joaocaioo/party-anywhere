@@ -29,17 +29,17 @@ errado: corrija um deles no mesmo PR. A experiência manda ([UX.md](UX.md)); a a
 | # | Decisão | Por quê | Alternativas descartadas |
 |---|---|---|---|
 | D1 | **Hub em Rust** (workspace com crates por módulo) | Desempenho previsível no caminho da entrada, sem coletor de lixo; boa interoperabilidade com Win32 e WinRT (crate `windows`); um binário só. | C++ (mais risco de memória na parte de rede); C#/.NET (runtime, GC no caminho quente) |
-| D2 | **UI em Tauri 2 + React + TypeScript (Vite)** | Visual rico e animado com tecnologia web, janela leve (WebView2), updater assinado pronto, maior ecossistema para quem contribuir. | Electron (pesado); UI nativa (lenta de iterar no visual que queremos) |
-| D3 | **Controles físicos via SDL3** | Cobre XInput, DirectInput, HID, DualSense/DualShock 4, Switch Pro, 8BitDo; hotplug por evento; luz e vibração; mais de 4 controles; número de série/caminho para reconhecer o mesmo aparelho. | XInput puro (4 controles, só Xbox); Raw Input à mão |
+| D2 | **UI em Tauri 2 com HTML/JS sem build** (`apps/hub/ui`) | A UI aprovada já existia em HTML; uma base só roda no navegador (modo demo) e no app (`bridge.js` troca a simulação pelo núcleo). Sem bundler, sem risco de o visual derivar. Janela sem moldura do Windows, do tamanho da área útil da tela. | React/TS (reescrever a UI aprovada e manter duas); Electron (pesado) |
+| D3 | **Controles físicos via gilrs** (Windows.Gaming.Input + XInput), atrás do lobby | Rust puro, sem compilar C: hotplug, bateria, vibração, mais de 4 controles. Um filtro ignora o eco dos nossos controles virtuais. SDL3 continua sendo a troca se precisarmos de luz do DualSense ou giroscópio. | SDL3 agora (build nativo pesado no MVP); XInput puro (4 controles, só Xbox) |
 | D4 | **Celular via página web servida pelo Hub** (HTTP + WebSocket) | Sem app para instalar: o QR abre o navegador. Medido no iPhone: rede ~5 ms; do toque ao PC ~24 ms (p50), quase todo dentro do Safari. | App nativo (fricção de instalação); nuvem (latência, privacidade) |
 | D5 | **Protocolo do celular: binário para estado, JSON para controle** | O estado vai 60 vezes por segundo e precisa ser mínimo; o resto (layout, avisos) muda pouco e precisa ser fácil de evoluir. | Tudo JSON (desperdício no caminho quente); tudo binário (difícil evoluir layouts) |
 | D6 | **Sempre o estado completo do controle, nunca eventos** | Perder ou repetir uma mensagem não deixa botão preso. Base para migrar para WebRTC sem ordenação. | Eventos "apertou/soltou" |
 | D7 | **Bluetooth via WinRT (`Windows.Devices.Enumeration`)** dentro do Hub | Pareamento personalizado sem a janela do Windows, com filtro de controles e PIN automático. | Mandar para as Configurações do Windows (a experiência que queremos superar) |
 | D8 | **Modo Universal via ViGEmBus** atrás de uma interface `VirtualPadSink` | É o único driver de controle virtual assinado e amplamente instalado. Está **descontinuado** (2023): isolado atrás de uma interface para trocar depois. | Driver próprio agora (exige certificado EV e assinatura da Microsoft; caro e lento) |
 | D9 | **SDK = cabeçalho C único** (`party_anywhere.h`, estilo stb) | ABI C funciona em C, C++, C#, Lua, Godot, Unity; um arquivo só, compila em x86 e x64 (mods de jogos antigos são 32 bits); nenhuma DLL para distribuir. | DLL (arquiteturas e versões para distribuir); SDK por linguagem |
-| D10 | **IPC do SDK: memória compartilhada (estado) + named pipe (eventos e comandos)** | Estado com latência ~0 e sem chamada de sistema por frame; eventos confiáveis e ordenados pelo pipe. | Socket local para tudo (latência e cópias); só memória (eventos frágeis) |
+| D10 | **IPC do SDK: só memória compartilhada** (vagas com seqlock + anel de comandos do jogo) | Estado com custo de nanossegundos e sem chamada de sistema por frame. Os eventos (entrou, caiu, voltou, saiu) o SDK gera comparando uma leitura com a anterior: não se perdem nem saem de ordem e não precisam de pipe. Menos partes móveis. | Memória + named pipe (mais código e estado para sincronizar); socket local (latência e cópias) |
 | D11 | **Manifesto `party-anywhere.json` na raiz do repositório do jogo** | Um arquivo previsível permite "colar o link e instalar". Ver [GAME-MANIFEST.md](GAME-MANIFEST.md). | Convenções implícitas; registro central obrigatório |
-| D12 | **Atualização do Hub com o updater do Tauri** (GitHub Releases + assinatura minisign) | Assinado, delta simples, sem servidor próprio. Comportamento definido pela UX (nunca interrompe). | Updater caseiro |
+| D12 | **Atualizações pelo GitHub Releases**, com ETag | Sem servidor nosso. Jogos: `party-anywhere.release.json` com hash. Hub: o instalador do release mais novo. Antes da versão pública: assinatura do instalador (ver Riscos). | Servidor próprio de atualização |
 | D13 | **Windows primeiro** | É onde estão os jogos e os mods. Linux/Steam Deck depois (uinput torna o Modo Universal trivial lá). | — |
 
 ## Módulos
@@ -48,16 +48,19 @@ Um crate por módulo, cada um com testes que rodam sem hardware (dispositivos fa
 
 | Crate | Responsabilidade | Depende de |
 |---|---|---|
-| `pa-core` | Modelo de dispositivos e vagas, regras do lobby, eventos, persistência (`%APPDATA%\PartyAnywhere\state.json`). **Sem I/O de hardware**. | — |
-| `pa-input` | SDL3: enumeração, hotplug, leitura normalizada, vibração, luz, bateria. | `pa-core` |
-| `pa-phone` | Servidor HTTP + WebSocket (axum/tokio), página embutida, QR, escolha do IP certo, tokens. | `pa-core` |
-| `pa-bluetooth` | Procurar, filtrar, parear e esquecer controles Bluetooth; estado do rádio. | `pa-core` |
-| `pa-virtualpad` | `VirtualPadSink`: implementação ViGEm (Xbox 360; DualShock 4 acima de 4 jogadores) e a falsa para testes. | `pa-core` |
-| `pa-ipc` | Servidor do SDK: memória compartilhada, pipe, sessões de jogo. | `pa-core` |
-| `pa-library` | Jogos do PC (Steam, Epic, GOG, Xbox, executável avulso) com capa e informações; manifestos, instalar por link, catálogo, jogo-base, atualizações de jogos. | — |
-| `apps/hub` | Tauri: liga os módulos, comandos e eventos para a UI. | todos |
-| `apps/phone` | Página do controle (TypeScript, sem framework pesado), embutida no binário do Hub. | — |
-| `sdk/c` | `party_anywhere.h` e exemplos. | — |
+| `pa-core` | `Pad`, vagas e **regras do lobby** (`Lobby`), puro e testado. | — |
+| `pa-phone` | Servidor HTTP + WebSocket (axum/tokio), página embutida, protocolo, escolha do IP, tokens; as vagas vêm do `Lobby` compartilhado. | `pa-core` |
+| `pa-virtualpad` | `VirtualPads`: controles virtuais de Xbox 360 no ViGEm, numa thread própria. | `pa-core` |
+| `pa-sdk` | Lado do Hub do SDK: a memória compartilhada (espelho do `party_anywhere.h`), testada contra o cabeçalho C compilado. | `pa-core` |
+| `pa-manifest` | `party-anywhere.json` e `party-anywhere.release.json`: tipos, validação com mensagens que dizem o que fazer, capa, links. | — |
+| `pa-library` | GitHub: prévia por link, Descobrir (tópico), instalação com hash e backup de jogo-base, `library.json`, atualizações (jogos e Hub). | `pa-manifest` |
+| `pa-cli` | `pa` para criadores (`new`, `validate`, `pack`, `inspect`) e o servidor MCP (`pa mcp`). | `pa-manifest`, `pa-library` |
+| `apps/hub/src-tauri` | O app: lobby compartilhado, controles (gilrs), teclados (Raw Input), celulares, Modo Universal, SDK, Biblioteca, jogos do PC (Steam/Epic), atualizações. | todos |
+| `apps/hub/ui` | A UI (HTML/JS). | — |
+| `sdk/c` | `party_anywhere.h` e o exemplo `arena_console.c`. | — |
+
+O Bluetooth próprio (D7) é a fase 3; até lá, "Adicionar jogador → Controle Bluetooth" explica o pareamento
+e abre o Bluetooth do Windows, e o controle pareado entra sozinho pelo gilrs.
 
 ## Modelo de dados
 
@@ -238,31 +241,39 @@ Dá para ter vários teclados jogando ao mesmo tempo, cada um como um jogador, e
 
 ## Modo Universal (controles virtuais)
 
-- Para cada **celular** numa vaga, o Hub cria um controle virtual de Xbox 360 no ViGEm.
-- Controles físicos continuam sendo vistos pelo jogo diretamente (sem duplicar).
-- Limite de 4 controles de Xbox no XInput: do 5º em diante, o Hub cria DualShock 4 virtual (jogos que
-  leem DirectInput/SDL veem), e a UI avisa "alguns jogos só aceitam 4 jogadores".
-- Primeiro uso: o Hub explica em uma frase e instala o driver (pede administrador uma vez).
-- Quando um jogo SDK se conecta, o Hub **desliga os controles virtuais** das vagas que o jogo assumiu
-  (senão o jogo leria a mesma pessoa duas vezes).
+- Cada **celular** e cada **teclado** numa vaga ganha um controle virtual de Xbox 360 no ViGEm, no número
+  da vaga. Controles físicos continuam sendo vistos pelo jogo diretamente (sem duplicar).
+- Os controles virtuais também aparecem para o gilrs: um Xbox 360 que surge até 3 s depois de o Hub ligar
+  um virtual é o eco dele e é ignorado (`gamepads::EchoFilter`).
+- Sem o ViGEmBus instalado, o lobby funciona igual (e os jogos do SDK também); só os jogos comuns não veem
+  os celulares. A UI explica e oferece instalar o componente (pede administrador uma vez).
+- Limite de 4 controles de Xbox no XInput: do 5º em diante, jogos XInput não veem. Planejado: DualShock 4
+  virtual acima de 4 e o aviso "alguns jogos só aceitam 4 jogadores".
+- Enquanto um jogo do SDK está conectado, o Hub **desliga todos os controles virtuais** (senão o jogo leria
+  a mesma pessoa duas vezes) e liga de novo quando o jogo sai.
 - **Futuro opcional**: esconder controles físicos (HidHide) e reemitir tudo como virtual, na ordem do
   lobby. Isso garante que P1 do lobby seja P1 no jogo e que um DualSense funcione em jogo "só Xbox".
 
 ## Modo SDK (IPC)
 
-Contrato completo em [SDK.md](SDK.md). Resumo do mecanismo:
+Contrato completo em [SDK.md](SDK.md). O mecanismo é **só memória compartilhada** `Local\PartyAnywhere.v1`
+(4976 bytes, layout `pa_shm` no cabeçalho, espelhado em `crates/pa-sdk`):
 
-- **Memória compartilhada** `Local\PartyAnywhere.v1` (tamanho fixo, cabeçalho versionado):
-  - cabeçalho: `magic`, `abi_version`, `hub_pid`, `generation` (incrementa a cada mudança de vagas);
-  - 10 vagas, cada uma com `seqlock u32`, estado da vaga, cor, nome curto e o `Pad`.
-  - O Hub escreve; o jogo só lê (seqlock: lê, confere o contador, repete se mudou). Sem trava no jogo.
-- **Named pipe** `\\.\pipe\party-anywhere.v1`, mensagens com tamanho prefixado:
-  - jogo → Hub: `hello` (id do jogo, versão do SDK, jogadores mín./máx.), `accept_players`,
-    `layout`, `toast`, `rumble`, `light`, `bye`;
-  - Hub → jogo: `welcome` (endereço do QR), `seat_joined`, `seat_left`, `seat_reconnecting`, `seat_renamed`.
-- O SDK funciona **sem o Hub aberto**: `pa_connect` falha com um código claro, e o jogo decide (avisar
-  ou cair para controles próprios).
-- Uma sessão de jogo por vez no início (o Hub recusa um segundo `hello`).
+- cabeçalho: `magic` ("PAH1"), `abi` (1), tamanho, `hub_heartbeat` (+1 a cada 100 ms), `game_pid` (o jogo
+  conectado), endereço do QR;
+- 10 vagas, cada uma com `seqlock` (ímpar = o Hub escrevendo), estado, aparelho, cor, nome e o `Pad`.
+  O Hub escreve (atrás de uma trava, um escritor por vez); o jogo lê sem trava e repete se pegou o meio;
+- anel de 64 comandos do jogo para o Hub (`rumble`, `toast`, `accepting`, `label`, `layout`, `light`): o jogo
+  escreve e avança `cmd_write`, o Hub lê a cada 100 ms e avança `cmd_read`.
+
+Regras:
+- **Um jogo por vez**: o jogo reserva com `InterlockedCompareExchange(game_pid, 0 → pid)`; outro recebe
+  `PA_ERR_BUSY`. Se o processo do jogo morrer sem desconectar, o Hub percebe e libera.
+- Os eventos (`SEAT_JOINED`, `RECONNECTING`, `RESUMED`, `LEFT`, `RENAMED`) o SDK gera comparando cada
+  `pa_poll` com o anterior; `HUB_LOST` quando o heartbeat para por 1,5 s (os pads ficam neutros).
+- O SDK funciona **sem o Hub aberto**: `pa_connect` falha com um código claro, e o jogo decide.
+- Aplicados hoje pelo Hub: `rumble` (celular e controle) e `toast` (celular). `label`, `layout` e `light`
+  já fazem parte da ABI e chegam ao Hub; o protocolo do celular ganha os layouts na próxima versão.
 
 ## Biblioteca: jogos do PC
 
@@ -319,11 +330,15 @@ exatamente como estavam.
 
 ## Atualização do Hub
 
-- Plugin updater do Tauri, com `latest.json` nos GitHub Releases e assinatura minisign (a chave
-  privada fica só no CI).
-- Checa ao abrir e a cada 6 h; baixa em segundo plano; **aplica ao fechar** ou quando a pessoa clica
-  em "Atualização pronta". Nunca durante uma sessão SDK.
-- Canal `stable` por padrão e `beta` opcional nos Ajustes.
+- O Hub consulta o último release de `joaocaioo/party-anywhere` ao abrir e a cada 6 h, com ETag (sem
+  novidade, a consulta nem conta no limite do GitHub). Versão nova: o ícone de atualização avisa; um clique
+  baixa `PartyAnywhere-X.Y.Z-setup.exe` (só de `https://github.com/`), abre o instalador e fecha o Hub.
+  Nunca durante uma partida, nunca sozinho.
+- Os jogos instalados por link são conferidos no mesmo ciclo; a novidade aparece como aviso com "Atualizar".
+- O release sai do workflow `.github/workflows/release.yml` a cada tag `vX.Y.Z` (instalador do Hub e a
+  ferramenta `pa`).
+- **Antes da versão pública**: assinar o instalador (Authenticode) ou migrar para o updater do Tauri com
+  assinatura minisign. Hoje a confiança é só o HTTPS do GitHub (ver Riscos).
 - O protocolo do celular e a ABI do SDK são **versionados**: um Hub novo continua falando com jogos de
   SDK antigo (compatibilidade para trás por pelo menos uma versão maior).
 
@@ -371,4 +386,5 @@ party-anywhere/
 | Steam Input reemite controles | Controle duplicado ou ordem trocada | Detectar Steam rodando e orientar; testar com e sem. |
 | Código de terceiros na Biblioteca | Malware | Selos, hash, catálogo revisado, sem scripts; avaliar assinatura de autores. |
 | Teclas de teclados extras chegam ao jogo (Modo Universal) | Dois jogadores mexendo no mesmo personagem | MVP: teclados extras só no Modo SDK; no Universal, um teclado nativo. Depois: filtro de teclado opcional (avaliar licença e anti-cheat). |
+| Instalador do Hub sem assinatura | Atualização adulterada se a conta do GitHub for comprometida; SmartScreen avisa "editor desconhecido" | Antes da versão pública: certificado de assinatura de código (Authenticode) e/ou updater do Tauri com minisign; a chave só no CI. |
 | Pareamento BT varia por fabricante | "Não pareia" é o pior momento da UX | Tabela de quirks alimentada por testes reais com cada controle. |

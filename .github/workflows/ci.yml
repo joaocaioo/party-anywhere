@@ -1,0 +1,21 @@
+# Testes e lint a cada push e pull request. Tudo roda no Windows, que é onde o Hub roda.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Testes (inclui o SDK em C compilado com MSVC)
+        run: cargo test --workspace --locked
+      - name: Lint
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings

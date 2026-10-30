@@ -1,9 +1,12 @@
-# Party Anywhere SDK (v1, rascunho)
+# Party Anywhere SDK (ABI 1)
 
 Para quem cria jogos e mods co-op. Com o SDK, o seu jogo **não tem código de controle**: o Hub
 descobre controles e celulares, organiza o lobby (P1..P10) e reconecta quem cai. O jogo só lê.
 
-> Status: contrato em rascunho. Os nomes podem mudar até a v1 sair (ver [ROADMAP.md](ROADMAP.md)).
+> O cabeçalho é [`sdk/c/party_anywhere.h`](../sdk/c/party_anywhere.h) (o `pa new` já coloca ele no projeto).
+> Exemplo completo: [`sdk/c/examples/arena_console.c`](../sdk/c/examples/arena_console.c), uma arena no
+> console para até 10 jogadores. Ele compila a cada build do Hub, e os testes de `crates/pa-sdk` conversam
+> com o cabeçalho compilado pela mesma memória do Hub.
 
 ## Por que um cabeçalho C
 
@@ -45,6 +48,7 @@ void game_frame(void) {
         case PA_EVENT_SEAT_RECONNECTING: pause_player(ev.seat);      break;
         case PA_EVENT_SEAT_RESUMED:      resume_player(ev.seat);     break;
         case PA_EVENT_SEAT_LEFT:         despawn_player(ev.seat);    break;
+        case PA_EVENT_SEAT_RENAMED:      update_name(ev.seat);       break;
         case PA_EVENT_HUB_LOST:          show_hub_closed_message();  break;
         default: break;
         }
@@ -85,7 +89,7 @@ conectado), `PA_ERR_INVALID_ARG`.
 typedef struct pa_seat_info {
     uint8_t     index;          // 0..9 → P1..P10
     pa_seat_state state;        // PA_SEAT_EMPTY | PA_SEAT_ACTIVE | PA_SEAT_RECONNECTING
-    pa_device_kind device;      // PA_DEVICE_GAMEPAD | PA_DEVICE_PHONE | PA_DEVICE_KEYBOARD_MOUSE
+    pa_device_kind device;      // PA_DEVICE_GAMEPAD | PA_DEVICE_PHONE | PA_DEVICE_KEYBOARD
     uint8_t     r, g, b;        // cor do jogador (fixa por índice)
     char        name[32];       // UTF-8, ex.: "João"
 } pa_seat_info;
@@ -131,7 +135,20 @@ void pa_rumble(pa_client* pa, int seat, float low, float high, int duration_ms);
 void pa_set_light(pa_client* pa, int seat, uint8_t r, uint8_t g, uint8_t b);   // luz do controle, se houver
 ```
 
-`seat = PA_ALL_SEATS` (-1) aplica a todos. Chamadas repetidas com o mesmo valor não geram tráfego.
+`seat = PA_ALL_SEATS` (-1) aplica a todos. `pa_set_accepting_players` repetido com o mesmo valor não gera
+tráfego.
+
+| Chamada | O que o Hub faz hoje |
+|---|---|
+| `pa_rumble` | Vibra o celular e o controle da vaga. |
+| `pa_toast` | Mostra o aviso no topo do celular. |
+| `pa_set_accepting_players`, `pa_set_label`, `pa_set_layout`, `pa_set_light` | Chegam ao Hub (já são ABI 1); o celular passa a mostrar layouts e rótulos na próxima versão do protocolo. |
+
+## Como funciona por dentro
+
+Memória compartilhada `Local\PartyAnywhere.v1`, criada pelo Hub (layout `pa_shm` no cabeçalho). Cada vaga
+tem um seqlock: o jogo nunca lê um estado pela metade e nunca trava. Os eventos saem da comparação de um
+`pa_poll` com o anterior. Detalhes em [ARCHITECTURE.md](ARCHITECTURE.md#modo-sdk-ipc).
 
 ## Garantias do Hub
 
@@ -139,6 +156,8 @@ void pa_set_light(pa_client* pa, int seat, uint8_t r, uint8_t g, uint8_t b);   /
 - A ordem dos eventos é a ordem real; `SEAT_JOINED` sempre vem antes do primeiro `pa_get_pad` válido daquela vaga.
 - O índice da vaga é estável durante a sessão. P3 continua P3 depois de cair e voltar.
 - Enquanto o jogo está conectado, o Hub desliga os controles virtuais do Modo Universal (sem entrada dupla).
+- Um jogo por vez (`PA_ERR_BUSY` para o segundo). Se o jogo fechar sem `pa_disconnect`, o Hub libera sozinho.
+- Hub fechado: `PA_EVENT_HUB_LOST` em até 1,5 s, e os pads ficam neutros.
 - ABI versionada: um Hub novo aceita jogos com SDK da mesma versão maior.
 
 ## Integração por tipo de projeto
