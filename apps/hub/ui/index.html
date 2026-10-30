@@ -1067,6 +1067,9 @@ function layoutArc(arc, order, focus) {
   const n = order.length;
   const W = arc.clientWidth;
   const H = arc.clientHeight;
+  // palco escondido (aba fora da tela): não calcula com tamanho falso; o ResizeObserver refaz ao aparecer
+  if (!W || !H) { arc._laid = ''; return; }
+  arc._laid = `${W}x${H}`;
   // carta encolhe conforme o lobby enche, e nunca passa da altura do palco
   const byCount = n <= 3 ? 240 : n <= 5 ? 220 : n <= 8 ? 190 : 170;
   // a carta em foco cresce 1,12x e a perspectiva soma ~11%: a altura dela tem de caber no palco
@@ -2143,8 +2146,6 @@ async function switchView(v) {
   const fromEl = document.getElementById('view-' + from);
   const toEl = document.getElementById('view-' + v);
   toEl.classList.add('active');
-  if (v === 'lobby') renderLobby();
-  if (v === 'library' && !arcade) renderLibrary();
   let done;
   if (arcade && v === 'library') {
     shellEl.classList.add('in-library');
@@ -2160,10 +2161,16 @@ async function switchView(v) {
     animateView(toEl, 'view-in', dir, IN_MS, 160);
     done = sleep(160 + IN_MS);
   }
+  // só agora a aba anterior saiu do fluxo: antes, as duas dividiam a altura e o lobby media o palco menor
+  // (a carta da volta ficava menor que a da abertura)
+  if (v === 'lobby') renderLobby();
+  if (v === 'library' && !arcade) renderLibrary();
   await done;
   fromEl.classList.remove('active', 'view-out');
   toEl.classList.remove('view-in');
   switching = false;
+  // e no tamanho final, depois da animação
+  if (v === 'lobby' && lobbyArc._order) layoutArc(lobbyArc, lobbyArc._order, lobbyFocus);
 }
 document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => switchView(t.dataset.view)));
 // o botão verde do topo adiciona jogador no lobby e jogo na biblioteca
@@ -2397,12 +2404,10 @@ document.querySelector('.demo-body').addEventListener('click', (e) => {
 // O tamanho das cartas depende do palco. Ele muda com a janela, mas também quando as fontes terminam de
 // carregar (o título muda de altura) e quando o app ajusta a janela à tela: recalcula em qualquer mudança,
 // senão o lobby da abertura fica diferente do lobby depois de ir e voltar da Biblioteca.
-let arcSizes = new WeakMap();
+// compara com o tamanho usado no último cálculo (arc._laid), não com o último que o observador viu
 const relayoutArc = (entries) => {
-  for (const { target, contentRect } of entries) {
-    const key = `${Math.round(contentRect.width)}x${Math.round(contentRect.height)}`;
-    if (arcSizes.get(target) === key || !target._order || !contentRect.height) continue;
-    arcSizes.set(target, key);
+  for (const { target } of entries) {
+    if (!target._order || `${target.clientWidth}x${target.clientHeight}` === target._laid) continue;
     if (target === lobbyArc) layoutArc(lobbyArc, lobbyArc._order, lobbyFocus);
     else if (currentView === 'library') layoutArc(libArc, libArc._order, libFocus);
   }
@@ -3165,16 +3170,23 @@ function prepCover(game) {
     img.onload = () => loaded(img, false);
     img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   };
-  // a arte larga sem logo (hero) combina com a tela deitada; senão, a capa
-  const src = game.hero || game.image;
-  if (src) {
+  const load = (src, onload, onerror) => {
     const img = new Image();
     // capas do GitHub: sem isto o WebGL recusa a imagem de outra origem
     if (/^https?:/.test(src)) img.crossOrigin = 'anonymous';
-    img.onload = () => loaded(img, true);
-    img.onerror = generated; // sem a imagem (ex.: página aberta sem o servidor): capa gerada
+    img.onload = () => onload(img);
+    img.onerror = onerror;
     img.src = src;
-  } else generated();
+  };
+  // a capa do jogo, como sempre. Só quando a capa é uma faixa de arte num fundo borrado (algumas da Steam)
+  // a tela usa a arte larga (hero), se houver; sem ela, a faixa nítida é ampliada (screenArt).
+  if (game.image) {
+    load(game.image, (cover) => {
+      if (game.hero && artBounds(cover).cropped) load(game.hero, (hero) => loaded(hero, true), () => loaded(cover, true));
+      else loaded(cover, true);
+    }, game.hero ? () => load(game.hero, (hero) => loaded(hero, true), generated) : generated);
+  } else if (game.hero) load(game.hero, (hero) => loaded(hero, true), generated);
+  else generated();
 }
 
 function titleLines(name) {
