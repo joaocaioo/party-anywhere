@@ -38,6 +38,9 @@ pub struct GameManifest {
     /// Hub mínimo para este jogo, se ele usa algo recente do SDK.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub min_hub_version: Option<String>,
+    /// O controle do celular feito para este jogo (opcional): vira o "Padrão do jogo" no Hub.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub controls: Option<crate::controls::Controls>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -191,6 +194,11 @@ impl GameManifest {
             out.push(Issue::warning("authors", "diga quem fez o jogo: [\"seu-usuario\"]."));
         }
 
+        if let Some(c) = &self.controls {
+            if let Err(e) = crate::controls::check_modes(&c.modes) {
+                out.push(Issue::error("controls", format!("{e} Monte no editor do Hub (Controles → Criar layout) e copie de lá.")));
+            }
+        }
         check_image_path(&mut out, "art.cover", Some(&self.art.cover));
         check_image_path(&mut out, "art.hero", self.art.hero.as_ref());
         check_image_path(&mut out, "art.logo", self.art.logo.as_ref());

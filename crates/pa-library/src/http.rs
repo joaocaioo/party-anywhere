@@ -43,6 +43,33 @@ impl Default for Ureq {
     }
 }
 
+impl Ureq {
+    /// Baixa avisando o progresso (baixado, total quando o servidor diz). Para arquivos grandes na UI.
+    pub fn download(&self, url: &str, max_bytes: u64, mut progress: impl FnMut(u64, Option<u64>)) -> Result<Vec<u8>, String> {
+        let resp = match self.agent.get(url).call() {
+            Ok(r) => r,
+            Err(ureq::Error::Status(code, _)) => return Err(format!("o download falhou ({code}).")),
+            Err(ureq::Error::Transport(t)) => return Err(format!("sem conexão com {}: {t}", host(url))),
+        };
+        let total = resp.header("Content-Length").and_then(|v| v.parse::<u64>().ok());
+        let mut reader = resp.into_reader().take(max_bytes + 1);
+        let mut body = Vec::new();
+        let mut buf = [0u8; 64 * 1024];
+        loop {
+            let n = reader.read(&mut buf).map_err(|e| format!("download interrompido: {e}"))?;
+            if n == 0 {
+                break;
+            }
+            body.extend_from_slice(&buf[..n]);
+            progress(body.len() as u64, total);
+        }
+        if body.len() as u64 > max_bytes {
+            return Err("arquivo maior que o esperado.".into());
+        }
+        Ok(body)
+    }
+}
+
 impl Http for Ureq {
     fn get(&self, url: &str, etag: Option<&str>, max_bytes: u64) -> Result<Response, String> {
         let mut req = self.agent.get(url);

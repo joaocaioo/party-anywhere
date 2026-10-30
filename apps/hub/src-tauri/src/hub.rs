@@ -60,6 +60,9 @@ pub struct Hub {
     /// Vagas que ficaram de fora do jogo aberto agora (havia mais gente do que o jogo aceita): o jogo não
     /// as vê (SDK: vaga vazia; Modo Universal: sem controle virtual). Volta tudo ao sair do jogo.
     benched: Mutex<[bool; MAX_SEATS]>,
+    /// Jogo aberto com "Padrão do jogo": o layout que os celulares usam enquanto ele roda, e quem trocou no
+    /// menu durante a partida (esses ficam com a escolha deles).
+    pub session_layout: Mutex<Option<(String, std::collections::HashSet<String>)>>,
 }
 
 #[derive(Clone, Serialize)]
@@ -120,6 +123,7 @@ impl Hub {
             watch_input: AtomicBool::new(false),
             last_activity: Mutex::new(HashMap::new()),
             benched: Mutex::new([false; MAX_SEATS]),
+            session_layout: Mutex::new(None),
         })
     }
 
@@ -162,6 +166,9 @@ impl Hub {
                         if let Some(key) = hub.device_at(seat as usize) {
                             let mut st = hub.settings.lock().unwrap();
                             if st.all_layouts().iter().any(|l| l.id == id) {
+                                if let Some((_, chose)) = hub.session_layout.lock().unwrap().as_mut() {
+                                    chose.insert(key.0.clone());
+                                }
                                 st.phone_layout.insert(key.0, id);
                                 let _ = st.save(&hub.settings_path);
                             }
@@ -207,7 +214,13 @@ impl Hub {
         let Some(key) = self.device_at(seat as usize) else { return };
         let (items, current) = {
             let st = self.settings.lock().unwrap();
-            (serde_json::to_value(st.all_layouts()).unwrap_or_default(), st.layout_for(&key.0))
+            let mine = st.layout_for(&key.0);
+            // jogo aberto com "Padrão do jogo": vale o dele, menos para quem trocou no menu durante a partida
+            let current = match self.session_layout.lock().unwrap().as_ref() {
+                Some((layout, chose)) if !chose.contains(&key.0) && st.all_layouts().iter().any(|l| &l.id == layout) => layout.clone(),
+                _ => mine,
+            };
+            (serde_json::to_value(st.all_layouts()).unwrap_or_default(), current)
         };
         if let Some(p) = self.phone.lock().unwrap().as_ref() {
             p.send_text(seat, &ServerText::Layouts { items: &items, current: &current });
@@ -294,6 +307,12 @@ impl Hub {
             v.update(seat as u8, Pad::NEUTRAL);
             v.unplug(seat as u8);
         }
+    }
+
+    /// O jogo que abriu tem um controle próprio: todos os celulares trocam para ele (`None`: cada um volta ao seu).
+    pub fn set_session_layout(&self, layout: Option<String>) {
+        *self.session_layout.lock().unwrap() = layout.map(|l| (l, Default::default()));
+        self.broadcast_layouts();
     }
 
     pub fn is_benched(&self, seat: usize) -> bool {

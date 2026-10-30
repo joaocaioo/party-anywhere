@@ -27,6 +27,9 @@ dois. O **Party Anywhere** resolve isso. É um app para Windows que coloca todo 
 
 Cada pessoa vira um jogador, de **P1 a P10**, com a sua cor. Depois é só escolher o jogo.
 
+> **Por enquanto, é co-op local:** todo mundo no mesmo lugar, na mesma tela (ou em tela dividida), com os
+> celulares no mesmo Wi-Fi do PC. Jogar pela internet não faz parte desta versão.
+
 ## Jogar
 
 1. Baixe e instale o **`PartyAnywhere-X.Y.Z-setup.exe`** (a versão mais nova) na página de [Releases](../../releases).
@@ -37,7 +40,7 @@ Pronto. O app se atualiza sozinho e avisa quando um jogo ganha versão nova.
 
 | Que tipo de jogo | Como funciona |
 |---|---|
-| Jogos que você já tem (Steam, Epic, qualquer `.exe`) | Celulares e teclados aparecem para o jogo como controles de Xbox. Na primeira vez o app pede para instalar um componente gratuito do Windows. |
+| Jogos que você já tem (Steam, Epic, qualquer `.exe`) | Celulares e teclados aparecem para o jogo como controles de Xbox. O instalador já oferece o componente gratuito do Windows que faz isso funcionar. |
 | Jogos e mods feitos para o Party Anywhere | Cada jogador chega pronto, com nome e cor. Nada para configurar. |
 | Um jogo que alguém publicou no GitHub | Biblioteca → **Adicionar** → cole o link. Ele instala com capa e se atualiza sozinho. |
 

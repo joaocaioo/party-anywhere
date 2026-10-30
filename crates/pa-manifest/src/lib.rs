@@ -5,6 +5,7 @@
 //!
 //! O Hub, a CLI `pa` e o servidor MCP usam as mesmas regras daqui. Sem I/O: quem chama lê os arquivos.
 
+pub mod controls;
 mod cover;
 mod game;
 mod issues;

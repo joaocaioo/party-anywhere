@@ -42,6 +42,7 @@
   --radius: 22px;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; }
 body {
   background: var(--bg);
@@ -505,6 +506,14 @@ button.row:hover { background: rgba(255, 255, 255, .035); }
 .pz.stick { border-radius: 50%; border: max(1px, calc(var(--u) * .006)) dashed rgba(255, 255, 255, .2); background: rgba(255, 255, 255, .025); }
 .pz.stick i { width: 44%; height: 44%; border-radius: 50%; background: color-mix(in srgb, var(--neon) 55%, #15161a); box-shadow: 0 0 calc(var(--u) * .06) rgba(60, 240, 96, .35); display: grid; place-items: center; font-style: normal; font-size: calc(var(--u) * .05 * var(--s)); color: rgba(0, 0, 0, .7); }
 .pz.dpad { display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); gap: 4%; }
+/* nome da ação no botão ("Pular", "Impulso"): embaixo da letra, pequeno */
+.pz { align-content: center; gap: 4%; }
+.pz em { font-style: normal; font-weight: 700; font-size: calc(var(--u) * .034 * var(--s)); line-height: 1; max-width: 94%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: .9; }
+.pz.face em { font-size: calc(var(--u) * .03 * var(--s)); }
+.le-field select, .edit-fields select { font: inherit; font-size: 14.5px; color: var(--text); height: 42px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--line-strong); background: #121318; outline: none; }
+.le-tools input { height: 32px; width: 190px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line-strong); background: rgba(0, 0, 0, .3); font-size: 13px; outline: none; }
+.le-tools input:focus { border-color: rgba(60, 240, 96, .6); }
+.edit-fields small { font-weight: 500; letter-spacing: 0; color: var(--faint); }
 .pz.dpad i { border-radius: 18%; background: #26282f; border: 1px solid rgba(255, 255, 255, .22); }
 
 
@@ -869,6 +878,17 @@ main { perspective: 1800px; }
 .gr-chips button { margin: 0; width: 52px; height: 52px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, .16); background: rgba(255, 255, 255, .04); font-family: var(--display); font-size: 24px; color: #f4f4f5; }
 .gr-chips button:hover { border-color: rgba(198, 245, 90, .7); color: #d8fc72; }
 .gr-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+/* instalar o componente dos celulares: cada passo à vista */
+.vi { display: grid; gap: 10px; width: min(460px, 100%); padding: 14px 16px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, .12); background: rgba(255, 255, 255, .04); text-align: left; }
+.vi-row { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; color: #f4f4f5; }
+.vi-row svg { width: 18px; height: 18px; flex: none; }
+.vi.done { border-color: rgba(60, 240, 96, .5); background: rgba(60, 240, 96, .08); }
+.vi.done .vi-row { color: var(--neon); }
+.vi.failed { border-color: rgba(255, 90, 95, .5); background: rgba(255, 90, 95, .08); }
+.vi.failed .vi-row { color: #ffb4b6; }
+.vi-bar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .1); overflow: hidden; }
+.vi-bar i { display: block; height: 100%; background: var(--neon); border-radius: 3px; transition: width .2s; }
+.vi-sub { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
 .gr-actions button { margin: 0; }
 .gr-seats { display: flex; flex-wrap: wrap; justify-content: center; gap: 18px; margin: 8px 0; }
 .gr-seat { margin: 0 !important; display: grid; justify-items: center; gap: 8px; width: 84px; opacity: .38; filter: grayscale(.7); transition: opacity .2s, filter .2s, transform .2s; }
@@ -1835,6 +1855,32 @@ async function startGame(g, players) {
 // Voltou do jogo: todo mundo volta a contar (no app, bridge.js avisa o núcleo).
 function gameStopped() {}
 
+// Instalar o componente dos celulares (ViGEmBus) com cada passo à vista: baixando, o instalador do Windows
+// aberto, conferindo, pronto ou o que deu errado. `box` mostra o estado; resolve true quando ficou pronto.
+const VI_TEXT = {
+  download: (s) => [`Baixando o componente... ${s.pct || 0}%`, ''],
+  installer: () => ['O instalador abriu', 'Confirme o aviso do Windows (Sim) e siga a janela do instalador até concluir. O Hub espera.'],
+  check: () => ['Conferindo...', ''],
+  done: () => ['Pronto! Celulares e teclados já são controles', ''],
+  failed: (s) => ['Não deu certo', s.message || 'Tente de novo.'],
+};
+let viBox = null;
+function virtualStep(st) {
+  if (!viBox || !VI_TEXT[st.stage]) return;
+  const [title, sub] = VI_TEXT[st.stage](st);
+  const ic = st.stage === 'done' ? icon('check') : st.stage === 'failed' ? icon('warn') : `<span class="spin" style="display:grid">${icon('spinner')}</span>`;
+  viBox.className = 'vi ' + st.stage;
+  viBox.innerHTML = `<div class="vi-row">${ic}<span>${escapeHtml(title)}</span></div>${st.stage === 'download' ? `<div class="vi-bar"><i style="width:${st.pct || 0}%"></i></div>` : ''}${sub ? `<div class="vi-sub">${escapeHtml(sub)}</div>` : ''}`;
+}
+async function installVirtual(box) {
+  viBox = box;
+  virtualStep({ stage: 'download', pct: 0 });
+  let ok = false;
+  try { ok = await hubData.installVirtual(); } catch (e) { virtualStep({ stage: 'failed', message: String(e && e.message ? e.message : e) }); }
+  viBox = null;
+  return !!ok;
+}
+
 // Quantos o jogo aceita: o último número de "1 a 8 jogadores" ou "Até 4 jogadores". Sem número: não se sabe.
 const maxPlayers = (g) => {
   const m = String(g.players || '').match(/(\d+)(?!.*\d)/);
@@ -1870,7 +1916,15 @@ function preGame(g) {
     const warnVirtual = () => new Promise((done) => {
       show(`<p class="gr-kicker">Falta um passo para os celulares</p><h3>Celulares e teclados ainda não funcionam neste jogo</h3>
         <p class="gr-help">Jogos comuns só enxergam controles. Para eles verem celulares e teclados como controles de Xbox, o Windows precisa de um componente gratuito (ViGEmBus). Leva menos de um minuto, uma vez só. Controles de verdade já funcionam.</p>
-        <div class="gr-actions"><button class="btn-neon" data-pre="install">${icon('download')}Instalar componente</button><button class="btn-ghost" data-pre="check">Já instalei: conferir</button><button class="btn-ghost" data-pre="skip">Jogar só com os controles</button><button class="btn-ghost" data-pre="back">Voltar</button></div>`, { step: 'virtual', skip: done, recheck: async () => {
+        <div class="vi" id="grVi" hidden></div>
+        <div class="gr-actions" id="grViActions"><button class="btn-neon" data-pre="install">${icon('download')}Instalar agora</button><button class="btn-ghost" data-pre="check">Já instalei: conferir</button><button class="btn-ghost" data-pre="skip">Jogar só com os controles</button><button class="btn-ghost" data-pre="back">Voltar</button></div>`, { step: 'virtual', skip: done, install: async () => {
+        const box = document.getElementById('grVi'), actions = document.getElementById('grViActions');
+        box.hidden = false;
+        actions.hidden = true;
+        if (await installVirtual(box)) { await sleep(1200); done(); return; }
+        actions.hidden = false;
+        actions.querySelector('[data-pre="install"]').lastChild.textContent = 'Tentar de novo';
+      }, recheck: async () => {
         if (await hubData.retryVirtual()) { toast('Pronto: celulares e teclados já são controles.', null, 'ok'); done(); }
         else toast('O componente ainda não está instalado. Se acabou de instalar, reinicie o PC.', null, 'warn');
       } });
@@ -1923,9 +1977,7 @@ document.getElementById('gameRun').addEventListener('click', async (e) => {
   else if (a === 'go') pre.go();
   else if (a === 'skip') pre.skip();
   else if (a === 'check') pre.recheck();
-  else if (a === 'install') {
-    try { await hubData.installVirtual(); toast('O instalador abriu: siga na tela e depois toque em "Já instalei: conferir".', null, 'ok'); } catch (err) { toast(String(err), null, 'warn'); }
-  }
+  else if (a === 'install') pre.install();
 });
 // controle e celular na tela de antes do jogo: A e B escolhem quem joga; o resto anda pelos botões
 function preNav(action, seat) {
@@ -2172,6 +2224,7 @@ function openEditGame(id) {
       <div class="edit-fields">
         <label>Nome<input name="name" maxlength="40" value="${escapeHtml(g.name)}" required></label>
         <label>Jogadores<input name="players" maxlength="30" value="${escapeHtml(g.players)}" placeholder="Ex.: 1 a 4 jogadores"></label>
+        <label>Controle no celular<select name="layout" id="editLayout"><option value="">Cada um usa o seu</option></select><small>Entra sozinho nos celulares quando este jogo abre. <button type="button" class="linkish" id="editNewLayout">Montar um para este jogo</button></small></label>
         <label>Descrição curta<textarea name="tagline" maxlength="110" rows="3">${escapeHtml(g.tagline)}</textarea></label>
         <div class="edit-actions"><button class="btn-neon" type="submit">Salvar</button><button type="button" class="btn-ghost" data-back>Cancelar</button><button type="button" class="danger-link" id="editRemove">Remover da biblioteca</button></div>
       </div>
@@ -2187,6 +2240,16 @@ function openEditGame(id) {
     });
     document.getElementById('editReset').addEventListener('click', () => { image = null; thumb.innerHTML = coverSvg({ ...g, image: null }); });
     document.getElementById('editRemove').addEventListener('click', () => { removeGame(g.id); openLibraryManager(); });
+    hubData.layouts().then((ls) => {
+      const sel = document.getElementById('editLayout');
+      if (!sel) return;
+      const mine = ls.find((l) => !l.fromGame && l.game === g.id) || ls.find((l) => l.fromGame && l.game === g.id);
+      sel.insertAdjacentHTML('beforeend', ls.map((l) => `<option value="${escapeHtml(l.id)}"${mine && mine.id === l.id ? ' selected' : ''}>${escapeHtml(l.name)}${l.fromGame ? ' (do jogo)' : ''}</option>`).join(''));
+    });
+    document.getElementById('editNewLayout').addEventListener('click', async () => {
+      const ls = await hubData.layouts();
+      openLayoutEditor(null, ls.find((l) => l.id === 'advanced'), g.id);
+    });
     document.getElementById('editForm').addEventListener('submit', (e) => {
       e.preventDefault();
       const f = new FormData(e.target);
@@ -2194,6 +2257,7 @@ function openEditGame(id) {
       g.players = f.get('players').trim() || g.players;
       g.tagline = f.get('tagline').trim() || g.tagline;
       g.image = image || undefined;
+      hubData.setGameLayout(g.id, f.get('layout') || null).catch((err) => toast(String(err), null, 'warn'));
       if (arcade) arcade.invalidate(g.id);
       libraryChanged(g.id);
       toast('Jogo atualizado', null, 'ok');
@@ -2835,18 +2899,31 @@ const demoSettings = { joinOnButton: false, preferredIp: null, joinUrl: JOIN_URL
 const hubData = {
   devices: async () => seats.filter(Boolean).map((x) => ({ key: x.deviceKey, kind: x.kind, deviceName: x.deviceName, via: x.via, battery: x.battery, ping: typeof x.ping === 'number' ? x.ping : null, seat: x.index, layout: x.kind === 'phone' ? 'advanced' : null })),
   layouts: async () => demoLayouts,
-  saveLayout: async (id, name, modes) => {
-    const l = { id: id || 'custom-' + Date.now(), name, modes, builtin: false };
+  saveLayout: async (id, name, modes, game) => {
+    demoLayouts.forEach((x) => { if (game && x.game === game) x.game = null; });
+    const l = { id: id || 'custom-' + Date.now(), name, modes, builtin: false, game: game || null };
     const i = demoLayouts.findIndex((x) => x.id === l.id);
     if (i >= 0) demoLayouts[i] = l; else demoLayouts.push(l);
     return l;
+  },
+  setGameLayout: async (game, layout) => {
+    demoLayouts.forEach((x) => { if (!x.fromGame && x.game === game) x.game = null; });
+    const l = demoLayouts.find((x) => x.id === layout);
+    if (l) l.game = game;
   },
   deleteLayout: async (id) => { const i = demoLayouts.findIndex((x) => x.id === id && !x.builtin); if (i >= 0) demoLayouts.splice(i, 1); return i >= 0; },
   settings: async () => demoSettings,
   setJoinPolicy: async (on) => { demoSettings.joinOnButton = on; },
   addresses: async () => [{ url: JOIN_URL, interface: 'Wi-Fi', current: true }, { url: 'http://172.24.160.1:27027/', interface: 'vEthernet (WSL)', current: false }],
   setJoinIp: async () => JOIN_URL,
-  installVirtual: async () => toast('No app, isto baixa e abre o instalador do componente.', null, 'ok'),
+  installVirtual: async () => {
+    for (let p = 0; p <= 100; p += 10) { virtualStep({ stage: 'download', pct: p }); await sleep(120); }
+    virtualStep({ stage: 'installer' }); await sleep(1600);
+    virtualStep({ stage: 'check' }); await sleep(500);
+    demoSettings.virtualPads = true;
+    virtualStep({ stage: 'done' });
+    return true;
+  },
   retryVirtual: async () => false,
   checkUpdate: async () => { updatePill.click(); },
   // no app: o núcleo avisa quando um aparelho aperta algo (deviceActivity); aqui, a Gamepad API faz isso
@@ -2879,7 +2956,7 @@ const posStyle = (p) => {
 function pieceHtml(p, i, tag = 'span') {
   const d = PIECE_DEF[p.kind];
   const inner = d.type === 'dpad' ? '<i style="grid-area:1/2"></i><i style="grid-area:2/1"></i><i style="grid-area:2/3"></i><i style="grid-area:3/2"></i>'
-    : d.type === 'stick' ? `<i>${d.short}</i>` : escapeHtml(d.short || d.label);
+    : d.type === 'stick' ? `<i>${d.short}</i>` : escapeHtml(d.short || d.label) + (p.label ? `<em>${escapeHtml(p.label)}</em>` : '');
   const c = FACE[p.kind] ? `;--c:${FACE[p.kind]}` : '';
   const attrs = tag === 'button' ? ` type="button" data-i="${i}" aria-label="${escapeHtml(d.label)}" title="${escapeHtml(d.label)}"` : '';
   return `<${tag} class="pz ${d.type}"${attrs} style="${posStyle(p)}${c}">${inner}</${tag}>`;
@@ -2888,6 +2965,7 @@ function pieceHtml(p, i, tag = 'span') {
 const phoneBar = (modes, current = 0) => `<div class="phone-pill"><i></i>${modes.length > 1 ? `<span class="lseg mini">${modes.map((m, i) => `<span class="${i === current ? 'on' : ''}">${escapeHtml(m.name)}</span>`).join('')}</span>` : '<em></em>'}<u></u></div>`;
 const miniPhone = (l) => `<div class="phone"><div class="screen-wrap"><div class="phone-screen">${(l.modes[0]?.pieces || []).map((p, i) => pieceHtml(p, i)).join('')}</div>${phoneBar(l.modes)}</div></div>`;
 
+const gameName = (id) => (games.find((g) => g.id === id) || { name: id }).name;
 const describeLayout = (l) => {
   if (l.modes.length > 1) return `${l.modes.length} modos: ${l.modes.map((m) => m.name).join(', ')}`;
   const n = l.modes[0]?.pieces.length || 0;
@@ -2912,10 +2990,10 @@ async function renderControls() {
   const usedBy = (id) => devs.filter((d) => d.layout === id && d.seat != null).map((d) => `P${d.seat + 1}`);
   document.getElementById('layoutRows').innerHTML = layouts.map((l) => {
     const users = usedBy(l.id);
-    const acts = l.builtin
+    const acts = l.builtin || l.fromGame
       ? `<button class="btn-ghost sm" data-dup-layout="${escapeHtml(l.id)}">Duplicar</button>`
       : `<button class="btn-ghost sm" data-edit-layout="${escapeHtml(l.id)}">Editar</button><button class="icon-btn sm" data-del-layout="${escapeHtml(l.id)}" title="Apagar" aria-label="Apagar ${escapeHtml(l.name)}">${icon('close')}</button>`;
-    return `<div class="lay-card">${miniPhone(l)}<div class="lay-meta"><span class="row-t"><b>${escapeHtml(l.name)}${l.builtin ? '<span class="tag-mini">PRONTO</span>' : ''}</b><small>${escapeHtml(describeLayout(l))}${users.length ? ` · em uso: ${users.join(', ')}` : ''}</small></span><span class="row-act">${acts}</span></div></div>`;
+    return `<div class="lay-card">${miniPhone(l)}<div class="lay-meta"><span class="row-t"><b>${escapeHtml(l.name)}${l.builtin ? '<span class="tag-mini">PRONTO</span>' : l.fromGame ? '<span class="tag-mini">DO JOGO</span>' : ''}</b><small>${escapeHtml(describeLayout(l))}${l.game ? ` · entra sozinho em ${escapeHtml(gameName(l.game))}` : ''}${users.length ? ` · em uso: ${users.join(', ')}` : ''}</small></span><span class="row-act">${acts}</span></div></div>`;
   }).join('') + `<button class="lay-card new" data-new-layout><span class="plus">${icon('plus')}</span><b>Criar layout</b><small>Monte o controle arrastando as peças para a tela do celular.</small></button>`;
 }
 document.getElementById('view-controls').addEventListener('click', async (e) => {
@@ -2955,7 +3033,7 @@ function modeProblems(m) {
 
 // Editor: a tela do celular com as peças; arrastar da lista para a tela, arrastar para mover, arrastar
 // para fora para tirar. Modos (ex.: A pé e Veículo) para jogos que mudam os comandos.
-function openLayoutEditor(layout, base) {
+function openLayoutEditor(layout, base, forGame) {
   const clone = (x) => JSON.parse(JSON.stringify(x));
   const src = layout || base;
   const st = {
@@ -2963,14 +3041,17 @@ function openLayoutEditor(layout, base) {
     modes: src ? clone(src.modes) : [{ name: 'Padrão', pieces: clone(SIMPLE_PIECES) }],
     m: 0,
     sel: null,
+    game: forGame || (layout && !layout.fromGame ? layout.game || '' : ''),
   };
-  if (!layout && base && base.builtin && base.id !== 'simple') st.name = `Meu ${base.name}`.slice(0, 24);
+  if (!layout && forGame && !st.name) st.name = gameName(forGame).slice(0, 24);
+  if (!layout && !forGame && base && base.builtin && base.id !== 'simple') st.name = `Meu ${base.name}`.slice(0, 24);
   const cur = () => st.modes[st.m];
   const title = layout ? 'Editar layout' : 'Criar layout';
   openModal(`${head(title, 'Arraste as peças para a tela do celular. Para tirar uma peça, arraste para fora da tela.')}
     <div class="le" id="le">
       <div class="le-top">
         <label class="le-field"><span class="le-cap">Nome do layout</span><input id="leName" maxlength="24" placeholder="Ex.: GTA, Corrida, Luta" value="${escapeHtml(st.name)}"></label>
+        <label class="le-field"><span class="le-cap">Entra sozinho no jogo</span><select id="leGame"><option value="">Nenhum (cada um escolhe)</option>${games.filter((g) => !g.universal).map((g) => `<option value="${escapeHtml(g.id)}"${g.id === st.game ? ' selected' : ''}>${escapeHtml(g.name)}</option>`).join('')}</select></label>
         <div class="le-modes"><span class="le-cap">Modos</span><div id="leModes"></div></div>
       </div>
       <div class="le-main">
@@ -3029,7 +3110,7 @@ function openLayoutEditor(layout, base) {
     const drawTools = () => {
       const p = st.sel != null ? cur().pieces[st.sel] : null;
       document.getElementById('leTools').innerHTML = p
-        ? `<b>${escapeHtml(PIECE_DEF[p.kind].label)}</b><span>Tamanho</span><span class="lseg">${SIZES.map(([n, v]) => `<button type="button" class="${Math.abs(p.s - v) < .01 ? 'on' : ''}" data-size="${v}">${n}</button>`).join('')}</span><button type="button" class="btn-ghost sm" data-remove>Tirar da tela</button>`
+        ? `<b>${escapeHtml(PIECE_DEF[p.kind].label)}</b>${PIECE_DEF[p.kind].type === 'stick' || PIECE_DEF[p.kind].type === 'dpad' ? '' : `<input id="leLabel" maxlength="12" placeholder="Nome no botão (ex.: Pular)" value="${escapeHtml(p.label || '')}">`}<span>Tamanho</span><span class="lseg">${SIZES.map(([n, v]) => `<button type="button" class="${Math.abs(p.s - v) < .01 ? 'on' : ''}" data-size="${v}">${n}</button>`).join('')}</span><button type="button" class="btn-ghost sm" data-remove>Tirar da tela</button>`
         : '<span>Toque numa peça para mudar o tamanho. Com uma peça escolhida, <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> movem e <kbd>Delete</kbd> tira.</span>';
     };
     const drawStatus = () => {
@@ -3219,10 +3300,19 @@ function openLayoutEditor(layout, base) {
     };
     document.addEventListener('keydown', key);
     nameIn.addEventListener('input', drawStatus);
+    // nome no botão: aparece na hora na tela do editor (e no celular, depois de salvar)
+    root.addEventListener('input', (e) => {
+      if (e.target.id !== 'leLabel' || st.sel == null) return;
+      const p = cur().pieces[st.sel];
+      p.label = e.target.value.trim() || undefined;
+      const el = screen.querySelector(`.pz[data-i="${st.sel}"]`);
+      if (el) el.outerHTML = pieceHtml(p, st.sel, 'button');
+      flags();
+    });
     document.getElementById('leSave').addEventListener('click', async () => {
       const name = nameIn.value.trim();
       try {
-        await hubData.saveLayout(layout ? layout.id : null, name, st.modes.map((m) => ({ name: m.name.trim(), pieces: m.pieces })));
+        await hubData.saveLayout(layout ? layout.id : null, name, st.modes.map((m) => ({ name: m.name.trim(), pieces: m.pieces })), document.getElementById('leGame').value || null);
         closeModal();
         toast(`Layout ${name} salvo. Já aparece no menu dos celulares.`, null, 'ok');
         renderControls();
@@ -3252,10 +3342,15 @@ async function renderSettings() {
   document.getElementById('virtualBox').innerHTML = st.virtualPads
     ? `<div class="row"><span class="row-ic">${icon('shield')}</span><span class="row-t"><b>Controle virtual</b><small>Celulares e teclados aparecem como controles de Xbox para qualquer jogo.</small></span><span class="pill ok">Instalado</span></div>`
     : `<div class="row"><span class="row-ic">${icon('shield')}</span><span class="row-t"><b>Controle virtual</b><small>Para jogos comuns verem celulares e teclados como controles, o Windows precisa deste componente gratuito (ViGEmBus). Jogos feitos com o SDK não precisam.</small></span><span class="pill off">Não instalado</span></div>
-       <div class="row"><span class="row-t"><small>Leva menos de um minuto. O instalador do Windows abre e pede sua confirmação.</small></span><span class="row-act"><button class="btn-ghost sm" id="vRetry">Já instalei: conferir</button><button class="btn-neon sm" id="vInstall">${icon('download')}Instalar</button></span></div>`;
+       <div class="row" id="vRow"><span class="row-t"><small>Leva menos de um minuto. O Hub baixa, o Windows pede sua confirmação e pronto.</small></span><span class="row-act"><button class="btn-ghost sm" id="vRetry">Já instalei: conferir</button><button class="btn-neon sm" id="vInstall">${icon('download')}Instalar</button></span></div>
+       <div class="row" id="vProgress" hidden><div class="vi" style="width:100%"></div></div>`;
   document.getElementById('verTxt').textContent = `Party Anywhere ${st.version}`;
   document.getElementById('vInstall')?.addEventListener('click', async () => {
-    try { await hubData.installVirtual(); toast('O instalador abriu: siga na tela e depois toque em "Já instalei: conferir".', null, 'ok'); } catch (err) { toast(String(err), null, 'warn'); }
+    const prog = document.getElementById('vProgress');
+    prog.hidden = false;
+    document.getElementById('vRow').hidden = true;
+    const ok = await installVirtual(prog.querySelector('.vi'));
+    if (ok) { await sleep(1200); renderSettings(); } else document.getElementById('vRow').hidden = false;
   });
   document.getElementById('vRetry')?.addEventListener('click', async () => {
     const ok = await hubData.retryVirtual();

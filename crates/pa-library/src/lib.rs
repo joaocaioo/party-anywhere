@@ -9,6 +9,7 @@ pub mod install;
 pub mod pcgames;
 pub mod store;
 pub mod updates;
+pub mod vigem;
 
 pub use github::{discover, fetch_latest, fetch_manifest, inspect, Discovered, InspectReport, LatestRelease};
 pub use store::{Installed, Library, LibraryEntry, LoadNote, Source};

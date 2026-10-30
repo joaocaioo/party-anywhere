@@ -61,6 +61,7 @@
   // navegador fica desligada para o mesmo controle não navegar duas vezes
   window.__padNavExternal = true;
   listen('nav', (e) => navAction(e.payload.action, e.payload.color, e.payload.seat));
+  listen('virtual-install', (e) => virtualStep(e.payload));
   listen('device-activity', (e) => deviceActivity(e.payload));
 
   // controles chegam pelo núcleo (gilrs)
@@ -191,7 +192,8 @@
     devices: () => invoke('devices_list'),
     watchDevices: (on) => invoke('devices_watch', { on }),
     layouts: () => invoke('layouts_list'),
-    saveLayout: (id, name, modes) => invoke('layout_save', { id, name, modes }),
+    saveLayout: (id, name, modes, game) => invoke('layout_save', { id, name, modes, game }),
+    setGameLayout: (game, layout) => invoke('game_layout_set', { game, layout }),
     deleteLayout: (id) => invoke('layout_delete', { id }),
     settings: () => invoke('settings_get'),
     setJoinPolicy: (on) => invoke('set_join_policy', { onButton: on }),

@@ -284,6 +284,12 @@ Regras:
 - Só com a janela do Hub em foco e sem jogo do SDK conectado: enquanto alguém joga, os botões são do jogo.
   "Em foco" é a janela em primeiro plano do Windows (`GetForegroundWindow`): o foco do Tauri some quando o
   teclado está dentro da página (WebView2), isto é, depois de qualquer clique no Hub.
+- O componente dos controles virtuais (ViGEmBus 1.22.0, BSD-3, versão fixa conferida pelo hash em
+  `pa_library::vigem`): o instalador do Hub leva o arquivo e, no fim, oferece instalar (o Windows pede
+  administrador; atualização silenciosa não pergunta). No app, "Instalar" baixa a mesma versão, abre com o
+  aviso de administrador (`ShellExecuteEx` "runas": `CreateProcess` falha calado com instalador que exige
+  admin), espera fechar, confere e avisa cada passo (`virtual-install`: baixando %, instalador aberto,
+  conferindo, pronto ou o erro). Na tela de antes do jogo, pronto já segue para o jogo.
 - Controles Xbox são lidos direto pelo XInput (`XInputGetState`, vaga achada como na vibração); os outros, pelos
   eventos do gilrs. `PA_DEBUG_INPUT=1` mostra no terminal o que chega de cada controle e o que a navegação vê.
 - A UI (`navAction`): nas telas de cartas, esquerda/direita andam nas cartas, cima vai para as abas, baixo
@@ -326,6 +332,11 @@ Regras:
      conferir ou jogar só com os controles.
   3. Mais gente do que o jogo aceita? "Quem vai jogar?": cada um aperta **A** no seu controle ou celular e a
      bolinha acende; **B** apaga; clique também vale; **Start** começa.
+- **Padrão do jogo**: `settings.game_layout` liga um jogo a um layout (qualquer um, até os prontos); um jogo
+  que traz `controls` no manifesto ganha um layout "do jogo" ao instalar (não editável, duplicável). Ao abrir
+  o jogo, `Hub::set_session_layout` manda esse layout a todos os celulares, menos a quem trocou no menu
+  durante a partida; `game_stopped` devolve cada um ao seu. As regras das peças ficam em
+  `pa_manifest::controls` (Hub, `pa validate` e MCP usam as mesmas).
 - `game_play(id, players)`: as vagas de fora ficam no banco (`Hub::set_players`): sem controle virtual e, no
   SDK, como vaga vazia. `game_stopped` (ao voltar para a biblioteca) devolve todo mundo.
 

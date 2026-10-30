@@ -169,41 +169,108 @@ pub fn set_join_ip(hub: Hubs, ip: Option<String>) -> String {
 /// Baixa o instalador oficial do ViGEmBus (o componente de controle virtual) do GitHub e abre: o Windows
 /// pede permissão de administrador. Depois, "Conferir" liga os controles virtuais sem reiniciar o Hub.
 #[tauri::command]
-pub async fn virtual_pads_install() -> Result<(), String> {
-    let path = tauri::async_runtime::spawn_blocking(|| -> Result<PathBuf, String> {
-        use pa_library::http::Http;
-        #[derive(Deserialize)]
-        struct Rel {
-            assets: Vec<Asset>,
-        }
-        #[derive(Deserialize)]
-        struct Asset {
-            name: String,
-            browser_download_url: String,
-        }
-        let http = Ureq::default();
-        let resp = http.get("https://api.github.com/repos/nefarius/ViGEmBus/releases/latest", None, 2 * 1024 * 1024)?;
-        if !resp.ok() {
-            return Err(format!("não consegui consultar o instalador ({}).", resp.status));
-        }
-        let rel: Rel = serde_json::from_slice(&resp.body).map_err(|_| "resposta inesperada do GitHub.".to_string())?;
-        let asset = rel
-            .assets
-            .into_iter()
-            .find(|a| a.name.to_lowercase().ends_with(".exe") && a.browser_download_url.starts_with("https://github.com/"))
-            .ok_or("o release do ViGEmBus não tem instalador.")?;
-        let bin = http.get(&asset.browser_download_url, None, 50 * 1024 * 1024)?;
-        if !bin.ok() {
-            return Err(format!("o download falhou ({}).", bin.status));
-        }
-        let path = std::env::temp_dir().join(&asset.name);
-        std::fs::write(&path, bin.body).map_err(|e| e.to_string())?;
+pub async fn virtual_pads_install(app: tauri::AppHandle, hub: Hubs<'_>) -> Result<bool, String> {
+    // cada passo vai para a UI (evento `virtual-install`): baixando N%, instalador aberto, pronto ou o erro
+    let step = |stage: &'static str, pct: Option<u8>, message: Option<String>| {
+        let _ = app.emit("virtual-install", VirtualStep { stage, pct, message });
+    };
+    step("download", Some(0), None);
+    let progress_app = app.clone();
+    let downloaded = tauri::async_runtime::spawn_blocking(move || -> Result<PathBuf, String> {
+        use pa_library::vigem;
+        let mut last = 0u8;
+        let bin = Ureq::default().download(vigem::URL, 50 * 1024 * 1024, |done, total| {
+            let pct = total.map(|t| (done * 100 / t.max(1)).min(100) as u8).unwrap_or(0);
+            if pct != last {
+                last = pct;
+                let _ = progress_app.emit("virtual-install", VirtualStep { stage: "download", pct: Some(pct), message: None });
+            }
+        })?;
+        vigem::verify(&bin)?;
+        let path = std::env::temp_dir().join(vigem::FILE);
+        std::fs::write(&path, bin).map_err(|e| e.to_string())?;
         Ok(path)
     })
     .await
-    .map_err(|e| e.to_string())??;
-    std::process::Command::new(&path).spawn().map_err(|e| format!("não consegui abrir o instalador: {e}"))?;
+    .map_err(|e| e.to_string())?;
+    let path = match downloaded {
+        Ok(p) => p,
+        Err(e) => {
+            step("failed", None, Some(format!("Não deu para baixar: {e}")));
+            return Ok(false);
+        }
+    };
+    // o instalador de driver precisa de administrador: o Windows mostra o aviso (UAC) e o Hub espera terminar
+    step("installer", None, None);
+    let ran = tauri::async_runtime::spawn_blocking(move || run_elevated_and_wait(&path)).await.map_err(|e| e.to_string())?;
+    if let Err(e) = ran {
+        step("failed", None, Some(e));
+        return Ok(false);
+    }
+    step("check", None, None);
+    let hub = hub.inner().clone();
+    let ok = tauri::async_runtime::spawn_blocking(move || {
+        // o driver pode levar um instante para aparecer depois que o instalador fecha
+        (0..12).any(|_| hub.retry_virtual_pads() || {
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            false
+        })
+    })
+    .await
+    .unwrap_or(false);
+    if ok {
+        step("done", None, None);
+    } else {
+        step("failed", None, Some("O instalador fechou, mas o componente não apareceu. Se ele pediu, reinicie o PC; senão, tente de novo.".into()));
+    }
+    Ok(ok)
+}
+
+#[derive(Clone, Serialize)]
+struct VirtualStep {
+    stage: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pct: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    message: Option<String>,
+}
+
+/// Abre um instalador pedindo administrador (o aviso do Windows) e espera ele fechar.
+#[cfg(windows)]
+fn run_elevated_and_wait(path: &std::path::Path) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Foundation::{CloseHandle, GetLastError};
+    use windows_sys::Win32::System::Threading::{WaitForSingleObject, INFINITE};
+    use windows_sys::Win32::UI::Shell::{ShellExecuteExW, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW};
+    use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+    let file: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
+    let verb: Vec<u16> = "runas".encode_utf16().chain(Some(0)).collect();
+    let mut info: SHELLEXECUTEINFOW = unsafe { std::mem::zeroed() };
+    info.cbSize = std::mem::size_of::<SHELLEXECUTEINFOW>() as u32;
+    info.fMask = SEE_MASK_NOCLOSEPROCESS;
+    info.lpVerb = verb.as_ptr();
+    info.lpFile = file.as_ptr();
+    info.nShow = SW_SHOWNORMAL;
+    if unsafe { ShellExecuteExW(&mut info) } == 0 {
+        let code = unsafe { GetLastError() };
+        return Err(if code == 1223 {
+            "Você recusou o aviso do Windows. Sem ele o componente não instala.".into()
+        } else {
+            format!("Não consegui abrir o instalador (erro {code}).")
+        });
+    }
+    if !info.hProcess.is_null() {
+        unsafe {
+            WaitForSingleObject(info.hProcess, INFINITE);
+            CloseHandle(info.hProcess);
+        }
+    }
     Ok(())
+}
+
+#[cfg(not(windows))]
+fn run_elevated_and_wait(_: &std::path::Path) -> Result<(), String> {
+    Err("só no Windows.".into())
 }
 
 #[tauri::command]
@@ -219,11 +286,20 @@ pub fn layouts_list(hub: Hubs) -> Vec<crate::settings::Layout> {
 }
 
 #[tauri::command]
-pub fn layout_save(hub: Hubs, id: Option<String>, name: String, modes: Vec<crate::settings::Mode>) -> Result<crate::settings::Layout, String> {
-    let saved = hub.settings.lock().unwrap().upsert_layout(id.as_deref(), &name, modes)?;
+pub fn layout_save(hub: Hubs, id: Option<String>, name: String, modes: Vec<crate::settings::Mode>, game: Option<String>) -> Result<crate::settings::Layout, String> {
+    let saved = hub.settings.lock().unwrap().upsert_layout(id.as_deref(), &name, modes, game)?;
     hub.save_settings();
     hub.broadcast_layouts();
     Ok(saved)
+}
+
+/// Na biblioteca: o controle do celular que entra sozinho quando este jogo abre (`None`: nenhum).
+#[tauri::command]
+pub fn game_layout_set(hub: Hubs, game: String, layout: Option<String>) -> Result<(), String> {
+    hub.settings.lock().unwrap().set_game(&game, layout.as_deref())?;
+    hub.save_settings();
+    hub.broadcast_layouts();
+    Ok(())
 }
 
 #[tauri::command]
@@ -382,11 +458,13 @@ struct InstallProgress {
 #[tauri::command]
 pub async fn library_install(
     app: tauri::AppHandle,
+    hub: Hubs<'_>,
     libs: Libs<'_>,
     url: String,
     base_dir: Option<String>,
 ) -> Result<Vec<UiGame>, String> {
     let libs = libs.inner().clone();
+    let hub = hub.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let http = Ureq::default();
         let report = pa_library::inspect(&http, &url)?;
@@ -401,6 +479,17 @@ pub async fn library_install(
         let _ = app.emit("install-progress", InstallProgress { id: manifest.id.clone(), stage: "download" });
         let installed = install(&http, manifest, latest, &libs.games_root, base_dir.as_deref())?;
         let _ = app.emit("install-progress", InstallProgress { id: manifest.id.clone(), stage: "done" });
+        // o jogo trouxe o controle do celular dele: vira o "Padrão do jogo"
+        if let Some(c) = &manifest.controls {
+            let saved = hub.settings.lock().unwrap().set_game_layout(&manifest.id, &manifest.name, c.modes.clone());
+            match saved {
+                Ok(_) => {
+                    hub.save_settings();
+                    hub.broadcast_layouts();
+                }
+                Err(e) => eprintln!("party-anywhere: controle de {} ignorado: {e}", manifest.id),
+            }
+        }
         let mut entry = pa_library::entry_for(&report).ok_or("manifesto ausente")?;
         entry.installed = Some(installed);
         let mut lib = libs.lib.lock().unwrap();
@@ -658,6 +747,9 @@ pub fn game_play(app: tauri::AppHandle, hub: Hubs, libs: Libs, id: String, playe
     let entry = libs.lib.lock().unwrap().get(&id).cloned().ok_or("jogo não encontrado na biblioteca")?;
     // mais gente do que o jogo aceita: só quem foi escolhido aparece para ele
     hub.set_players(players.as_deref());
+    // o jogo tem um controle próprio ("Padrão do jogo"): os celulares trocam para ele
+    let game_layout = hub.settings.lock().unwrap().layout_for_game(&id);
+    hub.set_session_layout(game_layout);
     match (&entry.source, &entry.installed) {
         (Source::Pc { launch, .. }, _) => {
             if launch.contains("://") {
@@ -678,6 +770,7 @@ pub fn game_play(app: tauri::AppHandle, hub: Hubs, libs: Libs, id: String, playe
 #[tauri::command]
 pub fn game_stopped(hub: Hubs) {
     hub.set_players(None);
+    hub.set_session_layout(None);
 }
 
 fn spawn(exe: &std::path::Path, args: &[String], cwd: Option<PathBuf>) -> Result<(), String> {

@@ -101,6 +101,9 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
   border: 2px solid color-mix(in srgb, var(--c) 70%, transparent);
   color: var(--c);
 }
+.area button { display: grid; place-content: center; justify-items: center; gap: 2px; line-height: 1; }
+.area button em { font-style: normal; font-weight: 700; font-size: calc(var(--u) * .038 * var(--s)); opacity: .9; max-width: 92%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb em { font-size: calc(var(--u) * .034 * var(--s)); }
 .down { filter: brightness(1.6); transform: scale(.94); }
 .fb.down { background: var(--c); color: rgba(0, 0, 0, .75); }
 .sh.down, .small.down, .dpad .down { background: var(--seat); color: rgba(0, 0, 0, .78); }
@@ -249,9 +252,11 @@ function render() {
     const k = p.kind, at = `data-i="${i}"`;
     if (k === 'stickL' || k === 'stickR') return `<div class="stick${prefs.stickSeen ? ' used' : ''}" ${at} data-stick="${k === 'stickL' ? 'l' : 'r'}"><div class="hint">Toque e<br>arraste</div></div>`;
     if (k === 'dpad') return `<div class="dpad" ${at}>${Object.keys(arrows).map((d) => `<button data-b="${d}">${arrows[d]}</button>`).join('')}</div>`;
-    if ('ABXY'.includes(k) && k.length === 1) return `<button class="fb" ${at} data-b="${k}" style="--c:var(--${k.toLowerCase()})">${k}</button>`;
-    if (label[k]) return `<button class="small" ${at} data-b="${k}">${label[k]}</button>`;
-    return `<button class="sh" ${at} data-b="${k}">${k}</button>`;
+    // nome da ação no jogo ("Pular", "Impulso"), quando o layout tem: embaixo da letra
+    const name = p.label ? `<em>${escapeHtml(p.label)}</em>` : '';
+    if ('ABXY'.includes(k) && k.length === 1) return `<button class="fb" ${at} data-b="${k}" style="--c:var(--${k.toLowerCase()})">${k}${name}</button>`;
+    if (label[k]) return `<button class="small" ${at} data-b="${k}">${label[k]}${name}</button>`;
+    return `<button class="sh" ${at} data-b="${k}">${k}${name}</button>`;
   }).join('');
   $('modes').innerHTML = layout.modes.length > 1 ? layout.modes.map((m, i) => `<button data-mode="${i}" class="${i === modeIdx ? 'on' : ''}">${escapeHtml(m.name)}</button>`).join('') : '';
   place();

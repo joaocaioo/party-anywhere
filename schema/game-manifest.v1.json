@@ -4,92 +4,311 @@
   "title": "Party Anywhere: manifesto de jogo (party-anywhere.json)",
   "description": "Faz o jogo aparecer na Biblioteca do Party Anywhere. Especificação: docs/GAME-MANIFEST.md.",
   "type": "object",
-  "required": ["manifestVersion", "id", "name", "tagline", "version", "art", "players", "sdk", "install", "launch"],
+  "required": [
+    "manifestVersion",
+    "id",
+    "name",
+    "tagline",
+    "version",
+    "art",
+    "players",
+    "sdk",
+    "install",
+    "launch"
+  ],
   "properties": {
-    "$schema": { "type": "string" },
-    "manifestVersion": { "const": 1 },
+    "$schema": {
+      "type": "string"
+    },
+    "manifestVersion": {
+      "const": 1
+    },
     "id": {
       "type": "string",
       "pattern": "^[a-z0-9]+(\\.[a-z0-9]+(-[a-z0-9]+)*)+$",
       "maxLength": 100,
       "description": "Identidade do jogo para sempre: com.seu-usuario.nome-do-jogo."
     },
-    "name": { "type": "string", "minLength": 1, "maxLength": 40 },
-    "tagline": { "type": "string", "minLength": 1, "maxLength": 90, "description": "Uma frase que aparece embaixo da capa." },
-    "description": { "type": "string", "description": "Texto longo, ou o caminho de um .md (normalmente README.md)." },
-    "authors": { "type": "array", "items": { "type": "string" } },
-    "license": { "type": "string" },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40
+    },
+    "tagline": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 90,
+      "description": "Uma frase que aparece embaixo da capa."
+    },
+    "description": {
+      "type": "string",
+      "description": "Texto longo, ou o caminho de um .md (normalmente README.md)."
+    },
+    "authors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "license": {
+      "type": "string"
+    },
     "version": {
       "type": "string",
       "pattern": "^v?(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$",
       "description": "Semver, igual à tag do release."
     },
-    "minHubVersion": { "type": "string" },
+    "minHubVersion": {
+      "type": "string"
+    },
     "art": {
       "type": "object",
-      "required": ["cover"],
+      "required": [
+        "cover"
+      ],
       "properties": {
-        "cover": { "$ref": "#/$defs/image", "description": "Obrigatória: retrato 3:4, mínimo 600x800, até 2 MB." },
-        "hero": { "$ref": "#/$defs/image", "description": "Opcional: 16:9, fundo da tela do jogo." },
-        "logo": { "$ref": "#/$defs/image", "description": "Opcional: PNG transparente." }
+        "cover": {
+          "$ref": "#/$defs/image",
+          "description": "Obrigatória: retrato 3:4, mínimo 600x800, até 2 MB."
+        },
+        "hero": {
+          "$ref": "#/$defs/image",
+          "description": "Opcional: 16:9, fundo da tela do jogo."
+        },
+        "logo": {
+          "$ref": "#/$defs/image",
+          "description": "Opcional: PNG transparente."
+        }
       }
     },
     "players": {
       "type": "object",
-      "required": ["min", "max"],
+      "required": [
+        "min",
+        "max"
+      ],
       "properties": {
-        "min": { "type": "integer", "minimum": 1, "maximum": 10 },
-        "max": { "type": "integer", "minimum": 1, "maximum": 10 },
-        "recommended": { "type": "integer", "minimum": 1, "maximum": 10 }
+        "min": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "recommended": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        }
       }
     },
     "sdk": {
       "type": "object",
-      "required": ["abi"],
-      "properties": { "abi": { "const": 1 } }
+      "required": [
+        "abi"
+      ],
+      "properties": {
+        "abi": {
+          "const": 1
+        }
+      }
     },
-    "tags": { "type": "array", "items": { "type": "string", "pattern": "^[^A-Z\\s]{1,24}$" } },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[^A-Z\\s]{1,24}$"
+      }
+    },
     "requires": {
       "type": "object",
       "properties": {
         "baseGame": {
           "type": "object",
-          "required": ["name", "exe"],
+          "required": [
+            "name",
+            "exe"
+          ],
           "properties": {
-            "name": { "type": "string" },
-            "steamAppId": { "type": "integer" },
-            "exe": { "$ref": "#/$defs/relativePath" },
-            "acceptedSha256": { "type": "array", "items": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" } },
-            "help": { "type": "string" }
+            "name": {
+              "type": "string"
+            },
+            "steamAppId": {
+              "type": "integer"
+            },
+            "exe": {
+              "$ref": "#/$defs/relativePath"
+            },
+            "acceptedSha256": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[0-9a-fA-F]{64}$"
+              }
+            },
+            "help": {
+              "type": "string"
+            }
           }
         }
       }
     },
     "install": {
       "type": "object",
-      "required": ["source", "asset", "target"],
+      "required": [
+        "source",
+        "asset",
+        "target"
+      ],
       "properties": {
-        "source": { "const": "github-release" },
-        "asset": { "type": "string", "pattern": "^[^/\\\\]+\\.[zZ][iI][pP]$", "description": "Pacote do release; {version} vira a versão." },
-        "target": { "enum": ["self", "baseGame"] },
+        "source": {
+          "const": "github-release"
+        },
+        "asset": {
+          "type": "string",
+          "pattern": "^[^/\\\\]+\\.[zZ][iI][pP]$",
+          "description": "Pacote do release; {version} vira a versão."
+        },
+        "target": {
+          "enum": [
+            "self",
+            "baseGame"
+          ]
+        },
         "files": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["from", "to"],
-            "properties": { "from": { "$ref": "#/$defs/relativePath" }, "to": { "$ref": "#/$defs/relativePath" } }
+            "required": [
+              "from",
+              "to"
+            ],
+            "properties": {
+              "from": {
+                "$ref": "#/$defs/relativePath"
+              },
+              "to": {
+                "$ref": "#/$defs/relativePath"
+              }
+            }
           }
         },
-        "sha256": { "deprecated": true, "description": "Não é mais usado: o hash vai no party-anywhere.release.json." }
+        "sha256": {
+          "deprecated": true,
+          "description": "Não é mais usado: o hash vai no party-anywhere.release.json."
+        }
       }
     },
     "launch": {
       "type": "object",
-      "required": ["exe"],
+      "required": [
+        "exe"
+      ],
       "properties": {
-        "exe": { "$ref": "#/$defs/relativePath" },
-        "args": { "type": "array", "items": { "type": "string" } },
-        "workingDir": { "type": "string" }
+        "exe": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "workingDir": {
+          "type": "string"
+        }
+      }
+    },
+    "controls": {
+      "description": "O controle do celular feito para o jogo: vira o \"Padrão do jogo\" no Hub e entra sozinho nos celulares quando o jogo abre. Monte no editor do Hub (Controles → Criar layout).",
+      "type": "object",
+      "required": [
+        "modes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "modes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "pieces"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 20,
+                "description": "Ex.: A pé, Veículo"
+              },
+              "pieces": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "x",
+                    "y"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "stickL",
+                        "stickR",
+                        "dpad",
+                        "A",
+                        "B",
+                        "X",
+                        "Y",
+                        "LB",
+                        "RB",
+                        "LT",
+                        "RT",
+                        "BACK",
+                        "START",
+                        "LS",
+                        "RS"
+                      ]
+                    },
+                    "x": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1,
+                      "description": "Centro, 0..1 da largura"
+                    },
+                    "y": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1,
+                      "description": "Centro, 0..1 da altura"
+                    },
+                    "s": {
+                      "type": "number",
+                      "minimum": 0.6,
+                      "maximum": 1.6,
+                      "default": 1,
+                      "description": "Tamanho (P 0,8 · M 1 · G 1,25)"
+                    },
+                    "label": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 12,
+                      "description": "Nome da ação no botão, ex.: Pular"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -97,11 +316,20 @@
     "relativePath": {
       "type": "string",
       "minLength": 1,
-      "not": { "pattern": "(^[/\\\\])|:|(^|[/\\\\])\\.\\.([/\\\\]|$)" },
+      "not": {
+        "pattern": "(^[/\\\\])|:|(^|[/\\\\])\\.\\.([/\\\\]|$)"
+      },
       "description": "Caminho relativo, sem .. e sem unidade (C:)."
     },
     "image": {
-      "allOf": [{ "$ref": "#/$defs/relativePath" }, { "pattern": "\\.([pP][nN][gG]|[jJ][pP][eE]?[gG]|[wW][eE][bB][pP])$" }]
+      "allOf": [
+        {
+          "$ref": "#/$defs/relativePath"
+        },
+        {
+          "pattern": "\\.([pP][nN][gG]|[jJ][pP][eE]?[gG]|[wW][eE][bB][pP])$"
+        }
+      ]
     }
   }
 }

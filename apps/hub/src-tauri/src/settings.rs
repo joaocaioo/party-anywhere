@@ -14,55 +14,13 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+pub use pa_manifest::controls::{check_modes, Mode, Piece, CANVAS};
+
 pub const SETTINGS_VERSION: u32 = 1;
 /// Layout de quem ainda não escolheu.
 pub const DEFAULT_LAYOUT: &str = "advanced";
-/// Proporção da tela de referência (largura ÷ altura), a área do controle abaixo da barra do topo.
-pub const CANVAS: f32 = 2.17;
-pub const MAX_MODES: usize = 6;
-/// Área reservada à pílula do topo (jogador, conexão, Menu): meia largura e altura, em unidades da altura.
-pub const TOP_PILL: (f32, f32) = (0.22, 0.14);
-
-/// Peças e o tamanho base (largura, altura) em unidades da altura da tela de referência.
-pub const PIECES: [(&str, f32, f32); 15] = [
-    ("stickL", 0.5, 0.5),
-    ("stickR", 0.36, 0.36),
-    ("dpad", 0.36, 0.36),
-    ("A", 0.2, 0.2),
-    ("B", 0.2, 0.2),
-    ("X", 0.2, 0.2),
-    ("Y", 0.2, 0.2),
-    ("LB", 0.36, 0.14),
-    ("RB", 0.36, 0.14),
-    ("LT", 0.36, 0.14),
-    ("RT", 0.36, 0.14),
-    ("BACK", 0.2, 0.11),
-    ("START", 0.2, 0.11),
-    ("LS", 0.2, 0.11),
-    ("RS", 0.2, 0.11),
-];
-
-/// Uma peça: centro em (x, y) na tela de referência (0..1 nos dois eixos) e um multiplicador de tamanho.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Piece {
-    pub kind: String,
-    pub x: f32,
-    pub y: f32,
-    #[serde(default = "one")]
-    pub s: f32,
-}
-
-fn one() -> f32 {
-    1.0
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Mode {
-    pub name: String,
-    pub pieces: Vec<Piece>,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Layout {
     pub id: String,
     pub name: String,
@@ -74,10 +32,17 @@ pub struct Layout {
     /// Pronto (Simples, Avançado): não dá para editar nem apagar; dá para duplicar.
     #[serde(default)]
     pub builtin: bool,
+    /// Jogo da biblioteca em que este layout entra sozinho ("Padrão do jogo"). Guardado em `game_layout`
+    /// (ou no próprio layout, quando ele veio com o jogo); `all_layouts` preenche para a UI.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub game: Option<String>,
+    /// Veio com o jogo (`controls` no manifesto): não dá para editar nem apagar; dá para duplicar.
+    #[serde(default)]
+    pub from_game: bool,
 }
 
 fn p(kind: &str, x_units: f32, y: f32, s: f32) -> Piece {
-    Piece { kind: kind.into(), x: x_units / CANVAS, y, s }
+    Piece { kind: kind.into(), x: x_units / CANVAS, y, s, label: None }
 }
 
 /// O Avançado, peça por peça (posições em unidades da altura; x é convertido para 0..1 da largura).
@@ -117,8 +82,18 @@ pub fn builtins() -> Vec<Layout> {
             ]),
             controls: vec![],
             builtin: true,
+            game: None,
+            from_game: false,
         },
-        Layout { id: "advanced".into(), name: "Avançado".into(), modes: one_mode(advanced_pieces()), controls: vec![], builtin: true },
+        Layout {
+            id: "advanced".into(),
+            name: "Avançado".into(),
+            modes: one_mode(advanced_pieces()),
+            controls: vec![],
+            builtin: true,
+            game: None,
+            from_game: false,
+        },
     ]
 }
 
@@ -126,60 +101,6 @@ pub fn builtins() -> Vec<Layout> {
 fn from_controls(controls: &[String]) -> Vec<Mode> {
     let pieces = advanced_pieces().into_iter().filter(|p| controls.contains(&p.kind)).collect();
     vec![Mode { name: "Padrão".into(), pieces }]
-}
-
-fn base_size(kind: &str) -> Option<(f32, f32)> {
-    PIECES.iter().find(|(k, _, _)| *k == kind).map(|(_, w, h)| (*w, *h))
-}
-
-/// Retângulo da peça em unidades da altura (x0, y0, x1, y1).
-pub fn rect(p: &Piece) -> Option<(f32, f32, f32, f32)> {
-    let (w, h) = base_size(&p.kind)?;
-    let (w, h) = (w * p.s, h * p.s);
-    let cx = p.x * CANVAS;
-    Some((cx - w / 2.0, p.y - h / 2.0, cx + w / 2.0, p.y + h / 2.0))
-}
-
-/// O modo pode ir para os celulares? Erro em português, dizendo o que ajustar.
-pub fn check_mode(m: &Mode) -> Result<(), String> {
-    let name = m.name.trim();
-    if name.is_empty() || name.chars().count() > 20 {
-        return Err("dê um nome de até 20 letras a cada modo (ex.: A pé, Veículo).".into());
-    }
-    let mut seen = Vec::new();
-    for piece in &m.pieces {
-        if seen.contains(&piece.kind) {
-            return Err(format!("o modo {name} tem a peça {} duas vezes.", piece.kind));
-        }
-        seen.push(piece.kind.clone());
-        if !(0.6..=1.6).contains(&piece.s) {
-            return Err(format!("tamanho fora do limite em {} ({name}).", piece.kind));
-        }
-        let (x0, y0, x1, y1) = rect(piece).ok_or_else(|| format!("peça desconhecida: {}", piece.kind))?;
-        if x0 < -0.001 || y0 < -0.001 || x1 > CANVAS + 0.001 || y1 > 1.001 {
-            return Err(format!("{} passa da borda da tela no modo {name}.", piece.kind));
-        }
-        let mid = CANVAS / 2.0;
-        if x0 < mid + TOP_PILL.0 - 0.005 && x1 > mid - TOP_PILL.0 + 0.005 && y0 < TOP_PILL.1 - 0.005 {
-            return Err(format!("{} está embaixo do Menu (no meio do topo) no modo {name}.", piece.kind));
-        }
-    }
-    let has_dir = seen.iter().any(|k| k == "stickL" || k == "stickR" || k == "dpad");
-    let has_button = seen.iter().any(|k| ["A", "B", "X", "Y"].contains(&k.as_str()));
-    if !has_dir || !has_button {
-        return Err(format!("o modo {name} precisa de um analógico ou das setas e de ao menos um botão (A, B, X ou Y)."));
-    }
-    // peças sobrepostas: no celular, um toque cairia nas duas
-    for (i, a) in m.pieces.iter().enumerate() {
-        for b in &m.pieces[i + 1..] {
-            let (a0, a1, a2, a3) = rect(a).unwrap();
-            let (b0, b1, b2, b3) = rect(b).unwrap();
-            if a0 < b2 - 0.005 && b0 < a2 - 0.005 && a1 < b3 - 0.005 && b1 < a3 - 0.005 {
-                return Err(format!("{} e {} estão uma em cima da outra no modo {name}.", a.kind, b.kind));
-            }
-        }
-    }
-    Ok(())
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -198,11 +119,21 @@ pub struct Settings {
     /// Chave do celular → layout escolhido.
     #[serde(default)]
     pub phone_layout: HashMap<String, String>,
+    /// Jogo da biblioteca → layout que entra sozinho quando ele abre (qualquer layout, até os prontos).
+    #[serde(default)]
+    pub game_layout: HashMap<String, String>,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { version: SETTINGS_VERSION, join_on_button: false, preferred_ip: None, layouts: vec![], phone_layout: HashMap::new() }
+        Self {
+            version: SETTINGS_VERSION,
+            join_on_button: false,
+            preferred_ip: None,
+            layouts: vec![],
+            phone_layout: HashMap::new(),
+            game_layout: HashMap::new(),
+        }
     }
 }
 
@@ -231,7 +162,28 @@ impl Settings {
     }
 
     pub fn all_layouts(&self) -> Vec<Layout> {
-        builtins().into_iter().chain(self.layouts.iter().cloned()).collect()
+        let mut all: Vec<Layout> = builtins().into_iter().chain(self.layouts.iter().cloned()).collect();
+        for l in all.iter_mut().filter(|l| !l.from_game) {
+            let mut games: Vec<&String> = self.game_layout.iter().filter(|(_, id)| **id == l.id).map(|(g, _)| g).collect();
+            games.sort();
+            l.game = games.first().map(|g| g.to_string());
+        }
+        all
+    }
+
+    /// Liga um jogo a um layout (`None`: o jogo volta a não ter padrão próprio).
+    pub fn set_game(&mut self, game: &str, layout: Option<&str>) -> Result<(), String> {
+        match layout {
+            Some(id) if self.all_layouts().iter().any(|l| l.id == id) => {
+                self.game_layout.insert(game.into(), id.into());
+                Ok(())
+            }
+            Some(_) => Err("esse layout não existe mais.".into()),
+            None => {
+                self.game_layout.remove(game);
+                Ok(())
+            }
+        }
     }
 
     pub fn layout_for(&self, device: &str) -> String {
@@ -243,24 +195,20 @@ impl Settings {
         }
     }
 
-    /// Cria ou atualiza um layout da pessoa (todos os modos conferidos).
-    pub fn upsert_layout(&mut self, id: Option<&str>, name: &str, modes: Vec<Mode>) -> Result<Layout, String> {
+    /// Cria ou atualiza um layout da pessoa (todos os modos conferidos). `game`: o jogo em que ele entra sozinho.
+    pub fn upsert_layout(&mut self, id: Option<&str>, name: &str, modes: Vec<Mode>, game: Option<String>) -> Result<Layout, String> {
         let name = name.trim();
         if name.is_empty() || name.chars().count() > 24 {
             return Err("dê um nome de até 24 letras ao layout.".into());
         }
-        if modes.is_empty() || modes.len() > MAX_MODES {
-            return Err(format!("um layout tem de 1 a {MAX_MODES} modos."));
-        }
-        for m in &modes {
-            check_mode(m)?;
-        }
-        let modes: Vec<Mode> = modes.into_iter().map(|m| Mode { name: m.name.trim().into(), pieces: m.pieces }).collect();
-        match id.and_then(|id| self.layouts.iter_mut().find(|l| l.id == id)) {
+        check_modes(&modes)?;
+        let modes: Vec<Mode> = modes.into_iter().map(clean_mode).collect();
+        let game = game.filter(|g| !g.trim().is_empty());
+        let saved = match id.and_then(|id| self.layouts.iter_mut().find(|l| l.id == id && !l.from_game)) {
             Some(l) => {
                 l.name = name.into();
                 l.modes = modes;
-                Ok(l.clone())
+                l.clone()
             }
             None => {
                 let base: String = name.to_lowercase().chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '-' }).collect();
@@ -271,20 +219,61 @@ impl Settings {
                     id = format!("custom-{base}-{n}");
                     n += 1;
                 }
-                let l = Layout { id, name: name.into(), modes, controls: vec![], builtin: false };
+                let l = Layout { id, name: name.into(), modes, controls: vec![], builtin: false, game: None, from_game: false };
                 self.layouts.push(l.clone());
-                Ok(l)
+                l
             }
+        };
+        // o jogo escolhido no editor: este layout passa a ser o padrão dele (e deixa de ser o de outros)
+        self.game_layout.retain(|_, l| *l != saved.id);
+        if let Some(g) = &game {
+            self.game_layout.insert(g.clone(), saved.id.clone());
         }
+        Ok(Layout { game, ..saved })
+    }
+
+    /// O controle que veio com o jogo (manifesto): entra como "do jogo", no lugar do anterior.
+    pub fn set_game_layout(&mut self, game: &str, name: &str, modes: Vec<Mode>) -> Result<Layout, String> {
+        check_modes(&modes)?;
+        let slug: String = game.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '-' }).collect();
+        let l = Layout {
+            id: format!("game-{slug}"),
+            name: name.chars().take(24).collect(),
+            modes: modes.into_iter().map(clean_mode).collect(),
+            controls: vec![],
+            builtin: false,
+            game: Some(game.into()),
+            from_game: true,
+        };
+        self.layouts.retain(|x| x.id != l.id);
+        self.layouts.push(l.clone());
+        Ok(l)
+    }
+
+    /// O layout que entra sozinho quando o jogo abre: o que a pessoa escolheu para ele; senão, o que veio com ele.
+    pub fn layout_for_game(&self, game: &str) -> Option<String> {
+        let all = self.all_layouts();
+        let mine = self.game_layout.get(game).filter(|id| all.iter().any(|l| &l.id == *id)).cloned();
+        mine.or_else(|| self.layouts.iter().find(|l| l.from_game && l.game.as_deref() == Some(game)).map(|l| l.id.clone()))
     }
 
     pub fn delete_layout(&mut self, id: &str) -> bool {
         let before = self.layouts.len();
-        self.layouts.retain(|l| l.id != id);
+        self.layouts.retain(|l| l.id != id || l.from_game);
+        self.game_layout.retain(|_, l| l != id);
         // quem usava volta para o padrão
         self.phone_layout.retain(|_, l| l != id);
         self.layouts.len() != before
     }
+}
+
+fn clean_mode(m: Mode) -> Mode {
+    let pieces = m
+        .pieces
+        .into_iter()
+        .map(|p| Piece { label: p.label.map(|l| l.trim().to_string()).filter(|l| !l.is_empty()), ..p })
+        .collect();
+    Mode { name: m.name.trim().into(), pieces }
 }
 
 pub fn path(roaming: &Path) -> PathBuf {
@@ -294,6 +283,7 @@ pub fn path(roaming: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pa_manifest::controls::check_mode;
 
     fn mode(name: &str, pieces: Vec<Piece>) -> Mode {
         Mode { name: name.into(), pieces }
@@ -311,19 +301,40 @@ mod tests {
     #[test]
     fn modes_are_validated() {
         let mut s = Settings::default();
-        assert!(s.upsert_layout(None, "X", vec![]).is_err(), "precisa de modo");
+        assert!(s.upsert_layout(None, "X", vec![], None).is_err(), "precisa de modo");
         let no_button = mode("A pé", vec![p("stickL", 0.4, 0.5, 1.0)]);
-        assert!(s.upsert_layout(None, "X", vec![no_button]).unwrap_err().contains("botão"));
+        assert!(s.upsert_layout(None, "X", vec![no_button], None).unwrap_err().contains("botão"));
         let out = mode("A pé", vec![p("stickL", 0.1, 0.5, 1.0), p("A", 1.5, 0.5, 1.0)]);
-        assert!(s.upsert_layout(None, "X", vec![out]).unwrap_err().contains("borda"));
+        assert!(s.upsert_layout(None, "X", vec![out], None).unwrap_err().contains("borda"));
         let pill = mode("A pé", vec![p("stickL", 0.4, 0.5, 1.0), p("A", 1.085, 0.1, 1.0)]);
-        assert!(s.upsert_layout(None, "X", vec![pill]).unwrap_err().contains("Menu"));
+        assert!(s.upsert_layout(None, "X", vec![pill], None).unwrap_err().contains("Menu"));
         let overlap = mode("A pé", vec![p("stickL", 0.4, 0.5, 1.0), p("A", 0.45, 0.5, 1.0)]);
-        assert!(s.upsert_layout(None, "X", vec![overlap]).unwrap_err().contains("uma em cima da outra"));
+        assert!(s.upsert_layout(None, "X", vec![overlap], None).unwrap_err().contains("uma em cima da outra"));
         let walk = mode("A pé", vec![p("stickL", 0.4, 0.5, 1.0), p("A", 1.6, 0.6, 1.0), p("B", 1.85, 0.4, 1.0)]);
         let drive = mode("Veículo", vec![p("stickL", 0.4, 0.5, 1.0), p("RT", 1.8, 0.5, 1.0), p("A", 1.6, 0.8, 1.0)]);
-        let l = s.upsert_layout(None, "GTA", vec![walk, drive]).unwrap();
+        let l = s.upsert_layout(None, "GTA", vec![walk, drive], None).unwrap();
         assert_eq!((l.id.as_str(), l.modes.len()), ("custom-gta", 2));
+    }
+
+    #[test]
+    fn a_game_uses_its_own_layout_first_then_the_one_that_came_with_it() {
+        let mut s = Settings::default();
+        let m = || vec![mode("Padrão", vec![p("stickL", 0.4, 0.5, 1.0), Piece { label: Some(" Impulso ".into()), ..p("RT", 1.8, 0.5, 1.0) }, p("A", 1.6, 0.8, 1.0)])];
+        assert_eq!(s.layout_for_game("speedrunners"), None);
+        let shipped = s.set_game_layout("speedrunners", "SpeedRunners", m()).unwrap();
+        assert!(shipped.from_game);
+        assert_eq!(s.layout_for_game("speedrunners").as_deref(), Some(shipped.id.as_str()));
+        let mine = s.upsert_layout(None, "Meu SR", m(), Some("speedrunners".into())).unwrap();
+        assert_eq!(mine.modes[0].pieces[1].label.as_deref(), Some("Impulso"));
+        assert_eq!(s.layout_for_game("speedrunners").as_deref(), Some(mine.id.as_str()));
+        assert!(!s.delete_layout(&shipped.id), "o que veio com o jogo não se apaga");
+        s.set_game("speedrunners", Some("simple")).unwrap();
+        assert_eq!(s.layout_for_game("speedrunners").as_deref(), Some("simple"), "até um pronto pode ser o padrão");
+        assert_eq!(s.all_layouts().iter().find(|l| l.id == "simple").unwrap().game.as_deref(), Some("speedrunners"));
+        s.set_game("speedrunners", None).unwrap();
+        assert_eq!(s.layout_for_game("speedrunners").as_deref(), Some(shipped.id.as_str()));
+        let long = vec![mode("Padrão", vec![p("stickL", 0.4, 0.5, 1.0), Piece { label: Some("Nome comprido demais".into()), ..p("A", 1.6, 0.8, 1.0) }])];
+        assert!(s.upsert_layout(None, "X", long, None).is_err());
     }
 
     #[test]
@@ -341,7 +352,7 @@ mod tests {
     fn deleted_layout_sends_its_phones_back_to_the_default() {
         let mut s = Settings::default();
         let m = mode("Padrão", vec![p("stickL", 0.4, 0.5, 1.0), p("A", 1.6, 0.6, 1.0)]);
-        let l = s.upsert_layout(None, "Luta", vec![m]).unwrap();
+        let l = s.upsert_layout(None, "Luta", vec![m], None).unwrap();
         s.phone_layout.insert("phone:abc".into(), l.id.clone());
         assert_eq!(s.layout_for("phone:abc"), l.id);
         assert!(s.delete_layout(&l.id));
@@ -353,7 +364,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = path(dir.path());
         let mut s = Settings { join_on_button: true, ..Default::default() };
-        s.upsert_layout(None, "Mira", vec![mode("Padrão", vec![p("stickL", 0.4, 0.5, 1.0), p("A", 1.6, 0.6, 1.0)])]).unwrap();
+        s.upsert_layout(None, "Mira", vec![mode("Padrão", vec![p("stickL", 0.4, 0.5, 1.0), p("A", 1.6, 0.6, 1.0)])], None).unwrap();
         s.save(&path).unwrap();
         assert_eq!(Settings::load(&path), s);
     }

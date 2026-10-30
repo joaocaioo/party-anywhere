@@ -213,6 +213,9 @@ O Hub lê nome e ícone do próprio executável, procura a capa pelo nome e, se 
 - **Layouts**: Simples (analógico, A, B, X, Y grandes e Start), Avançado (tudo) e os criados na aba
   Controles. Nada se sobrepõe, em nenhum celular. O Hub lembra o layout de cada celular.
 - **Modos**: um layout pode ter vários (ex.: A pé e Veículo). Os nomes ficam no topo; um toque troca na hora.
+- **Padrão do jogo**: cada jogo pode ter o seu controle (o que veio com o jogo, ou o que a pessoa escolheu em
+  Organizar → editar o jogo). Quando o jogo abre, os celulares trocam sozinhos; ao voltar, cada um volta para o
+  seu. Os botões podem ter o nome da ação ("Pular", "Impulso").
 - Topo: uma **pílula no meio** com o número e a cor do jogador, os modos, a conexão (verde, amarelo,
   vermelho) e o **Menu**. Os cantos ficam livres para os controles; os botões são grandes.
 - Sem zoom sem querer: dois toques rápidos ou pinça não aumentam a tela (no iPhone também).

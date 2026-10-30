@@ -40,11 +40,15 @@ jobs:
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item target/release/pa.exe dist/pa-windows-x64.exe
 
+      # o instalador leva o componente dos controles virtuais (ViGEmBus, versão fixa conferida pelo hash)
+      - name: Componente dos controles virtuais
+        run: python apps/hub/tools/fetch_vigem.py
+
       - name: Instalador do Hub
         shell: pwsh
         working-directory: apps/hub/src-tauri
         run: |
-          npx --yes @tauri-apps/cli@2 build
+          npx --yes @tauri-apps/cli@2 build --config tauri.release.conf.json
           $setup = Get-ChildItem ../../../target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
           $out = "../../../dist/PartyAnywhere-${{ github.ref_name }}-setup.exe".Replace("-v", "-")
           Copy-Item $setup.FullName $out

@@ -128,6 +128,7 @@ fn main() {
             commands::devices_list,
             commands::devices_watch,
             commands::game_stopped,
+            commands::game_layout_set,
             commands::virtual_pads_install,
             commands::virtual_pads_retry,
             commands::lobby_snapshot,

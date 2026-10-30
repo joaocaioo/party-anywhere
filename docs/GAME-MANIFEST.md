@@ -80,6 +80,40 @@ está em [`templates/game/`](../templates/game/), e o esquema JSON em
 | `install` | sim | v1 aceita só `github-release` e cópia de arquivos. **Sem scripts de instalação.** `asset` é um `.zip`; `target: "baseGame"` exige `requires.baseGame` e `files`. Caminhos sempre relativos, sem `..`. |
 | `minHubVersion` | não | Hub mínimo, se o jogo usa algo recente do SDK. |
 | `launch` | sim | Como abrir o jogo depois de instalado. |
+| `controls` | não | O controle do celular feito para o jogo ("Padrão do jogo"). Ver "Controle no celular". |
+
+## Controle no celular (`controls`, opcional)
+
+O jogo pode trazer o controle do celular feito para ele. No Hub ele vira o **"Padrão do jogo"**: quando o
+jogo abre, os celulares trocam sozinhos para ele; quando a pessoa volta para a biblioteca, cada um volta para o
+seu. Quem preferir outro troca no menu do celular durante a partida.
+
+O jeito fácil: monte no editor do Hub (**Controles → Criar layout**), com os modos e o nome de cada botão, e
+copie as peças. Cada peça tem o centro (`x`, `y`, de 0 a 1 numa tela de celular deitado), o tamanho `s`
+(0,6 a 1,6) e, opcional, o `label`: o nome da ação, que aparece no botão.
+
+```jsonc
+"controls": {
+  "modes": [
+    { "name": "A pé", "pieces": [
+      { "kind": "stickL", "x": 0.14, "y": 0.5 },
+      { "kind": "A", "x": 0.74, "y": 0.78, "s": 1.25, "label": "Pular" },
+      { "kind": "X", "x": 0.62, "y": 0.55, "s": 1.25, "label": "Item" },
+      { "kind": "RT", "x": 0.9, "y": 0.1, "s": 1.15, "label": "Impulso" }
+    ] },
+    { "name": "Veículo", "pieces": [ /* ... */ ] }
+  ]
+}
+```
+
+Regras (o `pa validate` confere e o Hub também): de 1 a 6 modos; em cada um, peças sem repetir, dentro da
+tela, fora do meio do topo (onde fica o Menu), sem uma em cima da outra, com um analógico ou as setas e ao
+menos um de A, B, X ou Y; nomes de até 12 letras. Peças: `stickL`, `stickR`, `dpad`, `A`, `B`, `X`, `Y`,
+`LB`, `RB`, `LT`, `RT`, `BACK`, `START`, `LS`, `RS`. Os analógicos são livres: no celular, nascem onde o dedo
+tocar na metade da tela em que estão.
+
+Jogos comuns (sem manifesto, como os da Steam) também ganham um padrão: na biblioteca, **Organizar → editar o
+jogo → Controle no celular**.
 
 ## A capa
 
