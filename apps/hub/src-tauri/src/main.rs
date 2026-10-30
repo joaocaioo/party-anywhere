@@ -116,6 +116,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::hub_info,
+            commands::network_addresses,
             commands::lobby_snapshot,
             commands::seat_remove,
             commands::seat_undo_remove,

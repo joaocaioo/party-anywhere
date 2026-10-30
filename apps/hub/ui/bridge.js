@@ -23,6 +23,9 @@
   syncMax();
   document.getElementById('demo')?.remove();
   document.getElementById('demoToggle')?.remove();
+  // o jogo abriu numa janela própria; esta tela só espera a volta
+  document.getElementById('grText').innerHTML = 'O jogo abriu. Quando terminar, <b>Esc</b>, <b>B</b> ou <b>Start</b> volta para a biblioteca.';
+  document.getElementById('grExit').textContent = 'Voltar para a biblioteca';
 
   // ------------------------------------------------------------------ lobby
   function applyLobby(v) {
@@ -114,6 +117,66 @@
       invoke('keyboards_listen', { on: true });
       invoke('keyboards_list').then(render).catch(warn);
       return () => { off(); invoke('keyboards_listen', { on: false }); unlisten.then((f) => f()); relisten.then((f) => f()); };
+    });
+  };
+
+  // ------------------------------------------------------------------ entrar pelo celular
+  // os celulares que entram de verdade aparecem na lista; sem o simulador do modo demonstração; "Não conecta?"
+  // mostra os endereços reais deste PC
+  window.openPhone = () => {
+    const full = () => seats.filter(Boolean).length >= MAX;
+    const waitingText = () => full()
+      ? '<span class="pulse warn"></span>Lobby cheio (10 de 10). Para entrar mais alguém, remova um jogador.'
+      : '<span class="pulse"></span>Aguardando celulares. Dá para entrar vários ao mesmo tempo.';
+    openModal(`${head('Entrar pelo celular', '<b>Cada pessoa</b> escaneia com a câmera do próprio celular.', true)}
+      <div class="phone-wrap">
+        <div>
+          <div class="qr-big" id="phoneQr">${qrSvg(JOIN_URL)}</div>
+          <div class="url" id="phoneUrl">${escapeHtml(JOIN_URL.replace('http://', ''))}</div>
+        </div>
+        <div>
+          <ul class="steps">
+            <li><span class="n">1</span><span>Use o <b>mesmo Wi-Fi</b> do PC</span></li>
+            <li><span class="n">2</span><span>Aponte a câmera para o <b>QR code</b></span></li>
+            <li><span class="n">3</span><span>Pronto: você entra no lobby <b>com a sua cor</b></span></li>
+          </ul>
+          <div class="waiting" id="phoneWaiting">${waitingText()}</div>
+          <div class="joined-list" id="joinedList"></div>
+          <div style="margin-top:18px"><button class="linkish" id="altIps">Não conecta?</button></div>
+          <div id="altBox"></div>
+        </div>
+      </div>`, () => {
+      const off = backTo(() => openAddPlayer(true));
+      // quem já estava no lobby não aparece como "entrou"
+      const seen = new Set(seats.filter((x) => x && x.kind === 'phone').map((x) => x.deviceKey + x.index));
+      const onLobby = () => {
+        const list = document.getElementById('joinedList');
+        if (!list) return;
+        for (const x of seats) {
+          if (!x || x.kind !== 'phone' || x.state !== 'active' || seen.has(x.deviceKey + x.index)) continue;
+          seen.add(x.deviceKey + x.index);
+          list.insertAdjacentHTML('beforeend', `<span class="joined"><i style="background:${x.color}">${x.index + 1}</i>${escapeHtml(x.name)} entrou como P${x.index + 1}</span>`);
+        }
+        document.getElementById('phoneWaiting').innerHTML = waitingText();
+      };
+      // depois do applyLobby (que atualiza os seats), não antes
+      const unlisten = listen('lobby', () => setTimeout(onLobby, 0));
+      document.getElementById('altIps').addEventListener('click', async () => {
+        const box = document.getElementById('altBox');
+        let addrs = [];
+        try { addrs = await invoke('network_addresses'); } catch (e) { warn(e); }
+        box.innerHTML = `<div class="modal-note" style="display:block">
+          <b style="color:var(--text)">Confira estas três coisas:</b><br>
+          • O celular está no <b>mesmo Wi-Fi</b>? Redes de convidados costumam bloquear celulares de falarem com o PC.<br>
+          • O Windows perguntou sobre a rede quando o Hub abriu? Permita em <b>redes privadas</b>.<br>
+          • O PC tem mais de uma rede? Tente outro endereço (toque para trocar o QR):
+          <div class="alt-ips">${addrs.length ? addrs.map((a) => `<span class="linkish" data-url="${escapeHtml(a.url)}">${escapeHtml(a.url.replace('http://', ''))}</span> (${escapeHtml(a.interface)})${a.current ? ' ✓' : ''}`).join('<br>') : 'Nenhuma rede encontrada: o PC está conectado?'}</div></div>`;
+        box.querySelectorAll('[data-url]').forEach((el) => el.addEventListener('click', () => {
+          document.getElementById('phoneQr').innerHTML = qrSvg(el.dataset.url);
+          document.getElementById('phoneUrl').textContent = el.dataset.url.replace('http://', '');
+        }));
+      });
+      return () => { off(); unlisten.then((f) => f()); };
     });
   };
 

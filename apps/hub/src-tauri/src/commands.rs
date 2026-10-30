@@ -46,6 +46,28 @@ pub fn hub_info(hub: Hubs) -> HubInfo {
     HubInfo { version: env!("CARGO_PKG_VERSION"), join_url: hub.join_url.lock().unwrap().clone() }
 }
 
+/// "Não conecta?": os endereços deste PC que o celular pode tentar, do mais provável ao menos.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Address {
+    url: String,
+    interface: String,
+    current: bool,
+}
+
+#[tauri::command]
+pub fn network_addresses(hub: Hubs) -> Vec<Address> {
+    let current = hub.join_url.lock().unwrap().clone();
+    let port = hub.phone.lock().unwrap().as_ref().map(|p| p.local_addr().port()).unwrap_or(crate::hub::PHONE_PORT);
+    pa_phone::net::lan_candidates()
+        .into_iter()
+        .map(|c| {
+            let url = format!("http://{}:{port}/", c.ip);
+            Address { current: url == current, url, interface: c.interface }
+        })
+        .collect()
+}
+
 // ---------------------------------------------------------------- lobby
 
 #[tauri::command]
