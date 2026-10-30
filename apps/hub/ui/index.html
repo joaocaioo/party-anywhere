@@ -2334,10 +2334,22 @@ document.querySelector('.demo-body').addEventListener('click', (e) => {
   if (a === 'btoff') { btOn = !btOn; toast(btOn ? 'Bluetooth ligado (simulado)' : 'Bluetooth desligado (simulado). Abra "Adicionar jogador → Controle Bluetooth".', null, btOn ? 'ok' : 'warn'); }
 });
 
-window.addEventListener('resize', () => {
-  if (lobbyArc._order) layoutArc(lobbyArc, lobbyArc._order, lobbyFocus);
-  if (libArc._order && currentView === 'library') layoutArc(libArc, libArc._order, libFocus);
-});
+// O tamanho das cartas depende do palco. Ele muda com a janela, mas também quando as fontes terminam de
+// carregar (o título muda de altura) e quando o app ajusta a janela à tela: recalcula em qualquer mudança,
+// senão o lobby da abertura fica diferente do lobby depois de ir e voltar da Biblioteca.
+let arcSizes = new WeakMap();
+const relayoutArc = (entries) => {
+  for (const { target, contentRect } of entries) {
+    const key = `${Math.round(contentRect.width)}x${Math.round(contentRect.height)}`;
+    if (arcSizes.get(target) === key || !target._order || !contentRect.height) continue;
+    arcSizes.set(target, key);
+    if (target === lobbyArc) layoutArc(lobbyArc, lobbyArc._order, lobbyFocus);
+    else if (currentView === 'library') layoutArc(libArc, libArc._order, libFocus);
+  }
+};
+new ResizeObserver(relayoutArc).observe(lobbyArc);
+new ResizeObserver(relayoutArc).observe(libArc);
+document.fonts?.ready.then(() => { if (lobbyArc._order) layoutArc(lobbyArc, lobbyArc._order, lobbyFocus); });
 
 window.__arcadeReady.then((a) => {
   a.setGames(games, coverSvg);
