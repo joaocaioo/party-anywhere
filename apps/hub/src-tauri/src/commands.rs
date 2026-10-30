@@ -1,0 +1,559 @@
+//! O que a UI pode pedir ao Hub (`invoke`). Rede e disco rodam fora da thread da UI.
+
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+
+use pa_core::{DeviceKind, JoinPolicy};
+use pa_library::http::Ureq;
+use pa_library::{install::install, Discovered, GameUpdate, HubUpdate, InspectReport, Installed, Library, LibraryEntry, Source};
+use serde::{Deserialize, Serialize};
+use tauri::{Emitter, State};
+use tauri_plugin_opener::OpenerExt;
+
+use crate::hub::{Hub, LobbyView};
+use crate::keyboards::{self, KeyboardView};
+use crate::pcscan::{self, PcGame};
+
+pub struct LibraryState {
+    pub lib: Mutex<Library>,
+    pub path: PathBuf,
+    pub games_root: PathBuf,
+    pub hub_etag: Mutex<Option<String>>,
+    /// Removidos há pouco, para o "Desfazer" devolver tudo (inclusive o que está instalado).
+    pub trash: Mutex<Vec<LibraryEntry>>,
+}
+
+impl LibraryState {
+    fn save(&self, lib: &Library) {
+        if let Err(e) = lib.save(&self.path) {
+            eprintln!("party-anywhere: não consegui salvar a biblioteca: {e}");
+        }
+    }
+}
+
+type Hubs<'a> = State<'a, Arc<Hub>>;
+type Libs<'a> = State<'a, Arc<LibraryState>>;
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HubInfo {
+    version: &'static str,
+    join_url: String,
+}
+
+#[tauri::command]
+pub fn hub_info(hub: Hubs) -> HubInfo {
+    HubInfo { version: env!("CARGO_PKG_VERSION"), join_url: hub.join_url.lock().unwrap().clone() }
+}
+
+// ---------------------------------------------------------------- lobby
+
+#[tauri::command]
+pub fn lobby_snapshot(hub: Hubs) -> LobbyView {
+    hub.snapshot()
+}
+
+#[tauri::command]
+pub fn seat_remove(hub: Hubs, index: usize) -> bool {
+    hub.remove_seat(index)
+}
+
+#[tauri::command]
+pub fn seat_undo_remove(hub: Hubs, index: usize) -> bool {
+    hub.undo_remove(index)
+}
+
+#[tauri::command]
+pub fn seat_rename(hub: Hubs, index: usize, name: String) -> bool {
+    let ok = hub.lobby.lock().unwrap().rename(index, &name);
+    hub.emit_lobby();
+    ok
+}
+
+#[tauri::command]
+pub fn seat_move(hub: Hubs, from: usize, to: usize) -> bool {
+    hub.move_seat(from, to)
+}
+
+/// Identificar: o controle vibra, o celular vibra; o teclado só tem a carta piscando (na UI).
+#[tauri::command]
+pub fn seat_identify(hub: Hubs, index: usize) {
+    let Some(seat) = hub.lobby.lock().unwrap().seat(index).cloned() else { return };
+    match seat.kind {
+        DeviceKind::Phone => {
+            if let Some(p) = hub.phone.lock().unwrap().as_ref() {
+                p.rumble(index as u8, 300, 200);
+            }
+        }
+        DeviceKind::Gamepad => {
+            if let Some(tx) = hub.gamepad_tx.lock().unwrap().as_ref() {
+                let _ = tx.send(crate::gamepads::Command::Rumble(seat.device));
+            }
+        }
+        DeviceKind::Keyboard => {}
+    }
+}
+
+#[tauri::command]
+pub fn set_join_policy(hub: Hubs, on_button: bool) {
+    hub.lobby.lock().unwrap().policy = if on_button { JoinPolicy::OnButtonPress } else { JoinPolicy::Automatic };
+    hub.emit_lobby();
+}
+
+// ---------------------------------------------------------------- teclados
+
+#[tauri::command]
+pub fn keyboards_list(hub: Hubs) -> Vec<KeyboardView> {
+    keyboards::list(&hub)
+}
+
+/// A tela "Teclado" abriu ou fechou: Enter num teclado só faz entrar com ela aberta.
+#[tauri::command]
+pub fn keyboards_listen(on: bool) {
+    keyboards::LISTENING.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+#[tauri::command]
+pub fn keyboard_add(hub: Hubs, key: String) -> Option<usize> {
+    keyboards::join(&hub, &key)
+}
+
+// ---------------------------------------------------------------- biblioteca
+
+/// O que a capa e a tela do fliperama mostram.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UiGame {
+    id: String,
+    name: String,
+    tagline: String,
+    players: String,
+    badge: &'static str,
+    store: Option<String>,
+    tags: Vec<String>,
+    art: [String; 3],
+    image: Option<String>,
+    installed: Option<String>,
+    update: Option<String>,
+    repo: Option<String>,
+}
+
+fn ui_game(e: &LibraryEntry) -> UiGame {
+    let (badge, store, tags, repo) = match &e.source {
+        Source::Repo { repo } => ("comm", None, vec!["Da comunidade".into()], Some(repo.clone())),
+        Source::Pc { store, .. } => ("pc", Some(store.clone()), vec!["Seu PC".into(), "Modo Universal".into()], None),
+    };
+    UiGame {
+        id: e.id.clone(),
+        name: e.name.clone(),
+        tagline: e.tagline.clone(),
+        players: e.players.clone(),
+        badge,
+        store,
+        tags,
+        art: palette(&e.id),
+        image: e.cover.clone(),
+        installed: e.installed.as_ref().map(|i| i.version.clone()),
+        update: e.update.clone(),
+        repo,
+    }
+}
+
+/// Cores da capa gerada (quando o jogo não tem imagem), estáveis por jogo.
+fn palette(id: &str) -> [String; 3] {
+    const P: [[&str; 3]; 6] = [
+        ["#4c1d95", "#ec4899", "#f97316"],
+        ["#082f49", "#06b6d4", "#facc15"],
+        ["#14532d", "#22c55e", "#fde047"],
+        ["#450a0a", "#dc2626", "#f59e0b"],
+        ["#1e1b4b", "#a855f7", "#22c55e"],
+        ["#064e3b", "#10b981", "#a3e635"],
+    ];
+    let h = id.bytes().fold(7u32, |h, b| h.wrapping_mul(31).wrapping_add(b as u32));
+    P[(h % 6) as usize].map(String::from)
+}
+
+#[tauri::command]
+pub fn library_list(libs: Libs) -> Vec<UiGame> {
+    libs.lib.lock().unwrap().games.iter().map(ui_game).collect()
+}
+
+#[tauri::command]
+pub async fn library_inspect(url: String) -> Result<InspectReport, String> {
+    tauri::async_runtime::spawn_blocking(move || pa_library::inspect(&Ureq::default(), &url)).await.map_err(|e| e.to_string())?
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct InstallProgress {
+    id: String,
+    stage: &'static str,
+}
+
+/// Instala (ou atualiza) um jogo publicado. `base_dir`: pasta do jogo-base, para mods.
+#[tauri::command]
+pub async fn library_install(
+    app: tauri::AppHandle,
+    libs: Libs<'_>,
+    url: String,
+    base_dir: Option<String>,
+) -> Result<Vec<UiGame>, String> {
+    let libs = libs.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let http = Ureq::default();
+        let report = pa_library::inspect(&http, &url)?;
+        let (Some(manifest), Some(latest), true) = (&report.manifest, &report.latest, report.installable) else {
+            let why = report.issues.iter().find(|i| i.is_error()).map(|i| i.message.clone());
+            return Err(why.unwrap_or(report.summary));
+        };
+        let base_dir = base_dir.map(PathBuf::from).or_else(|| {
+            let appid = manifest.requires.as_ref()?.base_game.as_ref()?.steam_app_id?;
+            pcscan::steam_app_dir(appid)
+        });
+        let _ = app.emit("install-progress", InstallProgress { id: manifest.id.clone(), stage: "download" });
+        let installed = install(&http, manifest, latest, &libs.games_root, base_dir.as_deref())?;
+        let _ = app.emit("install-progress", InstallProgress { id: manifest.id.clone(), stage: "done" });
+        let mut entry = pa_library::entry_for(&report).ok_or("manifesto ausente")?;
+        entry.installed = Some(installed);
+        let mut lib = libs.lib.lock().unwrap();
+        lib.upsert(entry);
+        libs.save(&lib);
+        Ok(lib.games.iter().map(ui_game).collect())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Um jogo como a UI tem: a lista inteira chega depois de qualquer mudança (mover, editar, remover,
+/// desfazer, adicionar do PC). O Hub aplica a diferença; quem saiu vai para a lixeira do "Desfazer".
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncGame {
+    id: String,
+    name: String,
+    #[serde(default)]
+    tagline: String,
+    #[serde(default)]
+    players: String,
+    #[serde(default)]
+    image: Option<String>,
+    #[serde(default)]
+    store: Option<String>,
+    #[serde(default)]
+    launch: Option<String>,
+}
+
+#[tauri::command]
+pub fn library_sync(libs: Libs, games: Vec<SyncGame>) -> Vec<UiGame> {
+    let mut lib = libs.lib.lock().unwrap();
+    let mut trash = libs.trash.lock().unwrap();
+    let mut next = Vec::with_capacity(games.len());
+    for g in games {
+        let existing = lib.remove(&g.id).or_else(|| trash.iter().position(|e| e.id == g.id).map(|i| trash.remove(i)));
+        let entry = match existing {
+            Some(mut e) => {
+                let image = g.image.filter(|i| !i.is_empty());
+                if e.name != g.name || e.tagline != g.tagline || (!g.players.is_empty() && e.players != g.players) || e.cover != image {
+                    e.name = g.name.chars().take(40).collect();
+                    e.tagline = g.tagline;
+                    if !g.players.is_empty() {
+                        e.players = g.players;
+                    }
+                    e.cover = image;
+                    e.edited = true;
+                }
+                e
+            }
+            // novo jogo do PC (Steam, Epic, .exe): só com como abrir
+            None => match (g.store, g.launch) {
+                (Some(store), Some(launch)) => LibraryEntry {
+                    id: g.id,
+                    name: g.name,
+                    tagline: g.tagline,
+                    players: if g.players.is_empty() { "Modo Universal".into() } else { g.players },
+                    source: Source::Pc { store, launch },
+                    cover: g.image.filter(|i| !i.is_empty()),
+                    installed: None,
+                    update: None,
+                    etag: None,
+                    edited: false,
+                },
+                _ => continue,
+            },
+        };
+        next.push(entry);
+    }
+    trash.extend(lib.games.drain(..));
+    let excess = trash.len().saturating_sub(20);
+    trash.drain(..excess);
+    lib.games = next;
+    libs.save(&lib);
+    lib.games.iter().map(ui_game).collect()
+}
+
+/// "Escolher pasta ou atalho": a janela de arquivo do Windows.
+#[tauri::command]
+pub async fn pick_game_file(app: tauri::AppHandle) -> Option<PcGame> {
+    use tauri_plugin_dialog::DialogExt;
+    let file = app
+        .dialog()
+        .file()
+        .set_title("Escolha o jogo")
+        .add_filter("Jogo ou atalho", &["exe", "lnk", "url"])
+        .blocking_pick_file()?;
+    let path = file.into_path().ok()?;
+    let stem = path.file_stem()?.to_string_lossy().to_string();
+    let name = pretty_name(&stem);
+    let slug: String = stem.to_lowercase().chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '-' }).collect();
+    Some(PcGame {
+        id: format!("pc-{}", slug.trim_matches('-')),
+        name,
+        store: "PC".into(),
+        players: "Modo Universal".into(),
+        tagline: "Jogo do seu PC, com os celulares como controles.".into(),
+        launch: path.to_string_lossy().to_string(),
+        image: None,
+    })
+}
+
+/// "GTA_SanAndreas" → "GTA San Andreas".
+fn pretty_name(stem: &str) -> String {
+    let mut out = String::new();
+    let mut prev: Option<char> = None;
+    for c in stem.chars() {
+        let c = if matches!(c, '_' | '-' | '.') { ' ' } else { c };
+        if let Some(p) = prev {
+            if (p.is_lowercase() && c.is_uppercase()) || (p.is_alphabetic() && c.is_ascii_digit()) {
+                out.push(' ');
+            }
+        }
+        if !(c == ' ' && out.ends_with(' ')) {
+            out.push(c);
+        }
+        prev = Some(c);
+    }
+    let mut words: Vec<String> = Vec::new();
+    for w in out.split_whitespace() {
+        let mut cs = w.chars();
+        words.push(cs.next().map(|f| f.to_uppercase().collect::<String>() + cs.as_str()).unwrap_or_default());
+    }
+    words.join(" ")
+}
+
+#[tauri::command]
+pub fn open_bluetooth_settings(app: tauri::AppHandle) -> Result<(), String> {
+    app.opener().open_url("ms-settings:bluetooth", None::<&str>).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn library_add_pc(libs: Libs, games: Vec<PcGame>) -> Vec<UiGame> {
+    let mut lib = libs.lib.lock().unwrap();
+    for g in games {
+        lib.upsert(LibraryEntry {
+            id: g.id,
+            name: g.name,
+            tagline: g.tagline,
+            players: g.players,
+            source: Source::Pc { store: g.store, launch: g.launch },
+            cover: g.image,
+            installed: None,
+            update: None,
+            etag: None,
+            edited: false,
+        });
+    }
+    libs.save(&lib);
+    lib.games.iter().map(ui_game).collect()
+}
+
+/// Devolve a entrada removida para o "Desfazer" (com a posição).
+#[tauri::command]
+pub fn library_remove(libs: Libs, id: String) -> Option<(usize, LibraryEntry)> {
+    let mut lib = libs.lib.lock().unwrap();
+    let pos = lib.games.iter().position(|g| g.id == id)?;
+    let entry = lib.games.remove(pos);
+    libs.save(&lib);
+    Some((pos, entry))
+}
+
+#[tauri::command]
+pub fn library_restore(libs: Libs, index: usize, entry: LibraryEntry) -> Vec<UiGame> {
+    let mut lib = libs.lib.lock().unwrap();
+    if lib.get(&entry.id).is_none() {
+        let i = index.min(lib.games.len());
+        lib.games.insert(i, entry);
+        libs.save(&lib);
+    }
+    lib.games.iter().map(ui_game).collect()
+}
+
+#[tauri::command]
+pub fn library_move(libs: Libs, from: usize, to: usize) -> bool {
+    let mut lib = libs.lib.lock().unwrap();
+    let ok = lib.move_game(from, to);
+    if ok {
+        libs.save(&lib);
+    }
+    ok
+}
+
+#[derive(Deserialize)]
+pub struct GameEdit {
+    name: Option<String>,
+    tagline: Option<String>,
+    players: Option<String>,
+    /// data URL ou caminho; `Some("")` tira a capa.
+    image: Option<String>,
+}
+
+#[tauri::command]
+pub fn library_edit(libs: Libs, id: String, edit: GameEdit) -> bool {
+    let mut lib = libs.lib.lock().unwrap();
+    let Some(e) = lib.get_mut(&id) else { return false };
+    if let Some(n) = edit.name.filter(|n| !n.trim().is_empty()) {
+        e.name = n.trim().chars().take(40).collect();
+    }
+    if let Some(t) = edit.tagline {
+        e.tagline = t.trim().chars().take(140).collect();
+    }
+    if let Some(p) = edit.players.filter(|p| !p.trim().is_empty()) {
+        e.players = p.trim().to_string();
+    }
+    if let Some(img) = edit.image {
+        e.cover = (!img.is_empty()).then_some(img);
+    }
+    e.edited = true;
+    libs.save(&lib);
+    true
+}
+
+#[tauri::command]
+pub async fn library_discover() -> Result<Vec<Discovered>, String> {
+    tauri::async_runtime::spawn_blocking(|| pa_library::discover(&Ureq::default())).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn pc_scan() -> Vec<PcGame> {
+    tauri::async_runtime::spawn_blocking(pcscan::scan).await.unwrap_or_default()
+}
+
+/// Confere atualizações dos jogos instalados por link; avisa a UI com o evento `game-updates`.
+#[tauri::command]
+pub async fn library_check_updates(app: tauri::AppHandle, libs: Libs<'_>) -> Result<Vec<GameUpdate>, String> {
+    let libs = libs.inner().clone();
+    let found = tauri::async_runtime::spawn_blocking(move || check_game_updates(&libs)).await.map_err(|e| e.to_string())?;
+    if !found.is_empty() {
+        let _ = app.emit("game-updates", &found);
+    }
+    Ok(found)
+}
+
+pub fn check_game_updates(libs: &LibraryState) -> Vec<GameUpdate> {
+    // trabalha numa cópia: a rede não segura a trava da biblioteca
+    let mut copy = libs.lib.lock().unwrap().clone();
+    let found = pa_library::check_games(&Ureq::default(), &mut copy);
+    let mut lib = libs.lib.lock().unwrap();
+    for g in &copy.games {
+        if let Some(e) = lib.get_mut(&g.id) {
+            e.update = g.update.clone();
+            e.etag = g.etag.clone();
+        }
+    }
+    libs.save(&lib);
+    found
+}
+
+#[tauri::command]
+pub fn game_play(app: tauri::AppHandle, libs: Libs, id: String) -> Result<(), String> {
+    let entry = libs.lib.lock().unwrap().get(&id).cloned().ok_or("jogo não encontrado na biblioteca")?;
+    match (&entry.source, &entry.installed) {
+        (Source::Pc { launch, .. }, _) => {
+            if launch.contains("://") {
+                app.opener().open_url(launch, None::<&str>).map_err(|e| format!("não consegui abrir {}: {e}", entry.name))
+            } else {
+                spawn(&PathBuf::from(launch), &[], None)
+            }
+        }
+        (Source::Repo { .. }, Some(inst)) => {
+            let exe = pa_library::install::exe_path(inst);
+            spawn(&exe, &inst.args, Some(inst.dir.join(&inst.working_dir)))
+        }
+        (Source::Repo { .. }, None) => Err(format!("{} ainda não está instalado.", entry.name)),
+    }
+}
+
+fn spawn(exe: &std::path::Path, args: &[String], cwd: Option<PathBuf>) -> Result<(), String> {
+    let mut cmd = std::process::Command::new(exe);
+    cmd.args(args);
+    if let Some(dir) = cwd.or_else(|| exe.parent().map(|p| p.to_path_buf())) {
+        cmd.current_dir(dir);
+    }
+    cmd.spawn().map(|_| ()).map_err(|e| format!("não consegui abrir o jogo ({}): {e}", exe.display()))
+}
+
+// ---------------------------------------------------------------- atualização do Hub
+
+#[tauri::command]
+pub async fn hub_check_update(app: tauri::AppHandle, libs: Libs<'_>) -> Result<Option<HubUpdate>, String> {
+    let libs = libs.inner().clone();
+    let etag = libs.hub_etag.lock().unwrap().clone();
+    let found = tauri::async_runtime::spawn_blocking(move || {
+        pa_library::check_hub(&Ureq::default(), env!("CARGO_PKG_VERSION"), etag.as_deref())
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    if let Some(u) = &found {
+        *libs.hub_etag.lock().unwrap() = u.etag.clone();
+        let _ = app.emit("hub-update", u);
+    }
+    Ok(found)
+}
+
+/// Baixa o instalador novo, abre e fecha o Hub (o instalador substitui a versão e reabre).
+#[tauri::command]
+pub async fn hub_apply_update(app: tauri::AppHandle, installer_url: String) -> Result<(), String> {
+    let path = tauri::async_runtime::spawn_blocking(move || -> Result<PathBuf, String> {
+        use pa_library::http::Http;
+        if !installer_url.starts_with("https://github.com/") {
+            return Err("endereço de atualização inesperado".into());
+        }
+        let resp = Ureq::default().get(&installer_url, None, 300 * 1024 * 1024)?;
+        if !resp.ok() {
+            return Err(format!("download falhou ({})", resp.status));
+        }
+        let path = std::env::temp_dir().join("PartyAnywhere-setup.exe");
+        std::fs::write(&path, resp.body).map_err(|e| e.to_string())?;
+        Ok(path)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    std::process::Command::new(&path).spawn().map_err(|e| e.to_string())?;
+    app.exit(0);
+    Ok(())
+}
+
+/// Instalado na pasta de um jogo-base? A UI pergunta a pasta quando o mod precisa.
+#[tauri::command]
+pub fn installed_info(libs: Libs, id: String) -> Option<Installed> {
+    libs.lib.lock().unwrap().get(&id).and_then(|e| e.installed.clone())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::pretty_name;
+
+    #[test]
+    fn names_from_files() {
+        assert_eq!(pretty_name("GTA_SanAndreas"), "GTA San Andreas");
+        assert_eq!(pretty_name("hades2"), "Hades 2");
+        assert_eq!(pretty_name("overcooked-all-you-can-eat"), "Overcooked All You Can Eat");
+    }
+}
+
+#[tauri::command]
+pub fn open_url(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return Err("só links da web".into());
+    }
+    app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
+}

@@ -14,9 +14,9 @@
 } }
 </script>
 <!--
-  Protótipo navegável do Hub (fase 0). Não é o app: serve para validar a experiência.
-  Controles reais funcionam pela Gamepad API (Chrome/Edge): conecte e aperte qualquer botão.
-  O painel "Demo" simula celulares, Bluetooth, quedas e atualizações.
+  UI do Hub. No navegador roda em modo demonstração: controles reais pela Gamepad API (Chrome/Edge) e o
+  painel "Demo" simula celulares, Bluetooth, quedas e atualizações. No app (Tauri), bridge.js liga tudo ao
+  núcleo em Rust: lobby, celulares, teclados, Biblioteca no GitHub, jogos do PC e atualizações.
 -->
 <style>
 :root {
@@ -1100,7 +1100,8 @@ function layoutArc(arc, order, focus) {
 // Lobby
 // ===================================================================================
 const lobbyArc = document.getElementById('lobbyArc');
-const JOIN_URL = 'http://192.168.0.12:27027/?h=K7Q2';
+// no app, o endereço real (IP da rede local) chega pelo bridge.js
+let JOIN_URL = 'http://192.168.0.12:27027/?h=K7Q2';
 
 function lobbyItems() {
   const items = seats.filter(Boolean).map((s) => ({ key: `p${s.index}-${s.deviceKey}`, type: 'player', seat: s }));
@@ -1257,6 +1258,7 @@ const colorName = (i) => COLOR_NAMES[i];
 
 // latência dos celulares oscila (no Hub real vem do PING/PONG)
 setInterval(() => {
+  if (document.documentElement.classList.contains('in-app')) return; // no app a latência é a medida
   let changed = false;
   for (const s of seats) {
     if (s && s.kind === 'phone' && s.state === 'active') {
@@ -2323,6 +2325,7 @@ window.__arcadeReady.then((a) => {
 
 renderLobby();
 </script>
+<script src="bridge.js"></script>
 
 <script type="module">
 // ===================================================================================
@@ -3072,6 +3075,8 @@ function prepCover(game) {
   };
   if (game.image) {
     const img = new Image();
+    // capas do GitHub: sem isto o WebGL recusa a imagem de outra origem
+    if (/^https?:/.test(game.image)) img.crossOrigin = 'anonymous';
     img.onload = () => loaded(img, true);
     img.onerror = generated; // sem a imagem (ex.: página aberta sem o servidor): capa gerada
     img.src = game.image;
