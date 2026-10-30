@@ -251,6 +251,12 @@ pub struct DeviceView {
     layout: Option<String>,
 }
 
+/// A aba Controles abriu ou fechou: liga ou desliga o aviso "este aparelho apertou algo".
+#[tauri::command]
+pub fn devices_watch(hub: Hubs, on: bool) {
+    hub.watch_input.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
 #[tauri::command]
 pub fn devices_list(hub: Hubs) -> Vec<DeviceView> {
     let lobby = hub.lobby.lock().unwrap();

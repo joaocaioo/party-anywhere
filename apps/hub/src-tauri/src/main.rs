@@ -126,6 +126,7 @@ fn main() {
             commands::layout_save,
             commands::layout_delete,
             commands::devices_list,
+            commands::devices_watch,
             commands::virtual_pads_install,
             commands::virtual_pads_retry,
             commands::lobby_snapshot,

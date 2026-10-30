@@ -257,6 +257,9 @@ fn key_event(hub: &Hub, id: &str, state: &mut [bool; 256], vk: u16, down: bool) 
         }
     }
     let key = DeviceKey(format!("kb:{id}"));
+    if down {
+        hub.activity(&key);
+    }
     let seat = hub.lobby.lock().unwrap().seat_of_device(&key);
     match seat {
         Some(s) => hub.set_pad(s, pad_from_keys(state)),

@@ -232,7 +232,9 @@ O Hub lê nome e ícone do próprio executável, procura a capa pelo nome e, se 
 
 - Uma coluna centrada, com grupos de linhas (título, explicação curta e o controle à direita), como os
   ajustes de um console. A barra de rolagem é a mesma em todo o Hub: fina e discreta, verde ao passar o mouse.
-- **Controles**: os aparelhos conectados agora (com a vaga ou "esperando"), com Identificar; e os layouts do
+- **Controles**: os aparelhos conectados agora (com a vaga ou "esperando"), com Identificar. **Apertou qualquer
+  tecla ou botão, a linha daquele aparelho pisca**: fácil saber quem é quem (o núcleo só avisa com a aba aberta,
+  no máximo a cada 150 ms por aparelho). E os layouts do
   celular em cartões com a **tela do celular em miniatura** (prontos: Duplicar; seus: Editar e Apagar; quem
   usava um layout apagado volta para o Avançado).
 - **Criar layout**: a tela de um celular deitado e a lista de peças ao lado. **Arrastar** da lista para a tela

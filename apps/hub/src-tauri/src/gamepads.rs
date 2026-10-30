@@ -123,6 +123,9 @@ fn run(hub: &Hub, gilrs: &mut Gilrs, rx: &Receiver<Command>) {
             EventType::ButtonPressed(..) | EventType::ButtonReleased(..) | EventType::ButtonChanged(..) | EventType::AxisChanged(..) => {
                 let Some(key) = keys.get(&ev.id) else { continue };
                 let pad = read_pad(gilrs, ev.id);
+                if matches!(ev.event, EventType::ButtonPressed(..)) || crate::hub::pressed(&pad) {
+                    hub.activity(key);
+                }
                 let seat = hub.lobby.lock().unwrap().seat_of_device(key);
                 match seat {
                     Some(s) => hub.set_pad(s, pad),

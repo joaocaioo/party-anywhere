@@ -61,6 +61,7 @@
   // navegador fica desligada para o mesmo controle não navegar duas vezes
   window.__padNavExternal = true;
   listen('nav', (e) => navAction(e.payload.action, e.payload.color));
+  listen('device-activity', (e) => deviceActivity(e.payload));
 
   // controles chegam pelo núcleo (gilrs)
   window.addPlayer = () => null;
@@ -188,6 +189,7 @@
   // ------------------------------------------------------------------ Controles e Ajustes: dados do núcleo
   Object.assign(hubData, {
     devices: () => invoke('devices_list'),
+    watchDevices: (on) => invoke('devices_watch', { on }),
     layouts: () => invoke('layouts_list'),
     saveLayout: (id, name, modes) => invoke('layout_save', { id, name, modes }),
     deleteLayout: (id) => invoke('layout_delete', { id }),

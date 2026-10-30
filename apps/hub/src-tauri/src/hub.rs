@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use pa_core::{DeviceKey, DeviceKind, JoinPolicy, Lobby, Pad, Seat, SeatState, MAX_SEATS, SEAT_COLORS};
 use pa_phone::protocol::ServerText;
@@ -53,6 +53,10 @@ pub struct Hub {
     pub sdk: Mutex<Option<pa_sdk::HubShm>>,
     /// Um jogo do SDK está conectado: os controles virtuais ficam desligados (sem entrada dupla).
     pub game_connected: AtomicBool,
+    /// A aba Controles está aberta: avisa a UI quando um aparelho aperta algo (para piscar a linha dele).
+    /// Desligado, não custa nada no caminho da entrada.
+    pub watch_input: AtomicBool,
+    last_activity: Mutex<HashMap<DeviceKey, Instant>>,
 }
 
 #[derive(Clone, Serialize)]
@@ -110,6 +114,8 @@ impl Hub {
             gamepad_tx: Mutex::new(None),
             sdk: Mutex::new(None),
             game_connected: AtomicBool::new(false),
+            watch_input: AtomicBool::new(false),
+            last_activity: Mutex::new(HashMap::new()),
         })
     }
 
@@ -167,7 +173,14 @@ impl Hub {
                         hub.unplug(seat as usize);
                         hub.emit_lobby();
                     }
-                    PhoneEvent::State { seat, pad, .. } => hub.set_pad(seat as usize, pad),
+                    PhoneEvent::State { seat, pad, .. } => {
+                        hub.set_pad(seat as usize, pad);
+                        if hub.watch_input.load(Ordering::Relaxed) && pressed(&pad) {
+                            if let Some(key) = hub.device_at(seat as usize) {
+                                hub.activity(&key);
+                            }
+                        }
+                    }
                     PhoneEvent::ClockSample { seat, rtt_ms, .. } => {
                         if let Some(key) = hub.device_at(seat as usize) {
                             if let Some(m) = hub.meta.lock().unwrap().get_mut(&key) {
@@ -214,6 +227,22 @@ impl Hub {
 
     pub fn device_at(&self, seat: usize) -> Option<DeviceKey> {
         self.lobby.lock().unwrap().seat(seat).map(|s| s.device.clone())
+    }
+
+    /// Um aparelho apertou algo: com a aba Controles aberta, a UI pisca a linha dele (no máximo a cada 150 ms
+    /// por aparelho).
+    pub fn activity(&self, key: &DeviceKey) {
+        if !self.watch_input.load(Ordering::Relaxed) {
+            return;
+        }
+        let now = Instant::now();
+        let mut last = self.last_activity.lock().unwrap();
+        if last.get(key).is_some_and(|t| now.duration_since(*t) < Duration::from_millis(150)) {
+            return;
+        }
+        last.insert(key.clone(), now);
+        drop(last);
+        let _ = self.app.emit("device-activity", &key.0);
     }
 
     /// Caminho da entrada: só copia o estado e repassa ao controle virtual (sem alocar).
@@ -412,4 +441,9 @@ impl Hub {
         self.emit_lobby();
         ok
     }
+}
+
+/// Algum botão, gatilho ou analógico apertado de verdade (não só ruído).
+pub fn pressed(p: &Pad) -> bool {
+    p.buttons != 0 || p.lt > 0.5 || p.rt > 0.5 || p.lx.abs() > 0.5 || p.ly.abs() > 0.5 || p.rx.abs() > 0.5 || p.ry.abs() > 0.5
 }

@@ -447,6 +447,11 @@ button.row:hover { background: rgba(255, 255, 255, .035); }
 .row-t small { display: block; margin-top: 3px; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
 .row-act { flex: none; display: flex; align-items: center; gap: 8px; }
 .row.empty { color: var(--muted); font-size: 14px; justify-content: center; }
+/* apertou algo nesse aparelho: a linha acende em verde e apaga devagar */
+.dev-row.ping { animation: devPing .9s ease-out; }
+.dev-row.ping .row-ic { animation: devPingIc .9s ease-out; }
+@keyframes devPing { 0% { background: rgba(60, 240, 96, .22); box-shadow: inset 3px 0 0 var(--neon); } 100% { background: transparent; box-shadow: inset 3px 0 0 transparent; } }
+@keyframes devPingIc { 0% { background: var(--neon); color: var(--neon-ink); box-shadow: 0 0 18px rgba(60, 240, 96, .6); } 100% { } }
 .addr-txt { font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; font-size: 13.5px; letter-spacing: -.01em; }
 .sw { width: 44px; height: 26px; border-radius: 13px; background: rgba(255, 255, 255, .14); position: relative; flex: none; transition: background .2s; }
 .sw::after { content: ""; position: absolute; left: 3px; top: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .2s; box-shadow: 0 1px 3px rgba(0, 0, 0, .4); }
@@ -2313,6 +2318,7 @@ async function switchView(v) {
     done = sleep(160 + IN_MS);
   }
   if (v === 'controls') renderControls();
+  hubData.watchDevices(v === 'controls');
   if (v === 'settings') renderSettings();
   // só agora a aba anterior saiu do fluxo: antes, as duas dividiam a altura e o lobby media o palco menor
   // (a carta da volta ficava menor que a da abertura)
@@ -2672,7 +2678,19 @@ const hubData = {
   installVirtual: async () => toast('No app, isto baixa e abre o instalador do componente.', null, 'ok'),
   retryVirtual: async () => false,
   checkUpdate: async () => { updatePill.click(); },
+  // no app: o núcleo avisa quando um aparelho aperta algo (deviceActivity); aqui, a Gamepad API faz isso
+  watchDevices: () => {},
 };
+
+// Um aparelho apertou algo: a linha dele pisca na aba Controles (fácil saber quem é quem).
+function deviceActivity(key) {
+  if (currentView !== 'controls') return;
+  const row = [...document.querySelectorAll('#devList .dev-row')].find((r) => r.dataset.key === key);
+  if (!row) return;
+  row.classList.remove('ping');
+  void row.offsetWidth;
+  row.classList.add('ping');
+}
 
 const pieceBox = (p) => {
   const d = PIECE_DEF[p.kind], w = d.w * p.s, h = d.h * p.s, cx = p.x * CANVAS;
@@ -2718,7 +2736,7 @@ async function renderControls() {
     const act = d.seat != null
       ? `<button class="btn-ghost sm" data-identify-seat="${d.seat}">Identificar</button><span class="seat-tag sm" style="--c:${color}">P${d.seat + 1}</span>`
       : `<span class="pill off plain">${d.kind === 'keyboard' ? 'Adicionar jogador → Teclado' : 'Esperando um botão'}</span>`;
-    return `<div class="row"><span class="row-ic${seat ? ' seat' : ''}" style="--c:${color}">${icon(kindIcon[d.kind] || 'pad')}</span><span class="row-t"><b>${escapeHtml(d.deviceName || 'Aparelho')}</b><small>${escapeHtml(info)}</small></span><span class="row-act">${act}</span></div>`;
+    return `<div class="row dev-row" data-key="${escapeHtml(d.key || '')}"><span class="row-ic${seat ? ' seat' : ''}" style="--c:${color}">${icon(kindIcon[d.kind] || 'pad')}</span><span class="row-t"><b>${escapeHtml(d.deviceName || 'Aparelho')}</b><small>${escapeHtml(info)}</small></span><span class="row-act">${act}</span></div>`;
   }).join('') : '<div class="row empty">Nenhum aparelho ainda. Ligue um controle ou escaneie o QR no Lobby.</div>';
   const usedBy = (id) => devs.filter((d) => d.layout === id && d.seat != null).map((d) => `P${d.seat + 1}`);
   document.getElementById('layoutRows').innerHTML = layouts.map((l) => {
