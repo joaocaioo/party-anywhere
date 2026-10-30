@@ -30,6 +30,10 @@ Cada pessoa vira um jogador, de **P1 a P10**, com a sua cor. Depois é só escol
 > **Por enquanto, é co-op local:** todo mundo no mesmo lugar, na mesma tela (ou em tela dividida), com os
 > celulares no mesmo Wi-Fi do PC. Jogar pela internet não faz parte desta versão.
 
+<p align="center">
+  <img src="docs/media/lobby.webp" alt="O lobby do Party Anywhere: controles, celulares e teclados entrando até 10 jogadores" width="800">
+</p>
+
 ## Jogar
 
 1. Baixe e instale o **`PartyAnywhere-X.Y.Z-setup.exe`** (a versão mais nova) na página de [Releases](../../releases).
@@ -37,6 +41,10 @@ Cada pessoa vira um jogador, de **P1 a P10**, com a sua cor. Depois é só escol
 3. Vá em **Biblioteca**, escolha o jogo e aperte **Jogar**.
 
 Pronto. O app se atualiza sozinho e avisa quando um jogo ganha versão nova.
+
+<p align="center">
+  <img src="docs/media/library.webp" alt="A Biblioteca: escolhendo um jogo no fliperama e escolhendo quem vai jogar" width="800">
+</p>
 
 | Que tipo de jogo | Como funciona |
 |---|---|
