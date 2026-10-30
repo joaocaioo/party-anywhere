@@ -1,0 +1,3615 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Party Anywhere Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Bungee&family=Caveat:wght@700&family=Doto:wght@900&family=DotGothic16&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<!--
+  Protótipo navegável do Hub (fase 0). Não é o app: serve para validar a experiência.
+  Controles reais funcionam pela Gamepad API (Chrome/Edge): conecte e aperte qualquer botão.
+  O painel "Demo" simula celulares, Bluetooth, quedas e atualizações.
+-->
+<style>
+:root {
+  --bg: #0b0c0f;
+  --shell: #131418;
+  --line: rgba(255, 255, 255, .08);
+  --line-strong: rgba(255, 255, 255, .16);
+  --glass: rgba(22, 23, 28, .62);
+  --text: #f4f4f5;
+  --muted: #9b9ca5;
+  --faint: #5d5e66;
+  --neon: #3cf060;
+  --neon-ink: #04140a;
+  --danger: #ff5a5f;
+  --lime: var(--neon); /* um verde só na interface; o verde-limão fica para a tela do fliperama */
+  --display: Anton, Impact, 'Arial Narrow', sans-serif;
+  --dots: Doto, DotGothic16, 'Courier New', monospace; /* matriz de pontos: só nas siglas do Bluetooth */
+  --retro: Bungee, Anton, Impact, sans-serif;         /* letreiro de fliperama: só na logo */
+  --card-w: 220px;
+  --focus-c: var(--neon);
+  --radius: 22px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
+input { font: inherit; color: inherit; }
+
+/* ---------- moldura ---------- */
+.page { min-height: 100%; padding: 28px 28px 72px; display: flex; }
+.shell {
+  position: relative;
+  flex: 1;
+  max-width: 1360px;
+  margin: 0 auto;
+  border-radius: 32px;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(1200px 500px at 50% -10%, rgba(60, 240, 96, .07), transparent 60%),
+    radial-gradient(900px 400px at 50% 110%, rgba(60, 240, 96, .05), transparent 60%),
+    var(--shell);
+  box-shadow: 0 40px 120px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .04);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 100px);
+  min-height: 520px;
+}
+
+/* ---------- topo ---------- */
+/* três colunas: logo | abas (no meio) | ações. Tudo em "pílulas", que funcionam sobre o fundo escuro e sobre o 3D */
+header.top {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 22px 0;
+  position: relative;
+  z-index: 20;
+}
+/* a pílula da logo existe sempre (transparente fora da Biblioteca): só a cor muda, o topo não se mexe */
+.logo { display: flex; align-items: center; white-space: nowrap; justify-self: start; padding: 8px 14px; margin-left: -14px; border-radius: 999px; background: rgba(6, 14, 3, 0); }
+/* as duas palavras com a mesma altura de maiúscula, mesmo sendo fontes diferentes */
+.logo-word { display: flex; align-items: baseline; gap: .16em; font-size: 20px; line-height: 1; text-transform: uppercase; }
+/* maiúscula: Anton = 0,86em, Bungee = 0,72em. ANYWHERE em 1,194em dá 0,86em; PARTY um pouco menor, com o pé das letras na mesma linha */
+.logo-word b { font-family: var(--display); font-size: .8em; font-weight: 400; color: #eef7e2; letter-spacing: .03em; }
+.logo-word i { font-family: var(--retro); font-size: 1.194em; font-weight: 400; font-style: normal; letter-spacing: .02em; color: var(--neon); text-shadow: 0 0 12px rgba(60, 240, 96, .4); }
+nav.tabs, .btn-soft, .update, .logo { transition: background .45s, border-color .45s, color .2s; }
+nav.tabs {
+  display: flex; gap: 2px; padding: 3px;
+  border-radius: 999px; border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .03);
+}
+.tab {
+  padding: 7px 15px;
+  font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted);
+  border-radius: 999px;
+  transition: color .2s, background .2s;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--neon); background: rgba(60, 240, 96, .12); }
+button:focus:not(:focus-visible) { outline: none; }
+button:focus-visible { outline: 2px solid var(--neon); outline-offset: 2px; }
+.top-right { justify-self: end; display: flex; align-items: center; gap: 8px; }
+/* atualização: um ícone discreto; só chama atenção quando há uma versão pronta */
+.update {
+  position: relative;
+  width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center;
+  color: var(--faint); border: 1px solid var(--line);
+  transition: color .2s, border-color .2s;
+}
+.update:hover { color: var(--text); border-color: var(--line-strong); }
+.update svg { width: 15px; height: 15px; }
+.update.ready { color: var(--lime); border-color: rgba(60, 240, 96, .45); }
+.update.ready::after {
+  content: ""; position: absolute; top: 4px; right: 4px; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--lime); box-shadow: 0 0 8px var(--lime);
+}
+.update .ring { position: absolute; inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); transform: rotate(-90deg); pointer-events: none; }
+.update .ring circle { fill: none; stroke-width: 2; }
+.update .ring .track { stroke: rgba(255, 255, 255, .08); }
+.update .ring .bar { stroke: var(--neon); stroke-linecap: round; transition: stroke-dashoffset .25s linear; filter: drop-shadow(0 0 3px rgba(60, 240, 96, .6)); }
+.update.downloading { color: var(--text); border-color: transparent; }
+/* na biblioteca o topo flutua sobre o fliperama: fundos escuros só nas pílulas, sem faixa por cima do 3D */
+.shell.in-library nav.tabs { background: rgba(6, 14, 3, .66); border-color: rgba(220, 255, 200, .12); }
+.shell.in-library .update { background: rgba(6, 14, 3, .66); }
+.shell.in-library .logo { background: rgba(6, 14, 3, .58); }
+.shell.in-library .btn-soft { background: rgba(6, 14, 3, .7); }
+.btn-neon {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 38px; padding: 0 18px;
+  border-radius: 999px;
+  background: var(--neon); color: var(--neon-ink);
+  font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  box-shadow: 0 4px 16px rgba(60, 240, 96, .16);
+  transition: box-shadow .2s, filter .2s;
+  white-space: nowrap;
+}
+.btn-neon:hover { filter: brightness(1.06); box-shadow: 0 0 0 3px rgba(60, 240, 96, .16), 0 6px 20px rgba(60, 240, 96, .22); }
+/* ação secundária e frequente (Adicionar, Jogar): verde suave, sem brilho forte */
+.btn-soft {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 34px; padding: 0 15px;
+  border-radius: 999px;
+  border: 1px solid rgba(60, 240, 96, .38);
+  background: rgba(60, 240, 96, .1); color: var(--neon);
+  font-size: 11px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase;
+  transition: background .2s, border-color .2s;
+  white-space: nowrap;
+}
+.btn-soft:hover { background: rgba(60, 240, 96, .18); border-color: rgba(60, 240, 96, .6); }
+.btn-soft svg { width: 14px; height: 14px; }
+.btn-soft.lg { height: 40px; padding: 0 20px; font-size: 12px; }
+.btn-neon svg { width: 16px; height: 16px; }
+.btn-ghost {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 40px; padding: 0 18px;
+  border-radius: 999px; border: 1px solid var(--line-strong);
+  font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  transition: border-color .2s, background .2s;
+}
+.btn-ghost:hover { border-color: rgba(255, 255, 255, .35); background: rgba(255, 255, 255, .04); }
+.btn-ghost svg { width: 16px; height: 16px; }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- views ---------- */
+main { flex: 1; display: flex; flex-direction: column; position: relative; min-height: 0; overflow: hidden; }
+.view { display: none; flex: 1; flex-direction: column; position: relative; min-height: 0; }
+.view.active { display: flex; }
+
+.hero { text-align: center; padding: 30px 24px 0; position: relative; z-index: 5; }
+.hero h1 {
+  margin: 0;
+  font-family: var(--display); font-weight: 400;
+  font-size: clamp(40px, 6.4vw, 92px);
+  line-height: .95;
+  letter-spacing: .015em;
+  text-transform: uppercase;
+  text-shadow: 0 0 40px rgba(255, 255, 255, .12);
+}
+.hero h1 .grad { color: var(--lime); text-shadow: 0 0 34px rgba(60, 240, 96, .35); }
+.hero p { margin: 16px auto 0; max-width: 520px; color: var(--muted); font-size: 15px; line-height: 1.55; }
+
+/* ---------- palco ---------- */
+.stage {
+  position: relative;
+  flex: 1;
+  min-height: 240px;
+  margin-top: 18px;
+  perspective: 1500px;
+  perspective-origin: 50% 40%;
+}
+.wall {
+  position: absolute; left: -10%; right: -10%; top: 6%; height: 70%;
+  border-radius: 50% 50% 0 0 / 22% 22% 0 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .055), rgba(255, 255, 255, .015) 40%, transparent 75%);
+  border-top: 1px solid rgba(255, 255, 255, .07);
+}
+.floor {
+  position: absolute; left: -30%; right: -30%; bottom: -8%; height: 55%;
+  background:
+    linear-gradient(rgba(255, 255, 255, .07) 1px, transparent 1px) 0 0 / 64px 64px,
+    linear-gradient(90deg, rgba(255, 255, 255, .07) 1px, transparent 1px) 0 0 / 64px 64px;
+  transform: perspective(500px) rotateX(68deg);
+  transform-origin: 50% 0;
+  -webkit-mask-image: radial-gradient(ellipse 50% 70% at 50% 0%, #000 30%, transparent 75%);
+  mask-image: radial-gradient(ellipse 50% 70% at 50% 0%, #000 30%, transparent 75%);
+}
+.arc { position: absolute; inset: 0; }
+
+/* ---------- cartas ---------- */
+.card {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: var(--card-w);
+  height: calc(var(--card-w) * 1.36);
+  margin-left: calc(var(--card-w) / -2);
+  margin-top: calc(var(--card-w) * -0.68);
+  border-radius: var(--radius);
+  transition: transform .55s cubic-bezier(.2, .8, .2, 1), opacity .4s, filter .4s, box-shadow .3s;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+}
+.card.entering { animation: cardIn .7s cubic-bezier(.2, .8, .2, 1); }
+@keyframes cardIn {
+  0% { opacity: 0; filter: brightness(2.2) blur(10px); }
+  60% { opacity: 1; filter: brightness(1.4) blur(0); }
+  100% { filter: none; }
+}
+.card.leaving { opacity: 0 !important; filter: blur(8px); pointer-events: none; }
+.card.is-focus { box-shadow: 0 0 0 3px var(--focus-c), 0 0 50px color-mix(in srgb, var(--focus-c) 45%, transparent), 0 30px 70px rgba(0, 0, 0, .6); }
+.card:not(.is-focus) { box-shadow: 0 24px 60px rgba(0, 0, 0, .55); }
+
+.player .art {
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 30% 10%, color-mix(in srgb, var(--c) 90%, white 10%) 0%, transparent 55%),
+    radial-gradient(120% 90% at 90% 100%, color-mix(in srgb, var(--c) 70%, black 30%) 0%, transparent 60%),
+    linear-gradient(160deg, color-mix(in srgb, var(--c) 55%, #101114) 0%, #101114 100%);
+}
+.player .art::after {
+  content: ""; position: absolute; inset: 0;
+  background: repeating-linear-gradient(115deg, rgba(255, 255, 255, .05) 0 2px, transparent 2px 9px);
+  mix-blend-mode: overlay;
+}
+.art-glyph { position: absolute; left: 50%; top: 46%; width: 62%; transform: translate(-50%, -50%) rotate(-8deg); opacity: .9; filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .45)); }
+.art-glyph svg { width: 100%; height: auto; display: block; }
+.art-num {
+  position: absolute; right: 14px; top: 58px;
+  font-family: var(--display); font-weight: 400;
+  font-size: calc(var(--card-w) * .34);
+  line-height: 1;
+  color: rgba(255, 255, 255, .92);
+  text-shadow: 0 4px 30px rgba(0, 0, 0, .35);
+  letter-spacing: -.02em;
+}
+.holo {
+  position: absolute; inset: -40%;
+  background: conic-gradient(from 0deg, #ff6ad5, #c774e8, #ad8cff, #8795e8, #94d0ff, #7cffcb, #ff6ad5);
+  mix-blend-mode: soft-light;
+  opacity: 0;
+  transition: opacity .5s;
+  animation: holo 7s linear infinite;
+}
+.card.is-focus .holo { opacity: .55; }
+@keyframes holo { to { transform: rotate(360deg); } }
+
+.chip, .panel {
+  position: absolute; left: 10px; right: 10px;
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: var(--glass);
+  border: 1px solid rgba(255, 255, 255, .12);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.chip { top: 10px; right: auto; max-width: calc(100% - 20px); padding-right: 14px; }
+.chip .dot { width: 26px; height: 26px; border-radius: 50%; flex: none; background: var(--c); box-shadow: 0 0 14px var(--c); display: grid; place-items: center; font-size: 10px; font-weight: 800; color: rgba(0, 0, 0, .75); }
+.chip small, .panel small { display: block; font-size: 10px; color: var(--muted); letter-spacing: .02em; line-height: 1.2; }
+.chip b { display: block; font-size: 13px; font-weight: 700; line-height: 1.25; outline: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(var(--card-w) - 90px); }
+.chip b[contenteditable="true"] { cursor: text; border-bottom: 1px dashed rgba(255, 255, 255, .25); }
+.panel { bottom: 10px; justify-content: space-between; }
+.panel .meta { min-width: 0; }
+.panel .meta small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.panel b { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 800; color: var(--neon); }
+.panel b svg { width: 15px; height: 15px; }
+.panel b.warn { color: #facc15; }
+.panel b.bad { color: var(--danger); }
+.mini {
+  flex: none;
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10px; font-weight: 800; letter-spacing: .1em;
+  color: var(--neon);
+  padding: 6px 4px 6px 8px;
+  border-radius: 8px;
+}
+.mini:hover { background: rgba(60, 240, 96, .1); }
+.card:not(.is-focus) .mini { display: none; }
+.player { container-type: inline-size; }
+@container (max-width: 199px) { .mini .t { display: none; } .mini { padding: 6px; } }
+.panel b { white-space: nowrap; }
+.x {
+  position: absolute; top: 12px; right: 12px;
+  width: 28px; height: 28px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: rgba(0, 0, 0, .45);
+  border: 1px solid rgba(255, 255, 255, .15);
+  opacity: 0; transition: opacity .2s;
+}
+.x svg { width: 14px; height: 14px; }
+.card:hover .x, .card.is-focus .x { opacity: 1; }
+.card.identify .art { animation: identify .9s ease; }
+@keyframes identify { 0%, 100% { filter: none; } 20%, 60% { filter: brightness(1.8) saturate(1.4); } 40%, 80% { filter: brightness(1); } }
+
+.player.reconnecting .art { filter: grayscale(1) brightness(.45); }
+.player.reconnecting .holo { display: none; }
+.reco {
+  position: absolute; inset: 0; border-radius: inherit;
+  display: none; place-content: center; text-align: center; gap: 10px;
+  font-size: 13px; font-weight: 700;
+}
+.reco svg { width: 30px; height: 30px; margin: 0 auto; }
+.reco small { color: var(--muted); font-weight: 500; font-size: 11px; }
+.player.reconnecting .reco { display: grid; }
+
+/* carta "+" */
+.add {
+  border: 2px dashed rgba(255, 255, 255, .16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .035), rgba(255, 255, 255, .012));
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  text-align: center; padding: 18px 14px;
+}
+.add:hover, .add.is-focus { border-color: rgba(60, 240, 96, .6); }
+.add-top { display: flex; align-items: center; justify-content: center; gap: 7px; font-size: 11px; font-weight: 800; letter-spacing: .07em; line-height: 1.25; text-transform: uppercase; color: var(--text); text-align: left; }
+.add .plus { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: rgba(60, 240, 96, .14); color: var(--neon); flex: none; }
+.add .plus svg { width: 12px; height: 12px; }
+.add .miniqr { width: 68%; aspect-ratio: 1; border-radius: 12px; overflow: hidden; background: #fff; padding: 6px; flex: none; box-shadow: 0 0 0 4px rgba(60, 240, 96, .1); }
+.add .miniqr svg { width: 100%; height: 100%; display: block; }
+.add p { margin: 0; font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+.add p b { color: var(--text); font-weight: 700; }
+
+/* ---------- rodapé do lobby ---------- */
+.lobby-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap;
+  padding: 0 28px 24px;
+  position: relative; z-index: 5;
+}
+.count { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.count .big { font-family: var(--display); font-weight: 400; font-size: 26px; }
+.count .big span { color: var(--faint); }
+.count .lbl { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.slots { display: flex; gap: 5px; }
+.slots i { width: 18px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .1); transition: background .3s, box-shadow .3s; }
+.hint { font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.hint kbd { font-family: inherit; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 6px; border: 1px solid var(--line-strong); color: var(--text); }
+.foot-actions { display: flex; gap: 10px; }
+
+/* ---------- biblioteca ---------- */
+.cover .art { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; }
+.cover .art svg { width: 100%; height: 100%; display: block; }
+.badge {
+  position: absolute; top: 10px; left: 10px;
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  padding: 5px 9px; border-radius: 999px;
+  background: var(--glass); border: 1px solid rgba(255, 255, 255, .15);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.badge svg { width: 12px; height: 12px; }
+.badge.ok { color: var(--neon); }
+.badge.comm { color: #facc15; }
+.badge.new { left: auto; right: 10px; background: var(--neon); color: var(--neon-ink); border-color: transparent; }
+.game-info {
+  display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap;
+  margin: 0 36px 30px; padding: 18px 22px;
+  border-radius: 20px; border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .025);
+  position: relative; z-index: 5;
+}
+.game-info h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 22px; }
+.game-info p { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+.game-info .tags { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.tagc { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--muted); }
+
+/* ---------- em breve ---------- */
+.soon { margin: auto; max-width: 520px; text-align: center; padding: 40px 24px; }
+.soon h2 { font-family: var(--display); font-weight: 400; font-size: 28px; margin: 0 0 12px; }
+.soon p { color: var(--muted); line-height: 1.6; }
+.soon ul { text-align: left; color: var(--muted); line-height: 1.9; margin: 18px auto 0; display: inline-block; }
+
+/* ---------- modal ---------- */
+.overlay {
+  position: fixed; inset: 0; z-index: 100;
+  display: none; align-items: center; justify-content: center;
+  padding: 20px;
+  background: rgba(5, 6, 8, .62);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.overlay.open { display: flex; animation: fade .25s ease; }
+@keyframes fade { from { opacity: 0; } }
+.modal {
+  position: relative;
+  width: min(820px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  border-radius: 28px;
+  border: 1px solid var(--line-strong);
+  background:
+    radial-gradient(600px 240px at 50% 0%, rgba(60, 240, 96, .08), transparent 70%),
+    #15161a;
+  box-shadow: 0 40px 120px rgba(0, 0, 0, .7);
+  padding: 30px;
+  animation: pop .35s cubic-bezier(.2, .8, .2, 1);
+}
+@keyframes pop { from { transform: translateY(16px) scale(.97); opacity: 0; } }
+.modal h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 24px; text-transform: uppercase; }
+.modal .sub { margin: 8px 0 0; color: var(--muted); font-size: 14px; }
+.modal .sub b { color: var(--text); font-weight: 600; }
+.modal-head { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 24px; }
+.modal-head .grow { flex: 1; }
+.icon-btn { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--line-strong); flex: none; }
+.icon-btn:hover { background: rgba(255, 255, 255, .06); }
+.icon-btn svg { width: 16px; height: 16px; }
+.options { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.option {
+  position: relative;
+  text-align: left;
+  padding: 24px;
+  border-radius: 22px;
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, .03);
+  overflow: hidden;
+  transition: border-color .2s, transform .2s, background .2s;
+}
+.option:hover, .option:focus-visible { border-color: rgba(60, 240, 96, .55); transform: translateY(-2px); background: rgba(60, 240, 96, .04); outline: none; }
+.option .num { display: block; font-family: var(--display); font-weight: 400; font-size: 24px; letter-spacing: .04em; color: var(--neon); margin-bottom: 12px; }
+.option h3 { margin: 0 0 6px; font-size: 17px; }
+.option p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.option p b { color: var(--text); font-weight: 600; }
+.option .kbd { position: absolute; top: 18px; right: 18px; font-size: 11px; color: var(--faint); }
+.options.three { grid-template-columns: repeat(3, 1fr); }
+.scan-wait { display: flex; align-items: center; gap: 10px; color: var(--muted); padding: 30px 4px; }
+.scan-wait svg { width: 18px; height: 18px; }
+.scan-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.scan-search { height: 38px; width: 200px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line-strong); background: rgba(0, 0, 0, .3); outline: none; }
+.scan-search:focus { border-color: rgba(60, 240, 96, .6); }
+.pc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 14px; max-height: 48vh; overflow: auto; padding: 2px; }
+.pc-grid { scrollbar-width: thin; scrollbar-color: rgba(60, 240, 96, .35) transparent; }
+.pc-card { position: relative; text-align: left; border-radius: 14px; overflow: hidden; background: #101411; border: 2px solid transparent; transition: border-color .2s, transform .2s; }
+.pc-card:not(:disabled):hover { transform: translateY(-2px); border-color: var(--line-strong); }
+.pc-card.on { border-color: var(--lime); }
+.pc-card[hidden] { display: none; }
+.pc-card .cv { aspect-ratio: 3 / 4; overflow: hidden; }
+.pc-card .cv img, .pc-card .cv svg { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pc-card .meta { padding: 8px 10px 10px; }
+.pc-card .meta b { display: block; font-size: 13px; line-height: 1.25; }
+.pc-card .meta small { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 11px; color: var(--muted); }
+.pc-card .meta small i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.pc-card .tick { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--lime); color: #142008; opacity: 0; transform: scale(.7); transition: .2s; }
+.pc-card .tick svg { width: 14px; height: 14px; }
+.pc-card.on .tick { opacity: 1; transform: none; }
+.pc-card.added { opacity: .5; }
+.pc-card .in-lib { position: absolute; top: 8px; left: 8px; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; padding: 4px 8px; border-radius: 999px; background: rgba(0, 0, 0, .7); }
+.scan-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; color: var(--muted); font-size: 13px; }
+.scan-foot .btn-neon[disabled] { opacity: .4; pointer-events: none; }
+.drop { display: grid; place-items: center; gap: 6px; padding: 34px; border-radius: 18px; border: 2px dashed var(--line-strong); color: var(--muted); cursor: pointer; text-align: center; transition: border-color .2s, background .2s; }
+.drop svg { width: 26px; height: 26px; color: var(--lime); }
+.drop b { color: var(--text); }
+.drop:hover, .drop.over { border-color: rgba(60, 240, 96, .6); background: rgba(60, 240, 96, .05); }
+.modal-note b { color: var(--text); font-weight: 600; }
+.seg { display: inline-flex; gap: 2px; padding: 3px; margin: -6px 0 20px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, .03); }
+.seg-btn { height: 32px; padding: 0 16px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--muted); display: inline-flex; align-items: center; gap: 8px; }
+.seg-btn.on { color: var(--neon); background: rgba(60, 240, 96, .12); }
+.seg-count { font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px; background: rgba(255, 255, 255, .08); }
+.lib-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 50vh; overflow: auto; scrollbar-width: thin; scrollbar-color: rgba(60, 240, 96, .35) transparent; }
+.lib-row { display: grid; grid-template-columns: 14px 28px 42px 1fr auto auto; align-items: center; gap: 12px; padding: 8px 10px 8px 12px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255, 255, 255, .025); cursor: grab; transition: border-color .2s, background .2s; }
+.lib-row:hover, .lib-row:focus-visible { border-color: var(--line-strong); background: rgba(255, 255, 255, .045); outline: none; }
+.lib-row.dragging { opacity: .45; }
+.lib-row.drop-above { box-shadow: inset 0 2px 0 var(--neon); }
+.lib-row.drop-below { box-shadow: inset 0 -2px 0 var(--neon); }
+.lib-row .grip { width: 10px; height: 18px; background-image: radial-gradient(circle, var(--faint) 1.3px, transparent 1.6px); background-size: 5px 6px; }
+.lib-row .pos { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--faint); }
+.lib-row .thumb { width: 42px; aspect-ratio: 3 / 4; border-radius: 7px; overflow: hidden; background: #111; }
+.lib-row .thumb img, .lib-row .thumb svg { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lib-row .info { min-width: 0; }
+.lib-row .info b { display: block; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lib-row .info small { display: block; margin-top: 3px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.btn-ghost.sm { height: 32px; padding: 0 14px; font-size: 11px; cursor: pointer; }
+.icon-btn.sm { width: 32px; height: 32px; }
+.edit-form { display: grid; grid-template-columns: 200px 1fr; gap: 26px; }
+.edit-art { display: grid; gap: 10px; justify-items: start; }
+.edit-art .pc { width: 100%; aspect-ratio: 3 / 4; border-radius: 16px; overflow: hidden; background: #111; box-shadow: 0 16px 40px rgba(0, 0, 0, .45); }
+.edit-art .pc img, .edit-art .pc svg { width: 100%; height: 100%; object-fit: cover; display: block; }
+.edit-fields { display: grid; gap: 14px; align-content: start; }
+.edit-fields label { display: grid; gap: 6px; font-size: 12px; font-weight: 700; letter-spacing: .04em; color: var(--muted); }
+.edit-fields input, .edit-fields textarea { font: inherit; font-size: 15px; font-weight: 500; letter-spacing: 0; color: var(--text); padding: 11px 14px; border-radius: 12px; border: 1px solid var(--line-strong); background: rgba(0, 0, 0, .3); outline: none; resize: vertical; }
+.edit-fields input:focus, .edit-fields textarea:focus { border-color: rgba(60, 240, 96, .6); box-shadow: 0 0 0 3px rgba(60, 240, 96, .12); }
+.edit-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+.danger-link { margin-left: auto; font-size: 12.5px; font-weight: 600; color: var(--danger); }
+.danger-link:hover { text-decoration: underline; }
+.modal-note { margin-top: 18px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); padding: 12px 14px; border-radius: 14px; background: rgba(255, 255, 255, .03); }
+.modal-note svg { width: 18px; height: 18px; color: var(--neon); flex: none; }
+
+.phone-wrap { display: grid; grid-template-columns: 260px 1fr; gap: 28px; align-items: center; }
+.qr-big { background: #fff; border-radius: 22px; padding: 14px; box-shadow: 0 0 0 6px rgba(60, 240, 96, .14), 0 0 60px rgba(60, 240, 96, .18); }
+.qr-big svg { width: 100%; height: auto; display: block; }
+.url { margin-top: 12px; text-align: center; font-family: ui-monospace, Consolas, monospace; font-size: 13px; color: var(--muted); }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.steps li { display: flex; gap: 14px; align-items: center; font-size: 15px; color: var(--muted); }
+.steps li b { color: var(--text); font-weight: 600; }
+.steps .n { width: 32px; height: 32px; border-radius: 50%; flex: none; display: grid; place-items: center; font-weight: 800; font-size: 13px; background: rgba(255, 255, 255, .06); border: 1px solid var(--line-strong); }
+.waiting { margin-top: 22px; display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--muted); }
+.pulse { width: 10px; height: 10px; border-radius: 50%; background: var(--neon); box-shadow: 0 0 0 0 rgba(60, 240, 96, .6); animation: pulse 1.6s infinite; }
+.pulse.warn { background: #facc15; animation: none; }
+.btn-ghost:disabled { opacity: .4; cursor: default; pointer-events: none; }
+@keyframes pulse { 70% { box-shadow: 0 0 0 12px rgba(60, 240, 96, 0); } 100% { box-shadow: 0 0 0 0 rgba(60, 240, 96, 0); } }
+.linkish { color: var(--neon); font-size: 13px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.joined-list { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+.joined { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 999px; background: rgba(255, 255, 255, .05); font-size: 13px; font-weight: 600; animation: pop .35s; }
+.joined i { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 10px; font-weight: 800; color: rgba(0, 0, 0, .75); }
+.alt-ips { margin-top: 10px; font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; color: var(--muted); line-height: 1.8; }
+
+/* bluetooth */
+.bt-tips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.tip { padding: 16px; border-radius: 18px; border: 1px solid var(--line); background: rgba(255, 255, 255, .025); }
+.tip .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 14px; margin-bottom: 8px; }
+/* sigla da marca em matriz de pontos, na cor da marca */
+.mono { display: grid; place-items: center; font-family: var(--dots); font-weight: 900; font-style: normal; letter-spacing: .04em; color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); }
+.tip .brand i { width: 34px; height: 30px; border-radius: 9px; font-size: 14px; }
+.seat-tag { display: inline-grid; place-items: center; min-width: 44px; height: 30px; padding: 0 12px; border-radius: 999px; background: var(--c); color: rgba(0, 0, 0, .78); font-family: var(--dots); font-weight: 900; font-size: 16px; letter-spacing: .04em; box-shadow: 0 0 14px color-mix(in srgb, var(--c) 50%, transparent); }
+.tip p { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.tip p b { color: var(--text); }
+.bt-scan { display: grid; grid-template-columns: 200px 1fr; gap: 26px; align-items: center; margin-top: 22px; }
+.radar { position: relative; width: 200px; height: 200px; border-radius: 50%; background: radial-gradient(circle, rgba(59, 130, 246, .18), transparent 70%); display: grid; place-items: center; }
+.radar::before, .radar::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(96, 165, 250, .5); animation: ring 2.4s infinite; }
+.radar::after { animation-delay: 1.2s; }
+@keyframes ring { from { transform: scale(.35); opacity: 1; } to { transform: scale(1); opacity: 0; } }
+.radar .core { width: 64px; height: 64px; border-radius: 50%; background: #2563eb; display: grid; place-items: center; box-shadow: 0 0 40px rgba(37, 99, 235, .6); position: relative; z-index: 1; }
+.radar .core svg { width: 30px; height: 30px; }
+.radar.idle::before, .radar.idle::after { animation: none; opacity: 0; }
+.found { display: grid; gap: 10px; }
+.found-empty { color: var(--muted); font-size: 14px; }
+.dev {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 12px 12px 14px;
+  border-radius: 16px; border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, .03);
+  animation: pop .35s;
+}
+.dev .ic { width: 44px; height: 40px; border-radius: 11px; flex: none; font-size: 16px; }
+.dev .t { flex: 1; min-width: 0; }
+.dev .t b { display: block; font-size: 15px; }
+.dev .t small { color: var(--faint); font-size: 12px; }
+.dev .act { flex: none; }
+.dev.ok { border-color: rgba(60, 240, 96, .5); }
+.dev .state { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--neon); }
+.dev .state svg { width: 16px; height: 16px; }
+.kb-ic { display: grid; place-items: center; background: rgba(255, 255, 255, .06); color: var(--text); }
+.kb-ic svg { width: 22px; height: 22px; }
+.kb-wait { display: flex; align-items: center; gap: 16px; padding: 16px 18px; margin-bottom: 14px; border-radius: 16px; background: rgba(60, 240, 96, .06); border: 1px solid rgba(60, 240, 96, .22); }
+.kb-wait b { font-size: 15px; }
+.kb-wait p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+.kb-key { flex: none; padding: 10px 14px 14px; border-radius: 10px; font-size: 13px; font-weight: 800; color: var(--text); background: rgba(255, 255, 255, .06); border: 1px solid var(--line-strong); box-shadow: 0 3px 0 rgba(255, 255, 255, .1); animation: kbPress 1.6s ease-in-out infinite; }
+@keyframes kbPress { 0%, 70%, 100% { transform: none; box-shadow: 0 3px 0 rgba(255, 255, 255, .1); } 80% { transform: translateY(2px); box-shadow: 0 1px 0 rgba(255, 255, 255, .1); } }
+.bt-off { text-align: center; padding: 30px 10px 10px; }
+.bt-off .core { width: 72px; height: 72px; margin: 0 auto 18px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, .06); color: var(--muted); }
+.bt-off .core svg { width: 34px; height: 34px; }
+.bt-off h3 { margin: 0 0 6px; }
+.bt-off p { margin: 0 0 20px; color: var(--muted); }
+
+/* adicionar por link */
+.field { display: flex; gap: 10px; }
+.field input {
+  flex: 1; height: 50px; padding: 0 18px;
+  border-radius: 16px; border: 1px solid var(--line-strong);
+  background: rgba(0, 0, 0, .3); font-size: 15px; outline: none;
+}
+.field input:focus { border-color: rgba(60, 240, 96, .6); box-shadow: 0 0 0 4px rgba(60, 240, 96, .12); }
+.preview { display: grid; grid-template-columns: 180px 1fr; gap: 24px; margin-top: 22px; animation: pop .35s; }
+.preview .pc { border-radius: 18px; overflow: hidden; aspect-ratio: 3 / 4; box-shadow: 0 20px 50px rgba(0, 0, 0, .5); }
+.preview .pc svg { width: 100%; height: 100%; display: block; }
+.preview h3 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 22px; }
+.preview .by { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.facts { display: grid; gap: 8px; margin: 16px 0; font-size: 14px; }
+.facts div { display: flex; align-items: center; gap: 10px; }
+.facts svg { width: 16px; height: 16px; color: var(--neon); flex: none; }
+.warnbox { display: flex; gap: 10px; padding: 12px 14px; border-radius: 14px; background: rgba(250, 204, 21, .07); border: 1px solid rgba(250, 204, 21, .25); color: #fde68a; font-size: 13px; line-height: 1.45; }
+.warnbox svg { width: 18px; height: 18px; flex: none; margin-top: 1px; }
+.errbox { margin-top: 18px; display: flex; gap: 10px; padding: 14px; border-radius: 14px; background: rgba(255, 90, 95, .08); border: 1px solid rgba(255, 90, 95, .3); font-size: 14px; line-height: 1.5; }
+.errbox svg { width: 18px; height: 18px; flex: none; color: var(--danger); margin-top: 2px; }
+.progress { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, .08); overflow: hidden; margin-top: 16px; }
+.progress i { display: block; height: 100%; width: 0; background: var(--neon); box-shadow: 0 0 16px var(--neon); transition: width .2s; }
+.progress-lbl { margin-top: 8px; font-size: 13px; color: var(--muted); }
+
+/* ---------- toasts ---------- */
+.toasts { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 200; display: grid; gap: 10px; justify-items: center; pointer-events: none; }
+.toast {
+  pointer-events: auto;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px 10px 10px;
+  border-radius: 999px;
+  background: rgba(24, 25, 30, .92);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, .5);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  font-size: 14px; font-weight: 600;
+  animation: toastIn .35s cubic-bezier(.2, .8, .2, 1);
+}
+.toast.out { opacity: 0; transform: translateY(8px); transition: .3s; }
+.toast i { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 11px; font-weight: 800; color: rgba(0, 0, 0, .75); flex: none; }
+.toast i svg { width: 15px; height: 15px; }
+.toast button { font-size: 12px; font-weight: 800; letter-spacing: .08em; color: var(--neon); padding: 4px 8px; text-transform: uppercase; }
+@keyframes toastIn { from { opacity: 0; transform: translateY(12px) scale(.96); } }
+
+/* ---------- painel demo ---------- */
+.demo { position: fixed; left: 18px; bottom: 18px; z-index: 150; font-size: 12px; }
+.demo-toggle { height: 34px; padding: 0 14px; border-radius: 999px; background: #22232a; border: 1px solid var(--line-strong); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: 11px; display: inline-flex; align-items: center; gap: 8px; }
+.demo-toggle svg { width: 14px; height: 14px; }
+.demo-body { display: none; margin-bottom: 10px; width: 250px; padding: 14px; border-radius: 18px; background: #1b1c21; border: 1px solid var(--line-strong); box-shadow: 0 20px 50px rgba(0, 0, 0, .6); }
+.demo.open .demo-body { display: grid; gap: 7px; }
+.demo-body h4 { margin: 0 0 4px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.demo-body button { text-align: left; padding: 8px 10px; border-radius: 10px; background: rgba(255, 255, 255, .04); font-size: 12.5px; }
+.demo-body button:hover { background: rgba(255, 255, 255, .09); }
+.demo-body hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; width: 100%; }
+
+/* ---------- fliperama 3D (biblioteca) ---------- */
+.arcade-stage {
+  position: absolute; inset: 0; z-index: 0;
+  border-radius: inherit; overflow: hidden;
+  background: #2f6420;
+  opacity: 0; visibility: hidden; pointer-events: none;
+}
+.arcade-stage.on { visibility: visible; }
+.shell.in-library .arcade-stage { pointer-events: auto; }
+.arcade-stage canvas { width: 100%; height: 100%; display: block; }
+.shell.in-library main { pointer-events: none; }
+.shell.in-library .arcade-ui { pointer-events: auto; }
+.arcade-ui { transition: opacity .4s; }
+/* entrando no jogo: só a tela do fliperama na vista */
+.shell.launching header.top, .shell.launching .arcade-ui { opacity: 0; pointer-events: none; transition: opacity .35s; }
+
+main { perspective: 1800px; }
+/* troca de aba leve: a vista atual some rápido, a nova entra depois. Nunca duas camadas cheias ao mesmo tempo */
+.view.view-out { position: absolute; inset: 0; pointer-events: none; will-change: transform, opacity; animation: viewOut var(--vt, 320ms) cubic-bezier(.4, 0, 1, 1) forwards; }
+.view.view-in { will-change: transform, opacity; animation: viewIn var(--vt, 520ms) cubic-bezier(0, 0, .2, 1) var(--vd, 0ms) both; }
+@keyframes viewOut { to { transform: translateX(calc(var(--dx) * 5%)) scale(.985); opacity: 0; } }
+@keyframes viewIn { from { transform: translateX(calc(var(--dx) * 5%)) scale(.985); opacity: 0; } }
+.view.view-out *, .view.view-in * { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+.view.view-out .holo, .view.view-in .holo { animation: none; }
+
+.arcade-ui {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap;
+  padding: 0 28px 24px;
+}
+.arcade-ui[hidden] { display: none; }
+.arcade-hint { display: flex; gap: 8px; flex-wrap: wrap; }
+.arcade-hint span, .glass-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 700; letter-spacing: .04em;
+  color: rgba(240, 255, 230, .9);
+  padding: 8px 13px; border-radius: 999px;
+  background: rgba(8, 20, 4, .72); border: 1px solid rgba(220, 255, 200, .16);
+}
+.arcade-hint kbd { font-family: inherit; font-size: 11px; padding: 1px 6px; border-radius: 5px; border: 1px solid rgba(220, 255, 200, .3); }
+.glass-btn { height: 40px; padding: 0 16px; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; }
+.glass-btn:hover { border-color: rgba(198, 245, 90, .7); color: #d8fc72; }
+.glass-btn svg { width: 15px; height: 15px; }
+
+.game-run {
+  position: fixed; inset: 0; z-index: 300;
+  display: none; place-content: center; text-align: center; gap: 14px;
+  background: #000; opacity: 0; transition: opacity .35s;
+}
+.game-run.on { display: grid; }
+.game-run.show { opacity: 1; }
+.game-run h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(54px, 9vw, 130px); line-height: .95; color: #c6f55a; text-shadow: 0 0 50px rgba(160, 255, 80, .35); text-transform: uppercase; }
+.game-run p { margin: 0; color: #8f9196; font-size: 15px; }
+.game-run .gr-players { display: flex; gap: 8px; justify-content: center; }
+.game-run .gr-players i { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 12px; font-weight: 800; color: rgba(0, 0, 0, .75); }
+.game-run button { justify-self: center; margin-top: 10px; }
+
+/* janelas baixas: o Hub tem altura fixa, então o lobby se compacta em vez de cortar o rodapé */
+.add { container-type: inline-size; }
+.add .miniqr { flex: none; }
+@container (max-width: 112px) {
+  .add p { display: none; }
+}
+@container (max-width: 150px) {
+  .add-top { font-size: 10px; letter-spacing: .05em; }
+  .add p { font-size: 10.5px; }
+}
+@media (max-height: 860px) {
+  .hero { padding-top: 18px; }
+  .hero h1 { font-size: clamp(28px, 4.4vw, 54px); }
+  .hero p { margin-top: 8px; font-size: 14px; }
+  .stage { margin-top: 6px; }
+  .lobby-foot { padding-bottom: 18px; }
+}
+
+/* ---------- responsivo ---------- */
+@media (max-width: 1280px) {
+  .hint { display: none; }
+}
+@media (max-width: 1120px) {
+  .lobby-foot { padding: 0 20px 24px; }
+  .game-info { margin: 0 20px 24px; }
+}
+@media (max-width: 1120px) {
+  header.top { grid-template-columns: 1fr auto; row-gap: 12px; padding: 16px 18px 0; }
+  nav.tabs { grid-column: 1 / -1; grid-row: 2; justify-self: center; overflow-x: auto; max-width: 100%; }
+}
+@media (max-width: 860px) {
+  .options.three { grid-template-columns: 1fr; gap: 10px; }
+  .options.three .option { display: grid; grid-template-columns: 40px 1fr; column-gap: 12px; padding: 16px 18px; }
+  .options.three .num { grid-row: span 2; margin: 2px 0 0; font-size: 20px; }
+  .options.three h3 { margin-bottom: 2px; }
+  .edit-form { grid-template-columns: 1fr; }
+  .edit-art { grid-template-columns: 120px auto; align-items: center; }
+  .edit-art .pc { grid-row: span 2; }
+}
+@media (max-width: 640px) {
+  .logo-word { font-size: 18px; }
+  .tab { padding: 7px 10px; font-size: 10.5px; letter-spacing: .05em; }
+  .btn-soft .lbl-long { display: none; }
+  .btn-soft { padding: 0 11px; }
+  .lib-row { grid-template-columns: 12px 36px 1fr auto auto; }
+  .lib-row .pos { display: none; }
+  .lobby-foot { padding: 0 16px 16px; }
+  .page { padding: 0; }
+  .shell { border-radius: 0; height: 100vh; }
+  .btn-neon .lbl-long { display: none; }
+  .options, .options.three, .phone-wrap, .bt-scan, .preview, .bt-tips { grid-template-columns: 1fr; }
+  .phone-wrap .qr-big { max-width: 240px; margin: 0 auto; }
+  .preview .pc { max-width: 180px; }
+  .radar { margin: 0 auto; }
+  .stage { min-height: 240px; }
+  .modal { padding: 22px; }
+  .hint { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="shell">
+    <div class="arcade-stage" id="arcadeStage" aria-hidden="true">
+      <canvas id="arcadeCanvas"></canvas>
+    </div>
+    <header class="top">
+      <div class="logo" aria-label="Party Anywhere">
+        <span class="logo-word"><b>Party</b><i>Anywhere</i></span>
+      </div>
+      <nav class="tabs" aria-label="Seções">
+        <button class="tab active" data-view="lobby">Lobby</button>
+        <button class="tab" data-view="library">Biblioteca</button>
+        <button class="tab" data-view="controls">Controles</button>
+        <button class="tab" data-view="settings">Ajustes</button>
+      </nav>
+      <div class="top-right">
+        <button class="btn-soft" id="addBtn"><span data-icon="plus"></span><span class="lbl-long">Adicionar jogador</span></button>
+        <button class="update" id="updatePill" aria-label="Atualizações do Hub"></button>
+      </div>
+    </header>
+
+    <main>
+      <!-- LOBBY -->
+      <section class="view active" id="view-lobby">
+        <div class="hero">
+          <h1>Quem vai<br><span class="grad">jogar?</span></h1>
+          <p id="lobbySub">Conecte um controle ou escaneie o QR com o celular. Até 10 jogadores.</p>
+        </div>
+        <div class="stage" id="lobbyStage">
+          <div class="wall"></div>
+          <div class="floor"></div>
+          <div class="arc" id="lobbyArc"></div>
+        </div>
+        <div class="lobby-foot">
+          <div class="count">
+            <div class="big" id="countBig">0<span>/10</span></div>
+            <div>
+              <div class="lbl">Jogadores</div>
+              <div class="slots" id="slots"></div>
+            </div>
+          </div>
+          <div class="hint"><kbd>←</kbd><kbd>→</kbd> navegar <span>·</span> <kbd>A</kbd> selecionar <span>·</span> <kbd>Y</kbd> adicionar jogador</div>
+          <div class="foot-actions">
+            <button class="btn-soft lg" id="playBtn"><span data-icon="play"></span><span class="lbl-long">Jogar</span></button>
+          </div>
+        </div>
+      </section>
+
+      <!-- BIBLIOTECA -->
+      <section class="view" id="view-library">
+        <!-- Biblioteca 3D: o fliperama é desenhado no #arcadeStage; a legenda está gravada no próprio painel. -->
+        <!-- Reserva: se o 3D não carregar (sem internet, sem WebGL), a biblioteca em cartas continua funcionando. -->
+        <div id="libFallback" hidden>
+          <div class="hero">
+            <h1>Sua <span class="grad">biblioteca</span></h1>
+            <p>Jogos feitos para jogar junto. Cole o link de um repositório e o jogo aparece aqui.</p>
+          </div>
+          <div class="stage" id="libStage" style="min-height: 400px">
+            <div class="wall"></div>
+            <div class="floor"></div>
+            <div class="arc" id="libArc"></div>
+          </div>
+          <div class="game-info" id="gameInfo"></div>
+        </div>
+      </section>
+
+      <!-- EM BREVE -->
+      <section class="view" id="view-controls">
+        <div class="soon">
+          <h2>Controles</h2>
+          <p>Todos os dispositivos que já passaram por este PC.</p>
+          <ul>
+            <li>Renomear e escolher o ícone de cada controle</li>
+            <li>Testar botões e analógicos ao vivo</li>
+            <li>Esquecer um controle Bluetooth</li>
+            <li>Ver a bateria e a latência dos celulares</li>
+          </ul>
+        </div>
+      </section>
+      <section class="view" id="view-settings">
+        <div class="soon">
+          <h2>Ajustes</h2>
+          <p>Poucos ajustes, todos com um padrão bom.</p>
+          <ul>
+            <li>Idioma e tamanho do texto (modo TV)</li>
+            <li>"Entrar só ao apertar um botão"</li>
+            <li>Rede do celular e endereço do QR</li>
+            <li>Atualizações: canal estável ou beta</li>
+            <li>Componente de controle virtual (Modo Universal)</li>
+          </ul>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div class="overlay" id="overlay"><div class="modal" id="modal" role="dialog" aria-modal="true"></div></div>
+<div class="toasts" id="toasts"></div>
+
+<div class="game-run" id="gameRun" role="dialog" aria-label="Jogo rodando">
+  <h2 id="grTitle"></h2>
+  <div class="gr-players" id="grPlayers"></div>
+  <p>O jogo está rodando (protótipo). <b>Esc</b>, <b>B</b> ou <b>Start</b> volta para a biblioteca.</p>
+  <button class="btn-ghost" id="grExit">Sair do jogo</button>
+</div>
+
+<div class="demo" id="demo">
+  <div class="demo-body">
+    <h4>Simular (protótipo)</h4>
+    <button data-demo="usb">+ Controle USB</button>
+    <button data-demo="phone">+ Celular entrando pelo QR</button>
+    <button data-demo="keyboard">+ Teclado (notebook, Bluetooth, USB)</button>
+    <button data-demo="fill">Encher o lobby (10)</button>
+    <hr>
+    <button data-demo="drop">Derrubar um jogador</button>
+    <button data-demo="back">Reconectar quem caiu</button>
+    <button data-demo="clear">Esvaziar o lobby</button>
+    <hr>
+    <button data-demo="update">Atualização disponível</button>
+    <button data-demo="btoff">Bluetooth: alternar ligado/desligado</button>
+    <button data-demo="forget">Apagar biblioteca salva (volta ao padrão)</button>
+  </div>
+  <button class="demo-toggle" id="demoToggle"><span data-icon="sparkle"></span>Demo</button>
+</div>
+
+<script>
+// ===================================================================================
+// Ícones
+// ===================================================================================
+const ICONS = {
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>',
+  keyboard: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6.5 10h.01M10 10h.01M14 10h.01M17.5 10h.01M8 14h8"/></svg>',
+  close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
+  chevron: '<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M9 6l6 6-6 6z"/></svg>',
+  phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>',
+  bt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10-5 5V2l5 5L7 17"/></svg>',
+  pad: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10a5 5 0 0 1 4.9 6l-.8 4a2.6 2.6 0 0 1-4.6 1.1L15 16H9l-1.5 2.1A2.6 2.6 0 0 1 2.9 17l-.8-4A5 5 0 0 1 7 7z"/><path d="M7.5 10.5v3M6 12h3"/><circle cx="16" cy="11" r=".6" fill="currentColor"/><circle cx="17.5" cy="13" r=".6" fill="currentColor"/></svg>',
+  battery: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2.5" y="7" width="17" height="10" rx="2.5"/><path d="M22 10.5v3"/><path d="M6 10.5v3M9.5 10.5v3M13 10.5v3" stroke-width="2.4"/></svg>',
+  wifi: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.8 16a5 5 0 0 1 6.4 0"/><circle cx="12" cy="19.3" r="1" fill="currentColor"/></svg>',
+  usb: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v15M9 5l3-3 3 3M7 9v3l5 3 5-3V9"/><circle cx="12" cy="19.5" r="2"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  spinner: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" class="spin"><path d="M12 3a9 9 0 1 0 9 9" /></svg>',
+  shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6l8-3z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>',
+  warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5L2.5 20h19L12 3.5z"/><path d="M12 10v4.5M12 17.5v.01"/></svg>',
+  link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4L12 5.6"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2"/></svg>',
+  users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.2A6.5 6.5 0 0 1 21.5 20"/></svg>',
+  download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></svg>',
+  refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.6-4.5L4 8M4 4v4h4M4 13a8 8 0 0 0 14.6 4.5L20 16M20 20v-4h-4"/></svg>',
+  sparkle: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.2 6.3L20.5 10.5l-6.3 2.2L12 19l-2.2-6.3L3.5 10.5l6.3-2.2z"/></svg>',
+  gamebox: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/></svg>',
+};
+const icon = (n) => ICONS[n] || '';
+document.querySelectorAll('[data-icon]').forEach((el) => { el.outerHTML = icon(el.dataset.icon); });
+
+// Arte grande das cartas: controle, celular e teclado. A pessoa bate o olho e sabe com o que cada um joga.
+const GLYPH_PAD = `<svg viewBox="0 0 200 130"><defs><linearGradient id="gp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset="1" stop-color="#fff" stop-opacity=".55"/></linearGradient></defs>
+  <path d="M52 14h96c24 0 43 18 45 42l4 40c2 20-22 32-37 18l-18-17H58l-18 17C25 128 1 116 3 96l4-40C9 32 28 14 52 14z" fill="url(#gp)"/>
+  <g fill="rgba(0,0,0,.55)"><rect x="40" y="50" width="12" height="36" rx="3"/><rect x="28" y="62" width="36" height="12" rx="3"/>
+  <circle cx="148" cy="52" r="7.5"/><circle cx="164" cy="68" r="7.5"/><circle cx="132" cy="68" r="7.5"/><circle cx="148" cy="84" r="7.5"/>
+  <circle cx="78" cy="92" r="13"/><circle cx="122" cy="92" r="13"/></g></svg>`;
+const GLYPH_PHONE = `<svg viewBox="0 0 200 130"><defs><linearGradient id="gph" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset="1" stop-color="#fff" stop-opacity=".55"/></linearGradient></defs>
+  <rect x="67" y="3" width="66" height="124" rx="15" fill="url(#gph)"/><rect x="72.5" y="8.5" width="55" height="113" rx="10" fill="rgba(0,0,0,.55)"/>
+  <rect x="90" y="13" width="20" height="6" rx="3" fill="rgba(255,255,255,.8)"/><rect x="88" y="113" width="24" height="3" rx="1.5" fill="rgba(255,255,255,.45)"/>
+  <circle cx="100" cy="58" r="13" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="3"/><circle cx="100" cy="58" r="5" fill="rgba(255,255,255,.85)"/>
+  <g fill="rgba(255,255,255,.8)"><circle cx="100" cy="84" r="4.5"/><circle cx="110" cy="94" r="4.5"/><circle cx="90" cy="94" r="4.5"/><circle cx="100" cy="104" r="4.5"/></g></svg>`;
+const GLYPH_KEYBOARD = (() => {
+  let keys = '';
+  const key = (x, y, w) => { keys += `<rect x="${x.toFixed(1)}" y="${y}" width="${w.toFixed(1)}" height="11" rx="2.5"/>`; };
+  [[13, 0], [12, 5], [11, 9]].forEach(([count, off], r) => { for (let i = 0; i < count; i++) key(13 + off + i * 13.6, 38 + r * 14.5, 11); });
+  key(13, 81.5, 11); key(26.6, 81.5, 11); key(40.2, 81.5, 24.5); key(68.3, 81.5, 70); key(141.9, 81.5, 11); key(155.5, 81.5, 11); key(169.1, 81.5, 18);
+  return `<svg viewBox="0 0 200 130"><defs><linearGradient id="gkb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset="1" stop-color="#fff" stop-opacity=".55"/></linearGradient></defs>
+  <rect x="5" y="28" width="190" height="76" rx="12" fill="url(#gkb)"/><g fill="rgba(0,0,0,.5)">${keys}</g></svg>`;
+})();
+
+// ===================================================================================
+// Estado
+// ===================================================================================
+const COLORS = ['#3B82F6', '#EF4444', '#22C55E', '#EAB308', '#A855F7', '#F97316', '#06B6D4', '#EC4899', '#84CC16', '#F5F5F4'];
+const MAX = 10;
+const seats = new Array(MAX).fill(null);
+let lobbyFocus = 0;
+let libFocus = 0;
+let currentView = 'lobby';
+let navColor = null; // cor de quem está navegando com o controle
+let btOn = true;
+let hubVersion = '0.1.0';
+
+// Biblioteca 3D: o módulo do fliperama (no fim da página) se registra aqui quando carrega.
+let arcade = null;
+let arcadeFailed = false;
+let gameRunning = false;
+window.__arcadeReady = new Promise((resolve, reject) => {
+  window.__resolveArcade = (api) => { arcade = api; resolve(api); };
+  window.__arcadeFail = (err) => { console.warn('Biblioteca 3D indisponível:', err); reject(err); };
+});
+window.__arcadeReady.catch(() => {});
+
+const BRANDS = {
+  playstation: { label: 'Controle PlayStation 5', tech: 'Wireless Controller', color: '#2563eb', short: 'PS' },
+  ps4:         { label: 'Controle PlayStation 4', tech: 'Wireless Controller', color: '#1d4ed8', short: 'PS' },
+  xbox:        { label: 'Controle Xbox', tech: 'Xbox Wireless Controller', color: '#16a34a', short: 'XB' },
+  nintendo:    { label: 'Controle Pro (Switch)', tech: 'Pro Controller', color: '#dc2626', short: 'NS' },
+  generic:     { label: 'Controle 8BitDo', tech: '8BitDo Ultimate 2C', color: '#6b7280', short: '8B' },
+  phone:       { label: 'Celular', tech: '', color: '#a855f7', short: '' },
+};
+const PHONE_MODELS = ['iPhone 15', 'Galaxy S24', 'Moto G84', 'Pixel 8', 'Redmi Note 13', 'iPhone 13'];
+const NAMES = ['Ana', 'Bruno', 'Carla', 'Diego', 'Duda', 'Felipe', 'Gabi', 'Heitor', 'Iara', 'Júlio', 'Lia', 'Marcos'];
+const usbCycle = ['xbox', 'playstation', 'nintendo', 'generic'];
+let usbIdx = 0, fakeId = 0;
+
+function pickName() {
+  const used = new Set(seats.filter(Boolean).map((s) => s.name));
+  return NAMES.find((n) => !used.has(n)) || `Jogador ${Math.floor(Math.random() * 90 + 10)}`;
+}
+
+// Regras do lobby (as mesmas de docs/ARCHITECTURE.md): dispositivo conhecido volta para a vaga dele;
+// novo ocupa a menor vaga vazia; vaga em "reconectando" fica guardada.
+function addPlayer(dev) {
+  const back = seats.find((s) => s && s.deviceKey === dev.deviceKey);
+  if (back) {
+    back.state = 'active';
+    renderLobby();
+    focusSeat(back.index);
+    toast(`P${back.index + 1} voltou`, back);
+    return back;
+  }
+  const idx = seats.findIndex((s) => s === null);
+  if (idx < 0) { toast('Lobby cheio (10 de 10).', null, 'warn'); return null; }
+  const seat = {
+    index: idx,
+    color: COLORS[idx],
+    name: dev.name || `Jogador ${idx + 1}`,
+    kind: dev.kind,
+    brand: dev.brand,
+    deviceName: dev.deviceName,
+    via: dev.via,
+    battery: dev.battery ?? null,
+    ping: dev.kind === 'phone' ? 12 : null,
+    deviceKey: dev.deviceKey,
+    gpIndex: dev.gpIndex ?? null,
+    state: 'active',
+  };
+  seats[idx] = seat;
+  renderLobby(seat.index);
+  focusSeat(idx);
+  toast(`P${idx + 1} entrou · ${seat.deviceName}`, seat);
+  return seat;
+}
+function removeSeat(idx) {
+  const old = seats[idx];
+  if (!old) return;
+  seats[idx] = null;
+  renderLobby();
+  toast(`P${idx + 1} saiu do lobby`, old, null, { label: 'Desfazer', fn: () => { if (!seats[idx]) { seats[idx] = old; renderLobby(); focusSeat(idx); } } });
+}
+function setReconnecting(idx) {
+  const s = seats[idx];
+  if (!s || s.state !== 'active') return;
+  s.state = 'reconnecting';
+  renderLobby();
+  toast(`P${idx + 1} caiu. Guardando a vaga...`, s, 'warn');
+}
+
+function fakeUsb() {
+  const b = usbCycle[usbIdx++ % usbCycle.length];
+  return addPlayer({ kind: 'gamepad', brand: b, deviceName: BRANDS[b].label, via: 'USB', battery: null, deviceKey: 'fake' + (++fakeId) });
+}
+const KEYBOARDS = [
+  { deviceName: 'Teclado do notebook', via: 'Notebook', battery: null },
+  { deviceName: 'Logitech K380', via: 'Bluetooth', battery: 64 },
+  { deviceName: 'Redragon Kumara', via: 'USB', battery: null },
+];
+let kbIdx = 0;
+function fakeKeyboard() {
+  const kb = KEYBOARDS[kbIdx++ % KEYBOARDS.length];
+  return addPlayer({ kind: 'keyboard', brand: 'keyboard', ...kb, deviceKey: 'kb' + (++fakeId) });
+}
+function fakePhone() {
+  const model = PHONE_MODELS[Math.floor(Math.random() * PHONE_MODELS.length)];
+  return addPlayer({ kind: 'phone', brand: 'phone', deviceName: model, via: 'Wi-Fi', name: pickName(), deviceKey: 'phone' + (++fakeId) });
+}
+
+// ===================================================================================
+// Arco de cartas (lobby e biblioteca)
+// ===================================================================================
+function layoutArc(arc, order, focus) {
+  const n = order.length;
+  const W = arc.clientWidth;
+  const H = arc.clientHeight;
+  // carta encolhe conforme o lobby enche, e nunca passa da altura do palco
+  const byCount = n <= 3 ? 240 : n <= 5 ? 220 : n <= 8 ? 190 : 170;
+  // a carta em foco cresce 1,12x e a perspectiva soma ~11%: a altura dela tem de caber no palco
+  const cardW = Math.max(110, Math.min(byCount, W / (n <= 2 ? 2.6 : 3.4), (H - 28) / 1.36 / 1.25));
+  arc.style.setProperty('--card-w', cardW + 'px');
+  // tudo em pixels de tela: a perspectiva de cada carta multiplica x e tamanho por P / (P - z)
+  const meta = order.map((el, i) => {
+    const c = i - (n - 1) / 2, d = i - focus, isF = d === 0;
+    const z = isF ? 140 : -Math.abs(c) * 34 - Math.min(Math.abs(d), 3) * 12;
+    const pf = 1400 / (1400 - z), sc = isF ? 1.12 : 1;
+    return { c, d, isF, z, pf, sc, half: (cardW * sc * pf) / 2 };
+  });
+  // passo entre vizinhas: "peek" é quanto aparece da carta ao lado da carta em foco, "st" das demais
+  const k = meta.filter((mt, i) => i < n - 1 && (mt.isF || meta[i + 1].isF)).length;
+  const m = n - 1 - k;
+  let fixed = n ? meta[0].half + meta[n - 1].half : 0;
+  for (let i = 0; i < n - 1; i++) if (meta[i].isF || meta[i + 1].isF) fixed += Math.abs(meta[i].half - meta[i + 1].half);
+  const room = W - 24 - fixed;
+  const sMax = cardW * 0.92, sMin = cardW * 0.16;
+  let st = sMax, peek = sMax;
+  if (k * peek + m * st > room) {
+    peek = cardW * 0.55;
+    st = m ? Math.min(sMax, (room - k * peek) / m) : 0;
+    if (m && st < sMin) st = sMin;
+    peek = k ? Math.max(cardW * 0.18, Math.min(sMax, (room - m * st) / k)) : 0;
+  }
+  const X = [0];
+  for (let i = 1; i < n; i++) {
+    const a = meta[i - 1], b = meta[i];
+    X.push(X[i - 1] + (a.isF || b.isF ? Math.abs(a.half - b.half) + peek : st));
+  }
+  let off = n ? -((X[0] - meta[0].half) + (X[n - 1] + meta[n - 1].half)) / 2 : 0;
+  // se nem assim couber, a carta em foco nunca sai do palco
+  if (meta[focus]) {
+    const lim = W / 2 - meta[focus].half - 12;
+    off = Math.max(-lim - X[focus], Math.min(lim - X[focus], off));
+  }
+  order.forEach((el, i) => {
+    const { c, d, isF, z, pf, sc } = meta[i];
+    const rot = Math.max(-28, Math.min(28, -c * (n > 6 ? 5 : 8)));
+    const x = (X[i] + off) / pf;
+    const y = isF ? 0 : Math.abs(c) * (n > 6 ? 4 : 8);
+    el.style.transform = `perspective(1400px) translate3d(${x}px, ${y}px, ${z}px) rotateY(${isF ? 0 : rot}deg) scale(${sc})`;
+    el.style.zIndex = 100 - Math.abs(d);
+    el.style.opacity = '';
+    el.classList.toggle('is-focus', isF);
+  });
+}
+
+// ===================================================================================
+// Lobby
+// ===================================================================================
+const lobbyArc = document.getElementById('lobbyArc');
+const JOIN_URL = 'http://192.168.0.12:27027/?h=K7Q2';
+
+function lobbyItems() {
+  const items = seats.filter(Boolean).map((s) => ({ key: `p${s.index}-${s.deviceKey}`, type: 'player', seat: s }));
+  if (items.length < MAX) items.push({ key: 'add', type: 'add' });
+  return items;
+}
+
+function playerCardHTML(s) {
+  const glyph = s.kind === 'phone' ? GLYPH_PHONE : s.kind === 'keyboard' ? GLYPH_KEYBOARD : GLYPH_PAD;
+  const sub = `P${s.index + 1} · ${s.kind === 'phone' ? 'Celular' : s.kind === 'keyboard' ? 'Teclado' : s.via}`;
+  return `
+    <div class="art" style="--c:${s.color}">
+      <div class="art-glyph">${glyph}</div>
+      <div class="art-num">P${s.index + 1}</div>
+      <div class="holo"></div>
+    </div>
+    <div class="chip" style="--c:${s.color}">
+      <span class="dot">${s.index + 1}</span>
+      <div><small>${sub}</small><b class="name" title="Clique para renomear">${escapeHtml(s.name)}</b></div>
+    </div>
+    <button class="x" title="Remover do lobby" data-remove="${s.index}">${icon('close')}</button>
+    <div class="panel">
+      <div class="meta"><small>${escapeHtml(s.deviceName)}</small>${seatStatHTML(s)}</div>
+      <button class="mini" data-identify="${s.index}" title="Identificar: vibra e acende o controle"><span class="t">IDENTIFICAR</span>${icon('chevron')}</button>
+    </div>
+    <div class="reco">${icon('spinner')}<div>Reconectando...<br><small>A vaga de P${s.index + 1} está guardada</small></div></div>`;
+}
+
+function seatStatHTML(s) {
+  let stat;
+  if (s.kind === 'phone') {
+    const cls = s.ping > 35 ? 'bad' : s.ping > 22 ? 'warn' : '';
+    stat = `<b class="${cls}">${icon('wifi')}${s.ping} ms</b>`;
+  } else if (s.kind === 'keyboard' && s.via === 'Notebook') {
+    stat = `<b>${icon('keyboard')}Do notebook</b>`;
+  } else if (s.battery != null) {
+    stat = `<b class="${s.battery < 20 ? 'bad' : ''}">${icon('battery')}${s.battery}%</b>`;
+  } else {
+    stat = `<b>${icon('usb')}Com fio</b>`;
+  }
+  return stat;
+}
+
+function addCardHTML(count) {
+  return `
+    <div class="add-top"><span class="plus">${icon('plus')}</span>Adicionar jogador</div>
+    <div class="miniqr">${qrSvg(JOIN_URL)}</div>
+    <p>${count === 0 ? '<b>Escaneie com o celular</b><br>ou conecte um controle' : '<b>Escaneie</b> ou conecte<br>outro controle'}</p>`;
+}
+
+function renderLobby(newSeatIndex) {
+  const items = lobbyItems();
+  const existing = new Map([...lobbyArc.children].filter((el) => !el.classList.contains('leaving')).map((el) => [el.dataset.key, el]));
+  const order = [];
+  for (const it of items) {
+    let el = existing.get(it.key);
+    if (!el) {
+      el = document.createElement('div');
+      el.dataset.key = it.key;
+      el.tabIndex = -1;
+      el.className = 'card ' + (it.type === 'player' ? 'player entering' : 'add');
+      el.addEventListener('animationend', () => el.classList.remove('entering'), { once: true });
+      lobbyArc.appendChild(el);
+    }
+    existing.delete(it.key);
+    if (it.type === 'player') {
+      const sig = JSON.stringify([it.seat.name, it.seat.state]);
+      const editing = el.querySelector('.name[contenteditable="true"]');
+      if (el.dataset.sig !== sig && !editing) { el.innerHTML = playerCardHTML(it.seat); el.dataset.sig = sig; }
+      const stat = seatStatHTML(it.seat), statEl = el.querySelector('.meta > b');
+      if (statEl && el.dataset.stat !== stat) { statEl.outerHTML = stat; el.dataset.stat = stat; }
+      el.classList.toggle('reconnecting', it.seat.state === 'reconnecting');
+    } else {
+      const sig = 'add' + (items.length - 1);
+      if (el.dataset.sig !== sig) { el.innerHTML = addCardHTML(items.length - 1); el.dataset.sig = sig; }
+    }
+    el.dataset.pos = order.length;
+    order.push(el);
+  }
+  for (const el of existing.values()) {
+    el.classList.add('leaving');
+    setTimeout(() => el.remove(), 450);
+  }
+  lobbyFocus = Math.max(0, Math.min(lobbyFocus, order.length - 1));
+  lobbyArc._order = order;
+  layoutArc(lobbyArc, order, lobbyFocus);
+  updateLobbyChrome();
+}
+
+function updateLobbyChrome() {
+  const active = seats.filter(Boolean);
+  document.getElementById('countBig').innerHTML = `${active.length}<span>/10</span>`;
+  document.getElementById('slots').innerHTML = COLORS.map((c, i) => {
+    const s = seats[i];
+    if (!s) return '<i></i>';
+    const col = s.state === 'active' ? c : '#4b4c54';
+    return `<i style="background:${col};box-shadow:0 0 10px ${s.state === 'active' ? c : 'transparent'}"></i>`;
+  }).join('');
+  const sub = document.getElementById('lobbySub');
+  const reco = active.filter((s) => s.state === 'reconnecting').length;
+  if (active.length === 0) sub.textContent = 'Conecte um controle ou escaneie o QR com o celular. Até 10 jogadores.';
+  else if (active.length === MAX) sub.textContent = 'Lobby cheio. Bora jogar!';
+  else if (reco) sub.textContent = `${reco === 1 ? 'Um jogador caiu' : reco + ' jogadores caíram'}. As vagas ficam guardadas até voltarem.`;
+  else sub.textContent = `${active.length} ${active.length === 1 ? 'jogador pronto' : 'jogadores prontos'}. Cabem mais ${MAX - active.length}.`;
+}
+
+function focusSeat(idx) {
+  const order = lobbyArc._order || [];
+  const pos = order.findIndex((el) => el.dataset.key.startsWith(`p${idx}-`));
+  if (pos >= 0) { lobbyFocus = pos; layoutArc(lobbyArc, order, lobbyFocus); }
+}
+
+lobbyArc.addEventListener('click', (e) => {
+  const rm = e.target.closest('[data-remove]');
+  if (rm) { e.stopPropagation(); removeSeat(+rm.dataset.remove); return; }
+  const idf = e.target.closest('[data-identify]');
+  if (idf) { e.stopPropagation(); identify(+idf.dataset.identify); return; }
+  const name = e.target.closest('.name');
+  const card = e.target.closest('.card');
+  if (!card) return;
+  const pos = +card.dataset.pos;
+  if (name && pos === lobbyFocus) { startRename(name, card); return; }
+  if (pos !== lobbyFocus) { lobbyFocus = pos; layoutArc(lobbyArc, lobbyArc._order, lobbyFocus); return; }
+  if (card.classList.contains('add')) openAddPlayer();
+});
+
+function startRename(nameEl, card) {
+  const idx = +card.dataset.key.slice(1).split('-')[0];
+  nameEl.contentEditable = 'true';
+  nameEl.focus();
+  document.getSelection().selectAllChildren(nameEl);
+  const done = () => {
+    nameEl.contentEditable = 'false';
+    const v = nameEl.textContent.trim().slice(0, 20);
+    if (seats[idx]) { seats[idx].name = v || `Jogador ${idx + 1}`; card.dataset.sig = ''; renderLobby(); }
+  };
+  nameEl.addEventListener('blur', done, { once: true });
+  nameEl.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); nameEl.blur(); } ev.stopPropagation(); });
+}
+
+function identify(idx) {
+  const s = seats[idx];
+  if (!s) return;
+  const el = (lobbyArc._order || []).find((c) => c.dataset.key.startsWith(`p${idx}-`));
+  if (el) {
+    el.classList.remove('identify'); void el.offsetWidth; el.classList.add('identify');
+    clearTimeout(el._identifyT); el._identifyT = setTimeout(() => el.classList.remove('identify'), 950);
+  }
+  if (s.gpIndex != null) rumble(s.gpIndex, 400);
+  toast(s.kind === 'phone' ? `Vibrando o celular de ${s.name}` : s.kind === 'keyboard' ? `${s.name}: aperte uma tecla nesse teclado e o card pisca` : `${s.deviceName} vibrando e acendendo em ${colorName(idx)}`, s);
+}
+const COLOR_NAMES = ['azul', 'vermelho', 'verde', 'amarelo', 'roxo', 'laranja', 'ciano', 'rosa', 'lima', 'branco'];
+const colorName = (i) => COLOR_NAMES[i];
+
+// latência dos celulares oscila (no Hub real vem do PING/PONG)
+setInterval(() => {
+  let changed = false;
+  for (const s of seats) {
+    if (s && s.kind === 'phone' && s.state === 'active') {
+      s.ping = Math.max(6, Math.min(48, Math.round(s.ping + (Math.random() - 0.5) * 8 + (14 - s.ping) * 0.25)));
+      changed = true;
+    }
+  }
+  if (changed && currentView === 'lobby') renderLobby();
+}, 1500);
+
+// ===================================================================================
+// Modal: adicionar jogador
+// ===================================================================================
+const overlay = document.getElementById('overlay');
+const modal = document.getElementById('modal');
+let modalCleanup = null;
+
+function openModal(html, onOpen) {
+  if (modalCleanup) { modalCleanup(); modalCleanup = null; }
+  modal.innerHTML = html;
+  overlay.classList.add('open');
+  if (onOpen) modalCleanup = onOpen() || null;
+}
+function closeModal() {
+  if (modalCleanup) { modalCleanup(); modalCleanup = null; }
+  overlay.classList.remove('open');
+}
+overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+modal.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) closeModal(); });
+
+function head(title, sub, back) {
+  return `<div class="modal-head">
+    ${back ? `<button class="icon-btn" data-back title="Voltar">${icon('back')}</button>` : ''}
+    <div class="grow"><h2>${title}</h2>${sub ? `<p class="sub">${sub}</p>` : ''}</div>
+    <button class="icon-btn" data-close title="Fechar">${icon('close')}</button></div>`;
+}
+
+function openAddPlayer(fromBack) {
+  if (!fromBack && seats.filter(Boolean).length >= MAX) { toast('Lobby cheio (10 de 10).', null, 'warn'); return; }
+  openModal(`${head('Adicionar jogador', 'Escolha como a pessoa vai jogar.')}
+    <div class="options three">
+      <button class="option" data-opt="phone">
+        <span class="num">01</span>
+        <h3>Celular</h3>
+        <p>Vira controle em segundos. <b>Sem instalar nada</b>: é só escanear o QR.</p>
+      </button>
+      <button class="option" data-opt="bt">
+        <span class="num">02</span>
+        <h3>Controle Bluetooth</h3>
+        <p>A gente encontra <b>só controles</b> e pareia por você, sem abrir o Windows.</p>
+      </button>
+      <button class="option" data-opt="kb">
+        <span class="num">03</span>
+        <h3>Teclado</h3>
+        <p>Do notebook, USB ou Bluetooth. <b>Cada teclado é um jogador.</b></p>
+      </button>
+    </div>
+    <div class="modal-note">${icon('usb')}<span><b>Controle com fio ou já pareado?</b> Ele entra sozinho: é só ligar.</span></div>`, () => {
+    const h = (e) => {
+      const o = e.target.closest('[data-opt]');
+      if (o) ({ phone: openPhone, bt: openBluetooth, kb: openKeyboard })[o.dataset.opt]();
+    };
+    const k = (e) => { if (e.key === '1') openPhone(); if (e.key === '2') openBluetooth(); if (e.key === '3') openKeyboard(); };
+    modal.addEventListener('click', h);
+    document.addEventListener('keydown', k);
+    setTimeout(() => modal.querySelector('.option')?.focus(), 50);
+    return () => { modal.removeEventListener('click', h); document.removeEventListener('keydown', k); };
+  });
+}
+
+function backTo(fn) {
+  const h = (e) => { if (e.target.closest('[data-back]')) fn(); };
+  modal.addEventListener('click', h);
+  return () => modal.removeEventListener('click', h);
+}
+
+// Teclado: o Hub vê cada teclado separado (Raw Input) e sabe qual apertou Enter. O navegador não sabe,
+// então o protótipo trata o Enter como vindo do próximo teclado da lista.
+function openKeyboard() {
+  openModal(`${head('Jogar no teclado', '<b>Cada teclado</b> vira um jogador: o do notebook, um USB ou um Bluetooth.', true)}
+    <div class="kb-wait"><span class="kb-key">Enter</span><div><b>Aperte Enter no teclado que vai jogar</b><p>Ele entra no lobby na hora. Mais alguém? Enter no outro teclado.</p></div></div>
+    <div class="found" id="kbList"></div>`, () => {
+    const off = backTo(() => openAddPlayer(true));
+    const list = document.getElementById('kbList');
+    const seatOf = (i) => seats.find((st) => st && st.deviceKey === 'kb-' + i);
+    const render = () => {
+      const full = seats.filter(Boolean).length >= MAX;
+      list.innerHTML = KEYBOARDS.map((kb, i) => {
+        const st = seatOf(i);
+        const info = kb.via === 'Notebook' ? 'Do notebook' : kb.via === 'USB' ? 'USB · com fio' : `Bluetooth · ${kb.battery}%`;
+        const act = st ? `<span class="seat-tag" style="--c:${st.color}">P${st.index + 1}</span>`
+          : full ? '<span class="state" style="color:var(--faint)">Lobby cheio</span>'
+          : `<button class="btn-ghost sm" data-kb="${i}">Conectar</button>`;
+        return `<div class="dev${st ? ' ok' : ''}"><span class="ic kb-ic">${icon('keyboard')}</span><div class="t"><b>${escapeHtml(kb.deviceName)}</b><small>${info}</small></div><div class="act">${act}</div></div>`;
+      }).join('');
+    };
+    const join = (i) => {
+      if (i < 0 || seatOf(i)) return;
+      addPlayer({ kind: 'keyboard', brand: 'keyboard', ...KEYBOARDS[i], name: undefined, deviceKey: 'kb-' + i });
+      render();
+    };
+    const click = (e) => { const b = e.target.closest('[data-kb]'); if (b) join(+b.dataset.kb); };
+    const key = (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault(); // um Enter, um teclado: nada de também "clicar" no botão em foco
+      join(KEYBOARDS.findIndex((kb, i) => !seatOf(i)));
+    };
+    list.addEventListener('click', click);
+    document.addEventListener('keydown', key);
+    render();
+    return () => { off(); document.removeEventListener('keydown', key); };
+  });
+}
+
+function openPhone() {
+  openModal(`${head('Entrar pelo celular', '<b>Cada pessoa</b> escaneia com a câmera do próprio celular.', true)}
+    <div class="phone-wrap">
+      <div>
+        <div class="qr-big">${qrSvg(JOIN_URL)}</div>
+        <div class="url">${JOIN_URL.replace('http://', '')}</div>
+      </div>
+      <div>
+        <ul class="steps">
+          <li><span class="n">1</span><span>Use o <b>mesmo Wi-Fi</b> do PC</span></li>
+          <li><span class="n">2</span><span>Aponte a câmera para o <b>QR code</b></span></li>
+          <li><span class="n">3</span><span>Pronto: você entra no lobby <b>com a sua cor</b></span></li>
+        </ul>
+        <div class="waiting"><span class="pulse"></span>Aguardando celulares. Dá para entrar vários ao mesmo tempo.</div>
+        <div class="joined-list" id="joinedList"></div>
+        <div style="margin-top:18px;display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+          <button class="btn-ghost" id="simPhone">${icon('phone')}Simular um celular entrando</button>
+          <button class="linkish" id="altIps">Não conecta?</button>
+        </div>
+        <div id="altBox"></div>
+      </div>
+    </div>`, () => {
+    const off = backTo(() => openAddPlayer(true));
+    const full = () => seats.filter(Boolean).length >= MAX;
+    const syncFull = () => {
+      const w = modal.querySelector('.waiting');
+      if (w) w.innerHTML = full() ? '<span class="pulse warn"></span>Lobby cheio (10 de 10). Para entrar mais alguém, remova um jogador.' : '<span class="pulse"></span>Aguardando celulares. Dá para entrar vários ao mesmo tempo.';
+      document.getElementById('simPhone').disabled = full();
+    };
+    const sim = () => {
+      if (full()) return;
+      const s = fakePhone();
+      syncFull();
+      if (s) document.getElementById('joinedList').insertAdjacentHTML('beforeend', `<span class="joined"><i style="background:${s.color}">${s.index + 1}</i>${escapeHtml(s.name)} entrou como P${s.index + 1}</span>`);
+    };
+    document.getElementById('simPhone').addEventListener('click', sim);
+    syncFull();
+    document.getElementById('altIps').addEventListener('click', () => {
+      document.getElementById('altBox').innerHTML = `<div class="modal-note" style="display:block">
+        <b style="color:var(--text)">Confira estas três coisas:</b><br>
+        • O celular está no mesmo Wi-Fi? Redes de convidados costumam bloquear.<br>
+        • O PC tem mais de uma rede? Tente outro endereço:
+        <div class="alt-ips">192.168.0.12:27027 (Wi-Fi) ✓<br>172.24.160.1:27027 (Ethernet)</div>
+        <button class="btn-ghost" style="margin-top:10px">${icon('shield')}Permitir no firewall do Windows</button></div>`;
+    });
+    return off;
+  });
+}
+
+const BT_FOUND = [
+  { brand: 'playstation', delay: 1100 },
+  { brand: 'xbox', delay: 2300 },
+  { brand: 'nintendo', delay: 3600 },
+];
+
+function openBluetooth() {
+  if (!btOn) {
+    openModal(`${head('Controle Bluetooth', '', true)}
+      <div class="bt-off">
+        <div class="core">${icon('bt')}</div>
+        <h3>O Bluetooth do PC está desligado</h3>
+        <p>Ligue para procurar controles. Leva um segundo.</p>
+        <button class="btn-neon" id="btOnBtn">${icon('bt')}Ligar Bluetooth</button>
+      </div>`, () => {
+      const off = backTo(() => openAddPlayer(true));
+      document.getElementById('btOnBtn').addEventListener('click', () => { btOn = true; toast('Bluetooth ligado', null, 'ok'); openBluetooth(); });
+      return off;
+    });
+    return;
+  }
+  const tip = (b, title, text) => `<div class="tip"><div class="brand"><i class="mono" style="--c:${BRANDS[b].color}">${BRANDS[b].short}</i>${title}</div><p>${text}</p></div>`;
+  openModal(`${head('Controle Bluetooth', 'Coloque o controle em <b>modo de pareamento</b>: a luz precisa <b>piscar rápido</b>.', true)}
+    <div class="bt-tips">
+      ${tip('playstation', 'PlayStation', 'Segure <b>PS + Create</b> (ou Share) até a luz piscar rápido.')}
+      ${tip('xbox', 'Xbox', 'Segure o <b>botão de parear</b>, em cima, até o logo piscar rápido.')}
+      ${tip('nintendo', 'Switch Pro', 'Segure o <b>botão de sincronizar</b>, perto do USB, até as luzes correrem.')}
+    </div>
+    <div class="bt-scan">
+      <div class="radar" id="radar"><div class="core">${icon('bt')}</div></div>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <b id="scanTitle">Procurando controles...</b>
+          <small style="color:var(--faint)">Fones e teclados ficam de fora</small>
+        </div>
+        <div class="found" id="found"><div class="found-empty">Nada ainda. Deixe o controle piscando por perto.</div></div>
+      </div>
+    </div>`, () => {
+    const off = backTo(() => openAddPlayer(true));
+    const timers = [];
+    const found = document.getElementById('found');
+    BT_FOUND.forEach(({ brand, delay }) => timers.push(setTimeout(() => {
+      if (found.querySelector('.found-empty')) found.innerHTML = '';
+      const B = BRANDS[brand];
+      const row = document.createElement('div');
+      row.className = 'dev';
+      row.innerHTML = `<div class="ic mono" style="--c:${B.color}">${B.short}</div>
+        <div class="t"><b>${B.label}</b><small>Aparece no Windows como "${B.tech}"</small></div>
+        <div class="act"><button class="btn-neon" style="height:36px;padding:0 16px">Parear</button></div>`;
+      row.querySelector('button').addEventListener('click', () => pair(row, brand));
+      found.appendChild(row);
+    }, delay)));
+    timers.push(setTimeout(() => {
+      document.getElementById('radar')?.classList.add('idle');
+      const t = document.getElementById('scanTitle');
+      if (t) t.textContent = 'Achamos estes controles';
+    }, 5200));
+    return () => { off(); timers.forEach(clearTimeout); };
+  });
+}
+
+function pair(row, brand) {
+  const act = row.querySelector('.act');
+  act.innerHTML = `<span class="state" style="color:var(--muted)">${icon('spinner')}Pareando...</span>`;
+  setTimeout(() => {
+    const s = addPlayer({ kind: 'gamepad', brand, deviceName: BRANDS[brand].label, via: 'Bluetooth', battery: 40 + Math.floor(Math.random() * 60), deviceKey: 'bt-' + brand });
+    if (!s) { act.innerHTML = '<span class="state" style="color:var(--danger)">Lobby cheio</span>'; return; }
+    row.classList.add('ok');
+    act.innerHTML = `<span class="seat-tag" style="--c:${s.color}">P${s.index + 1}</span>`;
+    row.querySelector('.t small').innerHTML = `Pareado. A luz agora está <strong style="color:${s.color}">${colorName(s.index)}</strong>.`;
+  }, 1500);
+}
+
+// ===================================================================================
+// Biblioteca
+// ===================================================================================
+const libArc = document.getElementById('libArc');
+const games = [
+  { id: 'arena', name: 'Arena Blast', tagline: 'Briga de arena em tela única. Último de pé vence.', players: '1 a 10 jogadores', badge: 'ok', tags: ['Ação', 'Tela única'], art: ['#4c1d95', '#ec4899', '#f97316'] },
+  { id: 'kart', name: 'Kart Caos', tagline: 'Corrida de kart com splitscreen dinâmico.', players: '2 a 8 jogadores', badge: 'ok', tags: ['Corrida', 'Splitscreen'], art: ['#082f49', '#06b6d4', '#facc15'] },
+  { id: 'sa', name: 'San Andreas Party', tagline: 'Mod de splitscreen para GTA San Andreas. Exige o jogo original.', players: '1 a 8 jogadores', badge: 'comm', tags: ['Mundo aberto', 'Mod', 'Exige jogo-base'], art: ['#422006', '#f59e0b', '#ef4444'], image: 'sample-art/gta-san-andreas.png' },
+  { id: 'op4', name: 'One Piece Pirate Warriors 4', tagline: 'Pancadaria em coop com a tripulação inteira, em tela dividida.', players: '1 a 4 jogadores', badge: 'comm', tags: ['Ação', 'Mod'], art: ['#1e1b4b', '#ef4444', '#f59e0b'], image: 'sample-art/one-piece-pw4.webp' },
+  { id: 'pong', name: 'Pong Royale', tagline: 'Pong com 10 raquetes ao mesmo tempo. Caos garantido.', players: '2 a 10 jogadores', badge: 'ok', tags: ['Festa', 'Rápido'], art: ['#1e1b4b', '#a855f7', '#22c55e'] },
+];
+
+// No Hub real: %APPDATA%\PartyAnywhere\library.json (ver ARCHITECTURE.md). No protótipo: localStorage.
+const LIBRARY_KEY = 'pa.library.v1';
+const DEFAULT_GAMES = JSON.parse(JSON.stringify(games));
+function saveLibrary() {
+  const plain = (keepImage) => JSON.stringify({ version: 1, games: games.map(({ isNew, image, ...g }) => (keepImage || !image?.startsWith('data:') ? { ...g, image } : g)) });
+  try { localStorage.setItem(LIBRARY_KEY, plain(true)); } catch (err) {
+    // capa enviada grande demais para o localStorage: salva o resto, sem a imagem
+    try { localStorage.setItem(LIBRARY_KEY, plain(false)); } catch (e2) { /* sem armazenamento: vale só nesta sessão */ }
+  }
+}
+function forgetLibrary() {
+  try { localStorage.removeItem(LIBRARY_KEY); } catch (err) { /* nada salvo */ }
+  games.splice(0, games.length, ...JSON.parse(JSON.stringify(DEFAULT_GAMES)));
+  libFocus = 0;
+  libraryChanged(games[0]?.id);
+  toast('Biblioteca voltou ao padrão', null, 'ok');
+}
+(function loadLibrary() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LIBRARY_KEY) || 'null');
+    const list = saved?.version === 1 && Array.isArray(saved.games) ? saved.games.filter((g) => g && g.id && g.name && Array.isArray(g.art)) : null;
+    if (list) games.splice(0, games.length, ...list);
+  } catch (err) { /* salvo ilegível ou sem acesso: começa com o padrão */ }
+})();
+
+function coverSvg(g) {
+  const [a, b, c] = g.art;
+  const id = 'cv' + g.id.replace(/[^a-z0-9]/gi, '');
+  const words = g.name.toUpperCase().split(' ');
+  const lines = words.length > 2 ? [words.slice(0, 2).join(' '), words.slice(2).join(' ')] : words;
+  const fs = Math.min(64, 520 / Math.max(...lines.map((l) => l.length)));
+  const shape = g.universal
+    ? `<g transform="translate(150 150) scale(1.5)" opacity=".95">${GLYPH_PAD.replace(/<svg[^>]*>|<\/svg>/g, '').replace(/id="gp"/g, `id="${id}g"`).replace(/url\(#gp\)/g, `url(#${id}g)`)}</g>`
+    : `<g fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="3"><circle cx="300" cy="330" r="120"/><circle cx="300" cy="330" r="190"/><circle cx="300" cy="330" r="260"/></g>
+       <polygon points="300,190 420,400 180,400" fill="#fff" fill-opacity=".18"/><circle cx="300" cy="330" r="62" fill="${c}" fill-opacity=".85"/>`;
+  return `<svg viewBox="0 0 600 800" preserveAspectRatio="xMidYMid slice"><defs>
+    <linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset=".6" stop-color="${b}"/><stop offset="1" stop-color="${c}"/></linearGradient>
+    <radialGradient id="${id}r" cx=".5" cy=".3" r=".7"><stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>
+    <rect width="600" height="800" fill="url(#${id})"/><rect width="600" height="800" fill="url(#${id}r)"/>${shape}
+    <rect y="560" width="600" height="240" fill="#000" fill-opacity=".28"/>
+    ${lines.map((l, i) => `<text x="300" y="${650 + i * (fs + 6) - (lines.length - 1) * (fs / 2)}" text-anchor="middle" font-family="Anton, Impact, sans-serif" font-weight="400" font-size="${fs}" fill="#fff">${escapeHtml(l)}</text>`).join('')}
+    <text x="300" y="760" text-anchor="middle" font-family="Inter, Arial" font-size="24" fill="#fff" fill-opacity=".8">${escapeHtml(g.players)}</text></svg>`;
+}
+
+function renderLibrary() {
+  libArc.innerHTML = '';
+  const order = games.map((g, i) => {
+    const el = document.createElement('div');
+    el.className = 'card cover' + (g.isNew ? ' entering' : '');
+    el.dataset.pos = i;
+    el.innerHTML = `<div class="art">${coverSvg(g)}<div class="holo" style="opacity:0"></div></div>
+      <span class="badge ${g.badge}">${g.badge === 'ok' ? icon('shield') + 'Verificado' : icon('users') + 'Da comunidade'}</span>
+      ${g.isNew ? '<span class="badge new">Novo</span>' : ''}`;
+    libArc.appendChild(el);
+    return el;
+  });
+  order.push(addGameCard());
+  libArc._order = order;
+  libFocus = Math.max(0, Math.min(libFocus, order.length - 1));
+  layoutArc(libArc, order, libFocus);
+  renderGameInfo();
+}
+function addGameCard() {
+  const el = document.createElement('div');
+  el.className = 'card add';
+  el.dataset.pos = games.length;
+  el.innerHTML = `<div class="plus">${icon('link')}</div><h3>Adicionar por link</h3><p>Cole o link do repositório<br>de um jogo Party Anywhere</p>`;
+  libArc.appendChild(el);
+  return el;
+}
+function renderGameInfo() {
+  const box = document.getElementById('gameInfo');
+  const g = games[libFocus];
+  if (!g) {
+    box.innerHTML = `<div><h2>Adicionar um jogo</h2><p>Todo jogo Party Anywhere tem um arquivo party-anywhere.json e uma capa. Cole o link e a gente cuida do resto.</p></div>
+      <button class="btn-neon" id="infoAdd">${icon('link')}Adicionar por link</button>`;
+    document.getElementById('infoAdd').onclick = openAddGame;
+    return;
+  }
+  box.innerHTML = `<div><h2>${escapeHtml(g.name)}</h2><p>${escapeHtml(g.tagline)}</p>
+      <div class="tags"><span class="tagc">${escapeHtml(g.players)}</span>${g.tags.map((t) => `<span class="tagc">${escapeHtml(t)}</span>`).join('')}</div></div>
+    <button class="btn-neon" id="infoPlay">${g.universal ? 'Ativar' : 'Jogar'} ${icon('play')}</button>`;
+  document.getElementById('infoPlay').onclick = () => launch(g);
+}
+function launch(g) {
+  if (g.universal) { toast('Modo Universal ativo. Abra qualquer jogo: os celulares já são controles.', null, 'ok'); return; }
+  const n = seats.filter((s) => s && s.state === 'active').length;
+  toast(n ? `Abrindo ${g.name} com ${n} ${n === 1 ? 'jogador' : 'jogadores'}... (protótipo)` : `Abrindo ${g.name}. Os jogadores podem entrar lá dentro. (protótipo)`, null, 'ok');
+}
+libArc.addEventListener('click', (e) => {
+  const card = e.target.closest('.card');
+  if (!card) return;
+  const pos = +card.dataset.pos;
+  if (pos !== libFocus) { libFocus = pos; layoutArc(libArc, libArc._order, libFocus); renderGameInfo(); return; }
+  if (card.classList.contains('add')) openAddGame(); else launch(games[pos]);
+});
+
+// Jogar pela biblioteca 3D: a câmera entra na tela do fliperama, a tela apaga e o jogo "roda".
+// Sair faz o caminho contrário.
+async function playGame(g) {
+  if (!g || gameRunning || switching) return;
+  if (g.universal) { launch(g); return; }
+  if (!arcade) { launch(g); return; }
+  gameRunning = true;
+  shellEl.classList.add('launching');
+  await arcade.launch();
+  document.getElementById('grTitle').textContent = g.name;
+  const active = seats.filter((s) => s && s.state === 'active');
+  document.getElementById('grPlayers').innerHTML = active.map((s) => `<i style="background:${s.color}">${s.index + 1}</i>`).join('');
+  const run = document.getElementById('gameRun');
+  run.classList.add('on');
+  requestAnimationFrame(() => run.classList.add('show'));
+}
+let exiting = false;
+async function exitGame() {
+  if (!gameRunning || exiting) return;
+  exiting = true;
+  const run = document.getElementById('gameRun');
+  run.classList.remove('show');
+  await sleep(360);
+  run.classList.remove('on');
+  const back = arcade.exitGame();
+  setTimeout(() => shellEl.classList.remove('launching'), 900);
+  await back;
+  gameRunning = false;
+  exiting = false;
+}
+document.getElementById('grExit').addEventListener('click', exitGame);
+window.addEventListener('arcade:play', () => arcade && playGame(arcade.current()));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Adicionar jogo. Qualquer jogo entra: os do PC rodam no Modo Universal (celulares viram controles de Xbox);
+// os da comunidade, feitos com o SDK, vêm por link e leem os jogadores direto do Hub.
+const PC_GAMES = [
+  { id: 'pc-gta-sa', name: 'Grand Theft Auto: San Andreas', store: 'Steam', players: 'Co-op local · 2 jogadores', tagline: 'Los Santos, 1992. O segundo jogador entra pelo celular.', image: 'sample-art/gta-san-andreas.png', art: ['#422006', '#f59e0b', '#ef4444'] },
+  { id: 'pc-op4', name: 'One Piece Pirate Warriors 4', store: 'Steam', players: 'Co-op local · 2 jogadores', tagline: 'Pancadaria com a tripulação do Chapéu de Palha.', image: 'sample-art/one-piece-pw4.webp', art: ['#1e1b4b', '#ef4444', '#f59e0b'] },
+  { id: 'pc-cuphead', name: 'Cuphead', store: 'Steam', players: 'Co-op local · 2 jogadores', tagline: 'Chefões difíceis com cara de desenho dos anos 30.', art: ['#3b1d0b', '#f59e0b', '#ef4444'] },
+  { id: 'pc-overcooked', name: 'Overcooked! 2', store: 'Steam', players: 'Co-op local · até 4', tagline: 'Cozinha caótica: ou todo mundo se entende, ou ninguém come.', art: ['#0c4a6e', '#38bdf8', '#facc15'] },
+  { id: 'pc-rocket', name: 'Rocket League', store: 'Epic', players: 'Tela dividida · até 4', tagline: 'Futebol com carros a jato.', art: ['#172554', '#3b82f6', '#f97316'] },
+  { id: 'pc-stardew', name: 'Stardew Valley', store: 'GOG', players: 'Co-op local · até 4', tagline: 'Uma fazenda, quatro amigos, nenhuma pressa.', art: ['#14532d', '#22c55e', '#fde047'] },
+  { id: 'pc-hades', name: 'Hades', store: 'Xbox', players: '1 jogador', tagline: 'Fuja do submundo. Jogue com o celular como controle.', art: ['#450a0a', '#dc2626', '#f59e0b'] },
+];
+const STORE_COLORS = { Steam: '#66c0f4', Epic: '#e5e5e5', GOG: '#a855f7', Xbox: '#22c55e', PC: '#3cf060' };
+
+function libraryChanged(focusId) {
+  saveLibrary();
+  if (arcade) {
+    arcade.setGames(games, coverSvg);
+    if (focusId) arcade.focus(games.findIndex((g) => g.id === focusId));
+  } else if (currentView === 'library') renderLibrary();
+}
+function moveGame(from, to) {
+  if (to < 0 || to >= games.length || from === to) return;
+  const [g] = games.splice(from, 1);
+  games.splice(to, 0, g);
+  libraryChanged();
+}
+function removeGame(id) {
+  const i = games.findIndex((g) => g.id === id);
+  if (i < 0) return;
+  const [g] = games.splice(i, 1);
+  libraryChanged();
+  toast(`${g.name} saiu da biblioteca`, null, null, { label: 'Desfazer', fn: () => { games.splice(i, 0, g); libraryChanged(g.id); if (document.getElementById('libList')) renderLibraryList(); } });
+}
+
+function toLibraryGame(g, source) {
+  return { id: g.id, name: g.name, tagline: g.tagline, players: g.players, badge: 'pc', store: source, tags: ['Seu PC', 'Modo Universal'], art: g.art, image: g.image, isNew: true };
+}
+function addToLibrary(list) {
+  games.forEach((x) => { x.isNew = false; });
+  list.forEach((g) => games.push(g));
+  saveLibrary();
+  libFocus = games.length - 1;
+  if (arcade) { arcade.setGames(games, coverSvg); arcade.focus(games.length - 1); }
+  closeModal();
+  if (currentView === 'library') { if (!arcade) renderLibrary(); } else switchView('library');
+  toast(list.length === 1 ? `${list[0].name} está na sua biblioteca` : `${list.length} jogos adicionados à biblioteca`, null, 'ok');
+}
+
+// Biblioteca: as duas abas do mesmo lugar. "Adicionar" traz jogos; "Organizar" edita, remove e reordena
+// os jogos que aparecem no fliperama.
+function libraryTabs(active) {
+  return `<div class="seg" role="tablist">
+    <button class="seg-btn${active === 'add' ? ' on' : ''}" data-seg="add">Adicionar jogo</button>
+    <button class="seg-btn${active === 'manage' ? ' on' : ''}" data-seg="manage">Organizar <span class="seg-count">${games.length}</span></button>
+  </div>`;
+}
+function wireLibraryTabs() {
+  const h = (e) => {
+    const b = e.target.closest('[data-seg]');
+    if (!b) return;
+    if (b.dataset.seg === 'add') openAddGame(); else openLibraryManager();
+  };
+  modal.addEventListener('click', h);
+  return () => modal.removeEventListener('click', h);
+}
+
+function openAddGame() {
+  openModal(`${head('Biblioteca', 'Os jogos que aparecem no fliperama.')}
+    ${libraryTabs('add')}
+    <div class="options three">
+      <button class="option" data-opt="scan">
+        <span class="num">01</span>
+        <h3>Jogos deste PC</h3>
+        <p>Encontramos o que está instalado na <b>Steam, Epic, GOG e Xbox</b>, já com capa.</p>
+      </button>
+      <button class="option" data-opt="file">
+        <span class="num">02</span>
+        <h3>Escolher arquivo</h3>
+        <p>Não apareceu? Aponte o <b>executável</b>, o <b>atalho</b> ou a <b>pasta</b> do jogo.</p>
+      </button>
+      <button class="option" data-opt="link">
+        <span class="num">03</span>
+        <h3>Co-op da comunidade</h3>
+        <p>Jogos feitos com o Party Anywhere: <b>cole o link</b> do repositório.</p>
+      </button>
+    </div>
+    <div class="modal-note">${icon('phone')}<span><b>Jogos do PC</b> rodam no Modo Universal: cada celular vira um controle de Xbox. <b>Jogos da comunidade</b> leem os jogadores direto do Hub.</span></div>`, () => {
+    const offTabs = wireLibraryTabs();
+    const h = (e) => {
+      const o = e.target.closest('[data-opt]');
+      if (!o) return;
+      if (o.dataset.opt === 'scan') openScanGames();
+      if (o.dataset.opt === 'file') openPickGame();
+      if (o.dataset.opt === 'link') openAddLink();
+    };
+    modal.addEventListener('click', h);
+    setTimeout(() => modal.querySelector('.option')?.focus(), 50);
+    return () => { modal.removeEventListener('click', h); offTabs(); };
+  });
+}
+
+function sourceLabel(g) {
+  if (g.badge === 'pc') return g.store ? `${g.store} · Modo Universal` : 'Modo Universal';
+  return g.badge === 'ok' ? 'Comunidade · verificado' : 'Comunidade';
+}
+function thumbHTML(g) {
+  return g.image ? `<img src="${g.image}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{innerHTML:coverSvg(games.find(x=>x.id==='${g.id}')||PC_GAMES[0])}).firstChild)">` : coverSvg(g);
+}
+function renderLibraryList() {
+  const list = document.getElementById('libList');
+  if (!list) return;
+  list.innerHTML = games.map((g, i) => `
+    <li class="lib-row" draggable="true" data-id="${g.id}" tabindex="0" aria-label="${escapeHtml(g.name)}, posição ${i + 1}">
+      <span class="grip" aria-hidden="true"></span>
+      <span class="pos">${String(i + 1).padStart(2, '0')}</span>
+      <span class="thumb">${thumbHTML(g)}</span>
+      <span class="info"><b>${escapeHtml(g.name)}</b><small>${escapeHtml(g.players)} · ${sourceLabel(g)}</small></span>
+      <button class="btn-ghost sm" data-edit="${g.id}">Editar</button>
+      <button class="icon-btn sm" data-remove-game="${g.id}" title="Remover da biblioteca" aria-label="Remover ${escapeHtml(g.name)}">${icon('close')}</button>
+    </li>`).join('');
+  const count = modal.querySelector('.seg-count');
+  if (count) count.textContent = games.length;
+}
+function openLibraryManager() {
+  openModal(`${head('Biblioteca', 'Os jogos que aparecem no fliperama.')}
+    ${libraryTabs('manage')}
+    <ol class="lib-list" id="libList"></ol>
+    <div class="modal-note">${icon('gamebox')}<span><b>Arraste</b> para mudar a ordem no fliperama (ou <b>Alt + ↑ ↓</b> no teclado). A primeira posição é a que aparece primeiro.</span></div>`, () => {
+    const offTabs = wireLibraryTabs();
+    renderLibraryList();
+    const list = document.getElementById('libList');
+    let dragId = null;
+    const click = (e) => {
+      const ed = e.target.closest('[data-edit]');
+      if (ed) { openEditGame(ed.dataset.edit); return; }
+      const rm = e.target.closest('[data-remove-game]');
+      if (rm) { removeGame(rm.dataset.removeGame); renderLibraryList(); }
+    };
+    const key = (e) => {
+      const row = e.target.closest('.lib-row');
+      if (!row || !e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+      e.preventDefault();
+      const i = games.findIndex((g) => g.id === row.dataset.id);
+      moveGame(i, i + (e.key === 'ArrowUp' ? -1 : 1));
+      renderLibraryList();
+      list.querySelector(`[data-id="${row.dataset.id}"]`)?.focus();
+    };
+    list.addEventListener('click', click);
+    list.addEventListener('keydown', key);
+    list.addEventListener('dragstart', (e) => { const r = e.target.closest('.lib-row'); if (r) { dragId = r.dataset.id; r.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; } });
+    list.addEventListener('dragend', () => { dragId = null; list.querySelectorAll('.lib-row').forEach((r) => r.classList.remove('dragging', 'drop-above', 'drop-below')); });
+    list.addEventListener('dragover', (e) => {
+      const r = e.target.closest('.lib-row');
+      if (!r || !dragId) return;
+      e.preventDefault();
+      const below = e.offsetY > r.offsetHeight / 2;
+      list.querySelectorAll('.lib-row').forEach((x) => x.classList.remove('drop-above', 'drop-below'));
+      r.classList.add(below ? 'drop-below' : 'drop-above');
+    });
+    list.addEventListener('drop', (e) => {
+      const r = e.target.closest('.lib-row');
+      if (!r || !dragId || r.dataset.id === dragId) return;
+      e.preventDefault();
+      const from = games.findIndex((g) => g.id === dragId);
+      let to = games.findIndex((g) => g.id === r.dataset.id);
+      if (r.classList.contains('drop-below')) to += 1;
+      if (from < to) to -= 1;
+      moveGame(from, to);
+      renderLibraryList();
+    });
+    return offTabs;
+  });
+}
+
+function openEditGame(id) {
+  const g = games.find((x) => x.id === id);
+  if (!g) return;
+  let image = g.image || null;
+  openModal(`${head('Editar jogo', 'O que você mudar aqui aparece na tela do fliperama.', true)}
+    <form class="edit-form" id="editForm">
+      <div class="edit-art">
+        <div class="pc" id="editThumb">${thumbHTML(g)}</div>
+        <label class="btn-ghost sm">${icon('download')}Trocar imagem<input type="file" id="editImage" accept="image/*" hidden></label>
+        <button type="button" class="linkish" id="editReset">Usar capa gerada</button>
+      </div>
+      <div class="edit-fields">
+        <label>Nome<input name="name" maxlength="40" value="${escapeHtml(g.name)}" required></label>
+        <label>Jogadores<input name="players" maxlength="30" value="${escapeHtml(g.players)}" placeholder="Ex.: 1 a 4 jogadores"></label>
+        <label>Descrição curta<textarea name="tagline" maxlength="110" rows="3">${escapeHtml(g.tagline)}</textarea></label>
+        <div class="edit-actions"><button class="btn-neon" type="submit">Salvar</button><button type="button" class="btn-ghost" data-back>Cancelar</button><button type="button" class="danger-link" id="editRemove">Remover da biblioteca</button></div>
+      </div>
+    </form>`, () => {
+    const off = backTo(openLibraryManager);
+    const thumb = document.getElementById('editThumb');
+    document.getElementById('editImage').addEventListener('change', (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = () => { image = r.result; thumb.innerHTML = `<img src="${image}" alt="">`; };
+      r.readAsDataURL(f);
+    });
+    document.getElementById('editReset').addEventListener('click', () => { image = null; thumb.innerHTML = coverSvg({ ...g, image: null }); });
+    document.getElementById('editRemove').addEventListener('click', () => { removeGame(g.id); openLibraryManager(); });
+    document.getElementById('editForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      g.name = f.get('name').trim() || g.name;
+      g.players = f.get('players').trim() || g.players;
+      g.tagline = f.get('tagline').trim() || g.tagline;
+      g.image = image || undefined;
+      if (arcade) arcade.invalidate(g.id);
+      libraryChanged(g.id);
+      toast('Jogo atualizado', null, 'ok');
+      openLibraryManager();
+    });
+    return off;
+  });
+}
+
+// Jogos instalados (no app: bibliotecas da Steam, manifestos da Epic, registro da GOG, pasta do Xbox)
+function openScanGames() {
+  openModal(`${head('Jogos deste PC', 'Marque os jogos que você quer na biblioteca.', true)}
+    <div id="scanBody"><div class="scan-wait">${icon('spinner')}Procurando jogos instalados...</div></div>`, () => {
+    const off = backTo(openAddGame);
+    const picked = new Set();
+    const timer = setTimeout(() => {
+      const inLib = new Set(games.map((g) => g.id));
+      const body = document.getElementById('scanBody');
+      if (!body) return;
+      body.innerHTML = `<div class="scan-head"><b>${PC_GAMES.length} jogos encontrados</b><input class="scan-search" id="scanSearch" placeholder="Buscar" autocomplete="off"></div>
+        <div class="pc-grid">${PC_GAMES.map((g) => `
+          <button class="pc-card${inLib.has(g.id) ? ' added' : ''}" data-id="${g.id}" ${inLib.has(g.id) ? 'disabled' : ''}>
+            <div class="cv">${g.image ? `<img src="${g.image}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{innerHTML:coverSvg(PC_GAMES.find(x=>x.id==='${g.id}'))}).firstChild)">` : coverSvg(g)}</div>
+            <span class="tick">${icon('check')}</span>
+            <div class="meta"><b>${escapeHtml(g.name)}</b><small><i style="background:${STORE_COLORS[g.store]}"></i>${g.store} · ${escapeHtml(g.players)}</small></div>
+            ${inLib.has(g.id) ? '<span class="in-lib">Na biblioteca</span>' : ''}
+          </button>`).join('')}</div>
+        <div class="scan-foot"><span id="scanCount">Nenhum jogo marcado</span><button class="btn-neon" id="scanAdd" disabled>Adicionar</button></div>`;
+      const update = () => {
+        document.getElementById('scanCount').textContent = picked.size ? `${picked.size} ${picked.size === 1 ? 'jogo marcado' : 'jogos marcados'}` : 'Nenhum jogo marcado';
+        const btn = document.getElementById('scanAdd');
+        btn.disabled = !picked.size;
+        btn.textContent = picked.size > 1 ? `Adicionar ${picked.size} jogos` : 'Adicionar';
+      };
+      body.querySelector('.pc-grid').addEventListener('click', (e) => {
+        const card = e.target.closest('.pc-card');
+        if (!card || card.disabled) return;
+        const id = card.dataset.id;
+        if (picked.has(id)) picked.delete(id); else picked.add(id);
+        card.classList.toggle('on', picked.has(id));
+        update();
+      });
+      document.getElementById('scanSearch').addEventListener('input', (e) => {
+        const q = e.target.value.trim().toLowerCase();
+        body.querySelectorAll('.pc-card').forEach((c) => { c.hidden = q && !PC_GAMES.find((g) => g.id === c.dataset.id).name.toLowerCase().includes(q); });
+      });
+      document.getElementById('scanAdd').addEventListener('click', () => {
+        addToLibrary(PC_GAMES.filter((g) => picked.has(g.id)).map((g) => toLibraryGame(g, g.store)));
+      });
+    }, 900);
+    return () => { off(); clearTimeout(timer); };
+  });
+}
+
+// Um jogo que não foi encontrado: o executável, o atalho ou a pasta (no app, a janela nativa do sistema)
+function openPickGame() {
+  openModal(`${head('Escolher pasta ou atalho', 'Aponte o executável (.exe), o atalho ou a pasta do jogo.', true)}
+    <label class="drop" id="pickDrop">
+      ${icon('download')}
+      <b>Clique para escolher</b>
+      <span>ou arraste o arquivo para cá</span>
+      <input type="file" id="pickInput" accept=".exe,.lnk,.url" hidden>
+    </label>
+    <div id="pickResult"></div>`, () => {
+    const off = backTo(openAddGame);
+    const show = (file) => {
+      if (!file) return;
+      const base = file.name.replace(/\.(exe|lnk|url)$/i, '');
+      const name = base.replace(/[_\-.]+/g, ' ').replace(/([a-z])([A-Z0-9])/g, '$1 $2').replace(/\s+/g, ' ').trim()
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+      const g = { id: 'pc-' + base.toLowerCase().replace(/[^a-z0-9]+/g, '-'), name, tagline: 'Jogo do seu PC, com os celulares como controles.', players: 'Modo Universal', art: [['#312e81', '#16a34a', '#c4f152'], ['#064e3b', '#10b981', '#a3e635'], ['#7c2d12', '#f97316', '#fde047']][name.length % 3] };
+      document.getElementById('pickResult').innerHTML = `<div class="preview">
+        <div class="pc">${coverSvg(g)}</div>
+        <div>
+          <h3>${escapeHtml(name)}</h3>
+          <div class="by">${escapeHtml(file.name)}</div>
+          <div class="facts">
+            <div>${icon('check')}Nome e ícone lidos do próprio executável</div>
+            <div>${icon('check')}Capa: procurada pelo nome; se não houver, a gente gera uma</div>
+            <div>${icon('phone')}Roda no Modo Universal: cada celular vira um controle de Xbox</div>
+          </div>
+          <div style="display:flex;gap:10px"><button class="btn-neon" id="pickAdd">${icon('plus')}Adicionar à biblioteca</button><button class="btn-ghost" data-close>Cancelar</button></div>
+        </div></div>`;
+      document.getElementById('pickAdd').addEventListener('click', () => addToLibrary([toLibraryGame(g, 'PC')]));
+    };
+    const input = document.getElementById('pickInput');
+    input.addEventListener('change', () => show(input.files[0]));
+    const drop = document.getElementById('pickDrop');
+    drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+    drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('over'); show(e.dataTransfer.files[0]); });
+    return off;
+  });
+}
+
+function openAddLink() {
+  openModal(`${head('Jogo co-op por link', 'Cole o link do repositório no GitHub.', true)}
+    <form class="field" id="linkForm">
+      <input id="linkInput" placeholder="https://github.com/autor/meu-jogo" autocomplete="off" spellcheck="false">
+      <button class="btn-neon" style="height:50px">Ler</button>
+    </form>
+    <div style="margin-top:10px;font-size:12.5px;color:var(--faint)">Dica: experimente <span class="linkish" data-fill="https://github.com/sofagames/kart-caos">github.com/sofagames/kart-caos</span> ou um link com "sem-manifesto" para ver o erro.</div>
+    <div id="linkResult"></div>`, () => {
+    const form = document.getElementById('linkForm');
+    const input = document.getElementById('linkInput');
+    setTimeout(() => input.focus(), 50);
+    const fill = (e) => { const f = e.target.closest('[data-fill]'); if (f) { input.value = f.dataset.fill; form.requestSubmit(); } };
+    modal.addEventListener('click', fill);
+    form.addEventListener('submit', (e) => { e.preventDefault(); readManifest(input.value.trim()); });
+    const off = backTo(openAddGame);
+    return () => { modal.removeEventListener('click', fill); off(); };
+  });
+}
+
+function readManifest(url) {
+  const out = document.getElementById('linkResult');
+  const m = url.match(/github\.com\/([\w.-]+)\/([\w.-]+)/i);
+  if (!m) {
+    out.innerHTML = `<div class="errbox">${icon('warn')}<div>Isso não parece um link de repositório do GitHub. O formato é <b>github.com/autor/jogo</b>.</div></div>`;
+    return;
+  }
+  out.innerHTML = `<div class="progress-lbl" style="margin-top:18px;display:flex;align-items:center;gap:8px">${icon('spinner').replace('<svg', '<svg width="16" height="16"')}Lendo party-anywhere.json...</div>`;
+  setTimeout(() => {
+    const [, owner, repoRaw] = m;
+    const repo = repoRaw.replace(/\.git$/, '');
+    if (/sem-manifesto|no-manifest/i.test(repo)) {
+      out.innerHTML = `<div class="errbox">${icon('warn')}<div>Este repositório não tem o arquivo <b>party-anywhere.json</b>, então não dá para instalar.<br>
+        É seu? <span class="linkish">Veja o guia do criador</span>: são 2 minutos com o template.</div></div>`;
+      return;
+    }
+    const name = repo.replace(/[-_]+/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
+    const needsBase = /sa|andreas|gta/i.test(repo);
+    const g = {
+      id: (owner + '-' + repo).toLowerCase(), name, tagline: 'Jogo da comunidade instalado por link.',
+      players: needsBase ? '1 a 8 jogadores' : '2 a 8 jogadores', badge: 'comm', tags: ['Da comunidade'], isNew: true,
+      art: [['#312e81', '#db2777', '#f59e0b'], ['#064e3b', '#10b981', '#a3e635'], ['#7c2d12', '#f97316', '#fde047']][repo.length % 3],
+    };
+    out.innerHTML = `<div class="preview">
+      <div class="pc">${coverSvg(g)}</div>
+      <div>
+        <h3>${escapeHtml(name)}</h3>
+        <div class="by">por ${escapeHtml(owner)} · versão 0.3.0</div>
+        <div class="facts">
+          <div>${icon('users')}${g.players}</div>
+          <div>${icon('download')}Download de 42 MB</div>
+          ${needsBase ? `<div>${icon('check')}GTA San Andreas encontrado na sua Steam (versão compatível)</div>` : `<div>${icon('check')}Não precisa de outro jogo</div>`}
+        </div>
+        <div class="warnbox">${icon('warn')}<div>Este jogo não foi verificado pela equipe Party Anywhere. Instale só se confiar no autor.</div></div>
+        <div style="margin-top:16px;display:flex;gap:10px"><button class="btn-neon" id="installBtn">${icon('download')}Instalar</button><button class="btn-ghost" data-close>Cancelar</button></div>
+        <div id="installProg"></div>
+      </div></div>`;
+    document.getElementById('installBtn').addEventListener('click', () => install(g));
+  }, 1100);
+}
+
+function install(g) {
+  const box = document.getElementById('installProg');
+  document.getElementById('installBtn').disabled = true;
+  box.innerHTML = '<div class="progress"><i id="pbar"></i></div><div class="progress-lbl" id="plbl">Baixando...</div>';
+  let p = 0;
+  const t = setInterval(() => {
+    p += 4 + Math.random() * 7;
+    const bar = document.getElementById('pbar');
+    const lbl = document.getElementById('plbl');
+    if (!bar) { clearInterval(t); return; }
+    bar.style.width = Math.min(100, p) + '%';
+    lbl.textContent = p < 70 ? `Baixando... ${Math.floor(p)}%` : p < 92 ? 'Conferindo a integridade do pacote...' : 'Instalando...';
+    if (p >= 100) {
+      clearInterval(t);
+      games.forEach((x) => { x.isNew = false; });
+      games.push(g);
+      saveLibrary();
+      libFocus = games.length - 1;
+      if (arcade) { arcade.setGames(games, coverSvg); arcade.focus(games.length - 1); }
+      closeModal();
+      if (currentView === 'library') { if (!arcade) renderLibrary(); } else switchView('library');
+      toast(`${g.name} está na sua biblioteca`, null, 'ok');
+    }
+  }, 120);
+}
+
+// ===================================================================================
+// Atualização do Hub
+// ===================================================================================
+const updatePill = document.getElementById('updatePill');
+let updateState = 'checking';
+function renderUpdate(pct) {
+  updatePill.classList.toggle('ready', updateState === 'ready');
+  const states = {
+    checking: [icon('spinner'), 'Procurando atualização...'],
+    uptodate: [icon('check'), `Party Anywhere v${hubVersion} · atualizado`],
+    downloading: [`${icon('download')}`, `Baixando a v0.2.0 (${pct}%)`],
+    ready: [icon('refresh'), 'Atualização pronta: instala quando você fechar o Hub'],
+  };
+  const [ic, label] = states[updateState];
+  updatePill.classList.toggle('downloading', updateState === 'downloading');
+  if (updateState === 'downloading') {
+    // o anel é criado uma vez e só avança: recriar a cada tique mataria a transição
+    if (!updatePill.querySelector('.ring')) {
+      updatePill.innerHTML = `${ic}<svg class="ring" viewBox="0 0 36 36"><circle class="track" cx="18" cy="18" r="17"/><circle class="bar" cx="18" cy="18" r="17" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/></svg>`;
+      updatePill.querySelector('.bar').getBoundingClientRect();
+    }
+    updatePill.querySelector('.bar').style.strokeDashoffset = 100 - (pct || 0);
+  } else updatePill.innerHTML = ic;
+  updatePill.title = label;
+  updatePill.setAttribute('aria-label', label);
+}
+function simulateUpdate() {
+  updateState = 'downloading';
+  let pct = 0;
+  const t = setInterval(() => {
+    pct = Math.min(100, pct + 9);
+    renderUpdate(pct);
+    if (pct >= 100) { clearInterval(t); updateState = 'ready'; renderUpdate(); }
+  }, 180);
+}
+updatePill.addEventListener('click', () => {
+  if (updateState === 'ready') {
+    toast('A v0.2.0 instala quando você fechar o Hub.', null, 'ok', { label: 'Reiniciar agora', fn: () => {
+      hubVersion = '0.2.0'; updateState = 'uptodate'; renderUpdate();
+      toast('Hub atualizado para a v0.2.0. Novidade: pareamento Bluetooth mais rápido.', null, 'ok');
+    } });
+  } else if (updateState === 'uptodate') {
+    updateState = 'checking'; renderUpdate();
+    setTimeout(() => { updateState = 'uptodate'; renderUpdate(); toast('Você já está na versão mais nova.', null, 'ok'); }, 1200);
+  }
+});
+renderUpdate();
+setTimeout(() => { updateState = 'uptodate'; renderUpdate(); }, 1600);
+
+// ===================================================================================
+// Navegação, teclado e controles reais (Gamepad API)
+// ===================================================================================
+// Troca de aba como movimento de câmera: as abas ficam lado a lado (Lobby | Biblioteca | Controles | Ajustes).
+// Indo para a direita, a vista atual sai pela esquerda e a nova entra pela direita (e vice-versa).
+// Na biblioteca, quem se move é a câmera 3D do fliperama, no mesmo sentido e no mesmo tempo.
+const ORDER = ['lobby', 'library', 'controls', 'settings'];
+const OUT_MS = 320, IN_MS = 520;
+const shellEl = document.querySelector('.shell');
+let switching = false;
+
+async function ensureArcade() {
+  if (arcade || arcadeFailed) return arcade;
+  const ready = window.__arcadeReady.then(() => true, () => false);
+  // 5 s para a biblioteca 3D baixar; se ela já baixou e só está compilando, espera terminar
+  const ok = await Promise.race([ready, sleep(5000).then(() => (window.__arcadeStarted ? ready : false))]);
+  if (!ok) {
+    arcadeFailed = true;
+    document.getElementById('libFallback').hidden = false;
+    document.getElementById('libFallback').style.display = 'contents';
+  }
+  return arcade;
+}
+
+function animateView(el, cls, dx, ms, delay = 0) {
+  el.style.setProperty('--dx', dx);
+  el.style.setProperty('--vt', ms + 'ms');
+  el.style.setProperty('--vd', delay + 'ms');
+  el.classList.add(cls);
+}
+
+// Troca de aba. Indo para a biblioteca: a vista atual some rápido e só então o fliperama aparece, com a
+// câmera chegando. Saindo: o fliperama recua e some, e a vista nova entra depois. Sem camadas por cima.
+async function switchView(v) {
+  if (v === currentView || switching || gameRunning) return;
+  switching = true;
+  const from = currentView;
+  const dir = Math.sign(ORDER.indexOf(v) - ORDER.indexOf(from)) || 1;
+  if (v === 'library' || from === 'library') await ensureArcade();
+  currentView = v;
+  document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.view === v));
+  document.querySelector('#addBtn .lbl-long').textContent = v === 'library' ? 'Adicionar jogo' : 'Adicionar jogador';
+  const fromEl = document.getElementById('view-' + from);
+  const toEl = document.getElementById('view-' + v);
+  toEl.classList.add('active');
+  if (v === 'lobby') renderLobby();
+  if (v === 'library' && !arcade) renderLibrary();
+  let done;
+  if (arcade && v === 'library') {
+    shellEl.classList.add('in-library');
+    animateView(fromEl, 'view-out', -dir, OUT_MS);
+    done = Promise.all([arcade.enter(-dir), sleep(OUT_MS)]);
+  } else if (arcade && from === 'library') {
+    shellEl.classList.remove('in-library'); // os botões do topo mudam de cor junto com a saída, não depois
+    animateView(fromEl, 'view-out', -dir, OUT_MS); // sai do fluxo já: a vista nova não divide a altura com ela
+    animateView(toEl, 'view-in', dir, IN_MS, 300);
+    done = Promise.all([arcade.leave(dir), sleep(300 + IN_MS)]);
+  } else {
+    animateView(fromEl, 'view-out', -dir, OUT_MS);
+    animateView(toEl, 'view-in', dir, IN_MS, 160);
+    done = sleep(160 + IN_MS);
+  }
+  await done;
+  fromEl.classList.remove('active', 'view-out');
+  toEl.classList.remove('view-in');
+  switching = false;
+}
+document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => switchView(t.dataset.view)));
+// o botão verde do topo adiciona jogador no lobby e jogo na biblioteca
+const addContext = () => (currentView === 'library' ? openAddGame() : openAddPlayer());
+document.getElementById('addBtn').addEventListener('click', addContext);
+document.getElementById('playBtn').addEventListener('click', () => switchView('library'));
+
+function moveFocus(dir) {
+  if (overlay.classList.contains('open')) return;
+  if (currentView === 'lobby') {
+    const n = (lobbyArc._order || []).length;
+    lobbyFocus = Math.max(0, Math.min(n - 1, lobbyFocus + dir));
+    layoutArc(lobbyArc, lobbyArc._order, lobbyFocus);
+  } else if (currentView === 'library') {
+    if (arcade) { if (!switching && !gameRunning) arcade.step(dir); return; }
+    const n = (libArc._order || []).length;
+    libFocus = Math.max(0, Math.min(n - 1, libFocus + dir));
+    layoutArc(libArc, libArc._order, libFocus);
+    renderGameInfo();
+  }
+}
+function activateFocus() {
+  if (overlay.classList.contains('open')) { modal.querySelector('.option:focus, button:focus')?.click(); return; }
+  if (currentView === 'lobby') {
+    const el = lobbyArc._order?.[lobbyFocus];
+    if (!el) return;
+    if (el.classList.contains('add')) openAddPlayer();
+    else identify(+el.dataset.key.slice(1).split('-')[0]);
+  } else if (currentView === 'library') {
+    if (arcade) { if (!switching) playGame(arcade.current()); return; }
+    if (libFocus >= games.length) openAddGame(); else launch(games[libFocus]);
+  }
+}
+document.addEventListener('keydown', (e) => {
+  if (e.target.matches('input, [contenteditable="true"]')) return;
+  if (gameRunning) { if (e.key === 'Escape' || e.key === 'Backspace') exitGame(); return; }
+  if (e.key === 'Escape') closeModal();
+  if (overlay.classList.contains('open')) return;
+  if (e.key === 'ArrowLeft') moveFocus(-1);
+  if (e.key === 'ArrowRight') moveFocus(1);
+  if (e.key === 'Enter') activateFocus();
+  if (e.key.toLowerCase() === 'y' || e.key === '+') addContext();
+});
+
+function brandFromId(id) {
+  if (/054c|dualsense|0ce6|0df2/i.test(id)) return 'playstation';
+  if (/wireless controller|playstation|dualshock|05c4|09cc/i.test(id)) return 'ps4';
+  if (/057e|pro controller|joy-con|nintendo/i.test(id)) return 'nintendo';
+  if (/xbox|xinput|045e/i.test(id)) return 'xbox';
+  return 'generic';
+}
+function rumble(gpIndex, ms) {
+  const gp = navigator.getGamepads?.()[gpIndex];
+  gp?.vibrationActuator?.playEffect?.('dual-rumble', { duration: ms, strongMagnitude: 0.7, weakMagnitude: 0.7 }).catch(() => {});
+}
+window.addEventListener('gamepadconnected', (e) => {
+  const gp = e.gamepad;
+  const brand = brandFromId(gp.id);
+  const label = brand === 'generic' ? 'Controle' : BRANDS[brand].label;
+  const s = addPlayer({ kind: 'gamepad', brand, deviceName: label, via: 'Conectado', battery: null, deviceKey: 'gp' + gp.index + gp.id, gpIndex: gp.index });
+  if (s) rumble(gp.index, 300);
+});
+window.addEventListener('gamepaddisconnected', (e) => {
+  const s = seats.find((x) => x && x.gpIndex === e.gamepad.index && x.state === 'active');
+  if (s) setReconnecting(s.index);
+});
+
+// Qualquer controle no lobby navega o Hub (UX: feito para a TV).
+const padState = {};
+function pollPads(t) {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  for (const gp of pads) {
+    if (!gp) continue;
+    const st = padState[gp.index] || (padState[gp.index] = { b: [], dir: 0, next: 0 });
+    const down = (i) => gp.buttons[i] && gp.buttons[i].pressed;
+    const hit = (i) => down(i) && !st.b[i];
+    let dir = 0;
+    if (down(14) || gp.axes[0] < -0.6) dir = -1;
+    if (down(15) || gp.axes[0] > 0.6) dir = 1;
+    const owner = seats.find((s) => s && s.gpIndex === gp.index);
+    if (dir && (dir !== st.dir || t >= st.next)) {
+      if (owner) setNavColor(owner.color);
+      moveFocus(dir);
+      st.next = t + (dir !== st.dir ? 380 : 170);
+    }
+    st.dir = dir;
+    if (hit(0)) { if (owner) setNavColor(owner.color); activateFocus(); }
+    if (gameRunning) {
+      if (hit(1) || hit(9)) exitGame();
+    } else {
+      if (hit(1)) closeModal();
+      if (hit(3)) addContext();
+      if (hit(9)) switchView(currentView === 'lobby' ? 'library' : 'lobby');
+    }
+    st.b = gp.buttons.map((b) => b.pressed);
+  }
+  requestAnimationFrame(pollPads);
+}
+requestAnimationFrame(pollPads);
+function setNavColor(c) {
+  if (navColor === c) return;
+  navColor = c;
+  document.documentElement.style.setProperty('--focus-c', c);
+}
+
+// ===================================================================================
+// Toasts, QR e utilidades
+// ===================================================================================
+function toast(text, seat, kind, action) {
+  const box = document.getElementById('toasts');
+  for (const t of box.children) if (!action && t.dataset.text === text) t.remove();
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.dataset.text = text;
+  let badge;
+  if (seat) badge = `<i style="background:${seat.color}">${seat.index + 1}</i>`;
+  else if (kind === 'warn') badge = `<i style="background:#facc15">${icon('warn')}</i>`;
+  else badge = `<i style="background:var(--neon)">${icon('check')}</i>`;
+  el.innerHTML = `${badge}<span>${escapeHtml(text)}</span>`;
+  if (action) {
+    const b = document.createElement('button');
+    b.textContent = action.label;
+    b.onclick = () => { action.fn(); el.remove(); };
+    el.appendChild(b);
+  }
+  box.appendChild(el);
+  while (box.children.length > 3) box.firstChild.remove();
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 300); }, action ? 5200 : 3000);
+}
+
+function qrSvg(text) {
+  try {
+    const qr = qrcode(0, 'M');
+    qr.addData(text);
+    qr.make();
+    const n = qr.getModuleCount();
+    let cells = '';
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) cells += `<rect x="${c}" y="${r}" width="1.04" height="1.04" rx=".22"/>`;
+    return `<svg viewBox="0 0 ${n} ${n}" shape-rendering="geometricPrecision"><g fill="#0b0c0f">${cells}</g></svg>`;
+  } catch (err) {
+    // sem a biblioteca (offline): um padrão decorativo no lugar
+    let cells = '';
+    for (let i = 0; i < 625; i++) if ((i * 7919) % 11 < 5) cells += `<rect x="${i % 25}" y="${Math.floor(i / 25)}" width="1" height="1"/>`;
+    return `<svg viewBox="0 0 25 25"><g fill="#0b0c0f">${cells}</g></svg>`;
+  }
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+// ===================================================================================
+// Painel demo
+// ===================================================================================
+document.getElementById('demoToggle').addEventListener('click', () => document.getElementById('demo').classList.toggle('open'));
+document.querySelector('.demo-body').addEventListener('click', (e) => {
+  const a = e.target.closest('[data-demo]')?.dataset.demo;
+  if (!a) return;
+  if (currentView !== 'lobby' && ['usb', 'phone', 'keyboard', 'fill', 'drop', 'back', 'clear'].includes(a)) switchView('lobby');
+  if (a === 'usb') fakeUsb();
+  if (a === 'phone') fakePhone();
+  if (a === 'keyboard') fakeKeyboard();
+  if (a === 'forget') forgetLibrary();
+  if (a === 'fill') { let guard = 0; while (seats.some((s) => s === null) && guard++ < 10) (guard % 2 ? fakePhone : fakeUsb)(); }
+  if (a === 'drop') { const act = seats.filter((s) => s && s.state === 'active'); if (act.length) setReconnecting(act[Math.floor(Math.random() * act.length)].index); else toast('Ninguém para derrubar.', null, 'warn'); }
+  if (a === 'back') { const r = seats.find((s) => s && s.state === 'reconnecting'); if (r) addPlayer({ deviceKey: r.deviceKey }); else toast('Ninguém caiu.', null, 'warn'); }
+  if (a === 'clear') { seats.fill(null); lobbyFocus = 0; renderLobby(); }
+  if (a === 'update') simulateUpdate();
+  if (a === 'btoff') { btOn = !btOn; toast(btOn ? 'Bluetooth ligado (simulado)' : 'Bluetooth desligado (simulado). Abra "Adicionar jogador → Controle Bluetooth".', null, btOn ? 'ok' : 'warn'); }
+});
+
+window.addEventListener('resize', () => {
+  if (lobbyArc._order) layoutArc(lobbyArc, lobbyArc._order, lobbyFocus);
+  if (libArc._order && currentView === 'library') layoutArc(libArc, libArc._order, libFocus);
+});
+
+window.__arcadeReady.then((a) => {
+  a.setGames(games, coverSvg);
+}, () => {});
+
+renderLobby();
+</script>
+
+<script type="module">
+// ===================================================================================
+// Biblioteca 3D: um fliperama modelado em código (Three.js), com os jogos em cards na tela CRT.
+// Referência: gabinete verde-oliva em luz verde difusa, câmera próxima e de frente na altura da tela,
+// marquise inclinada sob um capuz com dois alto-falantes fundos de aro arredondado, tela bem recuada
+// com caixa iluminada e borda neon, painel avançado com manches curtos e botões roxos e verdes,
+// portas de ficha prateadas e granulação de filme. Proporções medidas na imagem de referência.
+//
+// Desempenho: o canvas da tela só é redesenhado quando os cards se mexem; scanlines, faixa, clarão e
+// desligar são feitos no shader; a sombra é calculada uma vez; granulação e vinheta são um passe final.
+// API usada pela página: setGames, focus, step, current, enter, leave, launch, exitGame.
+// ===================================================================================
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
+
+window.__arcadeStarted = true; // a biblioteca 3D baixou; daqui em diante só falta compilar
+const V3 = THREE.Vector3;
+const V2 = THREE.Vector2;
+const stage = document.getElementById('arcadeStage');
+const canvas = document.getElementById('arcadeCanvas');
+
+// ---------- medidas (metros; a frente do gabinete olha para +z) ----------
+const W = 1.10;   // largura entre as laterais
+const T = 0.024;  // espessura das laterais (a borda prateada vista de frente)
+// A tela deita ~13° para trás (na referência a borda de cima do CRT é ~10% mais estreita que a de baixo)
+// e começa colada atrás do painel: entre os manches e a tela não há vão.
+const SCREEN_BOTTOM = [0.60, 0.965], SCREEN_TOP = [0.43, 1.70];
+// frente dos alto-falantes, inclinada para dentro (o topo vai para trás), com um chapéu em cima
+const FACE_BOTTOM = [0.62, 1.745], FACE_TOP = [0.54, 2.02];
+const CRT_W = 0.89, CRT_H = 0.58;
+const CRT_PX = [1280, 834];
+// câmera de frente, mais baixa, inclinada olhando um pouco para cima (para o meio da tela)
+const CAM = new V3(0, 1.1, 2.15);
+const LOOK = new V3(0, 1.36, 0.45);
+// Enquadramento da referência: as laterais do gabinete encostam nas bordas da imagem. Em janela baixa,
+// o CRT e os manches ainda cabem inteiros na área livre (e então sobra um pouco de verde dos lados).
+const FIT_HALF_WIDTH = 0.6, FIT_Z = 0.61; // laterais quase nas bordas
+const CORE_TOP = { y: 1.97, z: 0.56 };     // o alto dos alto-falantes
+const CORE_BOTTOM = { y: 0.875, z: 0.86 }; // borda do painel, com a legenda escrita
+
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+} catch (err) {
+  window.__arcadeFail(err);
+  throw err;
+}
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+// sem tone mapping: a cena tem pouca variação de luz e assim as cores batem com as da referência
+renderer.toneMapping = THREE.NoToneMapping;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.autoUpdate = false; // nada se mexe na cena: a sombra é calculada uma vez
+RectAreaLightUniformsLib.init();
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#2c6a20');
+const pmrem = new THREE.PMREMGenerator(renderer);
+
+// Estúdio verde: sala verde, softbox claro na frente e em cima, faixa de luz à esquerda e contraluz.
+// É o que dá a luz difusa da referência e os reflexos "profissionais" no cromado, no verniz e no vidro.
+function studioEnvironment() {
+  const env = new THREE.Scene();
+  env.add(new THREE.Mesh(new THREE.BoxGeometry(14, 9, 14),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color(0.05, 0.19, 0.03), side: THREE.BackSide })));
+  const light = (w, h, rgb, pos) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(...rgb), side: THREE.DoubleSide }));
+    m.position.copy(pos);
+    m.lookAt(0, 1.3, 0.4);
+    env.add(m);
+  };
+  light(4.5, 2.2, [2.6, 3.4, 2.0], new V3(0.4, 3.6, 3.8));   // softbox principal
+  light(1.0, 4.0, [1.6, 2.3, 1.2], new V3(-3.8, 1.8, 2.6));  // faixa à esquerda
+  light(0.8, 3.6, [0.7, 1.5, 0.5], new V3(3.6, 1.8, -0.8));  // contraluz
+  light(10, 10, [0.06, 0.22, 0.04], new V3(0, -0.6, 0));     // rebatido do chão
+  return pmrem.fromScene(env, 0.02).texture;
+}
+scene.environment = studioEnvironment();
+
+const camera = new THREE.PerspectiveCamera(50, 1, 0.02, 60);
+
+// ===================================================================================
+// Texturas procedurais
+// ===================================================================================
+function mkCanvas(w, h = w) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+function tex(c, srgb, repeat) {
+  const t = new THREE.CanvasTexture(c);
+  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat, repeat); }
+  return t;
+}
+
+// Couro granulado ("pebble"): mapa de altura com milhares de bolinhas → normal, rugosidade e cor.
+function makeLeather(size = 512) {
+  const hgt = new Float32Array(size * size);
+  for (let i = 0; i < 7000; i++) {
+    const cx = Math.random() * size | 0, cy = Math.random() * size | 0;
+    const r = 2.2 + Math.random() * 4.2, a = 0.5 + Math.random() * 0.5, r2 = r * r, ri = Math.ceil(r);
+    for (let y = -ri; y <= ri; y++) {
+      for (let x = -ri; x <= ri; x++) {
+        const d = (x * x + y * y) / r2;
+        if (d >= 1) continue;
+        hgt[(((cy + y) % size + size) % size) * size + (((cx + x) % size + size) % size)] += a * (1 - d) * (1 - d);
+      }
+    }
+  }
+  let max = 0;
+  for (let i = 0; i < hgt.length; i++) if (hgt[i] > max) max = hgt[i];
+  const H = (x, y) => hgt[((y + size) % size) * size + ((x + size) % size)] / max;
+  const nC = mkCanvas(size), rC = mkCanvas(size), aC = mkCanvas(size);
+  const nD = nC.getContext('2d').createImageData(size, size);
+  const rD = rC.getContext('2d').createImageData(size, size);
+  const aD = aC.getContext('2d').createImageData(size, size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      const nx = (H(x - 1, y) - H(x + 1, y)) * 2.4, ny = (H(x, y + 1) - H(x, y - 1)) * 2.4;
+      const l = Math.hypot(nx, ny, 1);
+      nD.data[i] = (nx / l * 0.5 + 0.5) * 255; nD.data[i + 1] = (ny / l * 0.5 + 0.5) * 255; nD.data[i + 2] = (1 / l * 0.5 + 0.5) * 255; nD.data[i + 3] = 255;
+      const h = H(x, y);
+      const rough = (0.66 - h * 0.24) * 255;
+      rD.data[i] = rD.data[i + 1] = rD.data[i + 2] = rough; rD.data[i + 3] = 255;
+      const alb = 228 + h * 27;
+      aD.data[i] = aD.data[i + 1] = aD.data[i + 2] = alb; aD.data[i + 3] = 255;
+    }
+  }
+  nC.getContext('2d').putImageData(nD, 0, 0);
+  rC.getContext('2d').putImageData(rD, 0, 0);
+  aC.getContext('2d').putImageData(aD, 0, 0);
+  return { normal: tex(nC, false, 4), rough: tex(rC, false, 4), albedo: tex(aC, true, 4) };
+}
+const leather = makeLeather();
+// o mesmo couro em grão mais fino, para o painel e para as peças pequenas
+const leatherFine = { normal: leather.normal.clone(), rough: leather.rough.clone() };
+leatherFine.normal.repeat.set(9, 9); leatherFine.rough.repeat.set(9, 9);
+
+// pegada dos manches estilo controle de PS5: micro-relevo de simbolozinhos (△ ○ ✕ □) bem pequenos,
+// sobre uma superfície emborrachada e lisa
+const gripTex = (() => {
+  const c = mkCanvas(128), g = c.getContext('2d');
+  g.fillStyle = 'rgb(128,128,128)'; g.fillRect(0, 0, 128, 128);
+  g.strokeStyle = 'rgb(150,150,150)'; g.lineWidth = 1.2;
+  const step = 16;
+  let k = 0;
+  for (let y = step / 2; y < 128; y += step) {
+    for (let x = step / 2 + ((y / step) % 2) * (step / 2); x < 128; x += step, k++) {
+      g.beginPath();
+      const r = 3;
+      switch (k % 4) {
+        case 0: g.moveTo(x, y - r); g.lineTo(x + r, y + r * 0.8); g.lineTo(x - r, y + r * 0.8); g.closePath(); break;
+        case 1: g.arc(x, y, r, 0, Math.PI * 2); break;
+        case 2: g.moveTo(x - r, y - r); g.lineTo(x + r, y + r); g.moveTo(x + r, y - r); g.lineTo(x - r, y + r); break;
+        default: g.rect(x - r, y - r, r * 2, r * 2);
+      }
+      g.stroke();
+    }
+  }
+  const t = tex(c, false);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(10, 3);
+  return t;
+})();
+
+// riscos finos e marcas de uso para metais e plásticos
+const wearTex = (() => {
+  const c = mkCanvas(256), g = c.getContext('2d');
+  g.fillStyle = 'rgb(120,120,120)'; g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 260; i++) {
+    const x = Math.random() * 256, y = Math.random() * 256, l = 6 + Math.random() * 40, a = Math.random() * Math.PI;
+    g.strokeStyle = `rgba(${Math.random() < 0.5 ? 70 : 170},${Math.random() < 0.5 ? 70 : 170},${Math.random() < 0.5 ? 70 : 170},.35)`;
+    g.lineWidth = 0.6;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
+  }
+  return tex(c, false, 3);
+})();
+
+// Metal escovado: riscos horizontais na rugosidade.
+const brushed = (() => {
+  const c = mkCanvas(256), g = c.getContext('2d'), d = g.createImageData(256, 256);
+  for (let y = 0; y < 256; y++) {
+    const row = 70 + Math.random() * 40;
+    for (let x = 0; x < 256; x++) {
+      const v = row + Math.random() * 14, i = (y * 256 + x) * 4;
+      d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 255;
+    }
+  }
+  g.putImageData(d, 0, 0);
+  return tex(c, false, 6);
+})();
+
+// Grade furadinha dos alto-falantes.
+const grilleTex = (() => {
+  const c = mkCanvas(256), g = c.getContext('2d');
+  g.fillStyle = '#7a9a52'; g.fillRect(0, 0, 256, 256);
+  g.fillStyle = '#1e2c12';
+  for (let y = 3, row = 0; y < 256; y += 5, row++) {
+    for (let x = 3 + (row % 2) * 2.5; x < 256; x += 5) { g.beginPath(); g.arc(x, y, 1.25, 0, 7); g.fill(); }
+  }
+  return tex(c, true);
+})();
+
+// Parede do fundo: verde com área mais clara (luz vinda da esquerda, como na referência).
+const wallTex = (() => {
+  const c = mkCanvas(512), g = c.getContext('2d');
+  const gr = g.createRadialGradient(170, 210, 20, 230, 260, 420);
+  gr.addColorStop(0, '#5da83d'); gr.addColorStop(0.55, '#3c8a29'); gr.addColorStop(1, '#2a671d');
+  g.fillStyle = gr; g.fillRect(0, 0, 512, 512);
+  return tex(c, true);
+})();
+
+// ===================================================================================
+// Materiais
+// ===================================================================================
+const phys = (o) => new THREE.MeshPhysicalMaterial(o);
+const leatherProps = (scale) => ({
+  map: leather.albedo, normalMap: leather.normal, normalScale: new V2(scale, scale),
+  roughnessMap: leather.rough, roughness: 1,
+});
+const M = {
+  body: phys({ color: '#435e26', ...leatherProps(0.4), clearcoat: 0.3, clearcoatRoughness: 0.45 }),
+  bodyDark: phys({ color: '#33421d', ...leatherProps(0.35), clearcoat: 0.2, clearcoatRoughness: 0.5 }),
+  bezel: phys({ color: '#48662b', ...leatherProps(0.3), clearcoat: 0.25, clearcoatRoughness: 0.45 }),
+  panel: phys({ color: '#3d4d23', map: leather.albedo, normalMap: leatherFine.normal, normalScale: new V2(0.35, 0.35), roughnessMap: leatherFine.rough, roughness: 1, clearcoat: 0.6, clearcoatRoughness: 0.28 }),
+  trim: phys({ color: '#d2d6ca', metalness: 1, roughness: 1, roughnessMap: brushed }),
+  plate: phys({ color: '#c6c9bf', metalness: 1, roughness: 1, roughnessMap: brushed, bumpMap: wearTex, bumpScale: 0.4 }),
+  speakerRing: phys({ color: '#dfe2d8', metalness: 1, roughness: 0.18 }),
+  chrome: phys({ color: '#f2f3ef', metalness: 1, roughness: 0.07 }),
+  ball: phys({ color: '#f5bfd5', metalness: 0, roughness: 0.62, clearcoat: 0.12, clearcoatRoughness: 0.5, sheen: 0.6, sheenRoughness: 0.75, sheenColor: '#ffd6e6', emissive: '#6a2c45', emissiveIntensity: 0.5, bumpMap: gripTex, bumpScale: 0.18 }),
+  purple: phys({ color: '#9073c8', roughness: 0.32, roughnessMap: wearTex, clearcoat: 1, clearcoatRoughness: 0.12, emissive: '#24163a', emissiveIntensity: 0.4 }),
+  green: phys({ color: '#46d571', roughness: 0.32, roughnessMap: wearTex, clearcoat: 1, clearcoatRoughness: 0.12, emissive: '#0d3a18', emissiveIntensity: 0.4 }),
+  black: phys({ color: '#10180b', roughness: 0.6, normalMap: leatherFine.normal, normalScale: new V2(0.25, 0.25), clearcoat: 0.3 }),
+  bowl: new THREE.MeshStandardMaterial({ color: '#25331a', roughness: 0.75, side: THREE.DoubleSide }),
+  lip: phys({ color: '#4a6329', roughness: 0.42, normalMap: leatherFine.normal, normalScale: new V2(0.12, 0.12), clearcoat: 0.55, clearcoatRoughness: 0.25, side: THREE.DoubleSide }),
+  grille: new THREE.MeshStandardMaterial({ map: grilleTex, roughness: 0.5, metalness: 0.55 }),
+  recess: new THREE.MeshStandardMaterial({ color: '#5a8c2e', roughness: 0.8, emissive: '#1d420c', emissiveIntensity: 0.2, side: THREE.BackSide }),
+  recessEdge: new THREE.MeshStandardMaterial({ color: '#4d7a28', roughness: 0.8 }),
+  wall: new THREE.MeshStandardMaterial({ map: wallTex, roughness: 1 }),
+  floor: new THREE.MeshStandardMaterial({ color: '#265518', roughness: 0.95, bumpMap: wearTex, bumpScale: 0.6 }),
+};
+
+// ===================================================================================
+// Geometria
+// ===================================================================================
+function shade(m, cast = true) { m.castShadow = cast; m.receiveShadow = true; return m; }
+
+// Extrusão de um perfil (z, y) ao longo de x. Depois do rotateY, a peça ocupa x de -depth a 0.
+function profileShape(points) {
+  const s = new THREE.Shape();
+  for (const p of points) {
+    if (p[0] === 'M') s.moveTo(p[1], p[2]);
+    else if (p[0] === 'Q') s.quadraticCurveTo(p[1], p[2], p[3], p[4]);
+    else s.lineTo(p[0], p[1]);
+  }
+  s.closePath();
+  return s;
+}
+function extrude(shape, depth, mats, bevel = 0) {
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 3, curveSegments: 12,
+  });
+  geo.rotateY(-Math.PI / 2);
+  return shade(new THREE.Mesh(geo, mats));
+}
+const slabPts = (pts) => profileShape([['M', ...pts[0]], ...pts.slice(1)]);
+function box(w, h, d, mat, x, y, z) {
+  const m = shade(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat));
+  m.position.set(x, y, z);
+  return m;
+}
+function cyl(rt, rb, h, mat, seg = 32) { return shade(new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat)); }
+function lathe(pts, mat, seg = 64) {
+  return shade(new THREE.Mesh(new THREE.LatheGeometry(pts.map(([r, h]) => new V2(r, h)), seg), mat));
+}
+// grupo encostado numa face inclinada: origem no meio da face, +z = normal, +y = subindo pela face
+function faceGroup(bottom, top) {
+  const g = new THREE.Group();
+  const [bz, by] = bottom, [tz, ty] = top;
+  g.position.set(0, (by + ty) / 2, (bz + tz) / 2);
+  g.rotation.x = -Math.atan2(bz - tz, ty - by);
+  g.userData.length = Math.hypot(bz - tz, ty - by);
+  return g;
+}
+
+// ---------- tela CRT: camadas em textura + shader ----------
+// Cada jogo vira uma textura "página" desenhada uma vez. A troca de jogo desliza duas páginas dentro do
+// shader: durante a animação nada é redesenhado nem reenviado para a placa de vídeo.
+const [PW, PH] = CRT_PX;
+const blankTex = new THREE.DataTexture(new Uint8Array(4), 1, 1);
+blankTex.needsUpdate = true;
+const crtUniforms = {
+  baseMap: { value: blankTex }, maskMap: { value: blankTex }, topMap: { value: blankTex }, chromeMap: { value: blankTex },
+  pageA: { value: blankTex }, pageB: { value: blankTex },
+  slideA: { value: 0 }, slideB: { value: 0 }, alphaA: { value: 1 }, alphaB: { value: 0 },
+  time: { value: 0 }, power: { value: 1 }, flash: { value: 0 },
+};
+const crtMat = new THREE.ShaderMaterial({
+  uniforms: crtUniforms,
+  transparent: true,
+  vertexShader: /* glsl */`
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: /* glsl */`
+    uniform sampler2D baseMap, maskMap, topMap, chromeMap, pageA, pageB;
+    uniform float slideA, slideB, alphaA, alphaB, time, power, flash;
+    varying vec2 vUv;
+    vec4 page(sampler2D m, float dx) {
+      vec2 u = vUv + vec2(dx, 0.0);
+      if (u.x < 0.0 || u.x > 1.0) return vec4(0.0);
+      return texture2D(m, u);
+    }
+    vec3 over(vec3 dst, vec4 src) { return mix(dst, src.rgb, clamp(src.a, 0.0, 1.0)); }
+    void main() {
+      vec4 base = texture2D(baseMap, vUv);
+      if (base.a < 0.004) discard;
+      float glass = texture2D(maskMap, vUv).a;
+      vec3 col = base.rgb;
+      vec4 a = page(pageA, slideA);
+      vec4 b = page(pageB, slideB);
+      col = over(col, vec4(a.rgb, a.a * alphaA * glass));
+      col = over(col, vec4(b.rgb, b.a * alphaB * glass));
+      vec4 ch = texture2D(chromeMap, vUv);
+      col = over(col, vec4(ch.rgb, ch.a * glass));
+      col = over(col, texture2D(topMap, vUv));
+      float scan = 0.935 + 0.065 * sin(vUv.y * ${PH.toFixed(1)} * 2.0944);            // uma linha a cada 3 px
+      float band = 0.06 * smoothstep(0.09, 0.0, abs(fract(vUv.y * 0.75 + time * 0.085) - 0.5));
+      float flick = 0.992 + 0.008 * sin(time * 53.0);
+      col *= (scan * flick + band) * 1.04;
+      col = col * power + flash * vec3(0.95, 1.0, 0.86);
+      gl_FragColor = vec4(col, base.a);
+    }`,
+});
+
+// Retângulo de TV antiga: cantos redondos e lados levemente abaulados.
+function tvPath(g, x0, y0, x1, y1, r, b) {
+  const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+  g.beginPath();
+  g.moveTo(x0 + r, y0);
+  g.quadraticCurveTo(mx, y0 - b, x1 - r, y0);
+  g.quadraticCurveTo(x1, y0, x1, y0 + r);
+  g.quadraticCurveTo(x1 + b, my, x1, y1 - r);
+  g.quadraticCurveTo(x1, y1, x1 - r, y1);
+  g.quadraticCurveTo(mx, y1 + b, x0 + r, y1);
+  g.quadraticCurveTo(x0, y1, x0, y1 - r);
+  g.quadraticCurveTo(x0 - b, my, x0, y0 + r);
+  g.quadraticCurveTo(x0, y0, x0 + r, y0);
+  g.closePath();
+}
+const TV = { rim: [22, 20, PW - 22, PH - 20, 84, 13], gap: [34, 31, PW - 34, PH - 31, 76, 12], glass: [46, 42, PW - 46, PH - 42, 70, 11] };
+
+// vidro: só reflexo (soma por cima do conteúdo), recortado no formato da TV
+const glassAlpha = (() => {
+  const c = mkCanvas(640, 417), g = c.getContext('2d');
+  g.scale(0.5, 0.5);
+  tvPath(g, ...TV.gap);
+  g.fillStyle = '#fff'; g.fill();
+  return tex(c, false);
+})();
+const glassMat = new THREE.MeshPhysicalMaterial({
+  color: '#000000', roughness: 0.45, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.55,
+  transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, alphaMap: glassAlpha, envMapIntensity: 0.07,
+});
+
+function bulgedPlane(w, h, amount) {
+  const geo = new THREE.PlaneGeometry(w, h, 48, 32);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const nx = pos.getX(i) / (w / 2), ny = pos.getY(i) / (h / 2);
+    pos.setZ(i, amount * (1 - nx * nx) * (1 - ny * ny));
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
+// ---------- o gabinete ----------
+function buildCabinet() {
+  const cab = new THREE.Group();
+
+  // laterais: face verde, borda (T-molding) prateada. Perfil medido na referência.
+  const sideShape = profileShape([
+    ['M', 0, 0], [0.72, 0], [0.72, 0.84], [0.86, 0.89], [0.86, 0.955], [0.63, 1.005],
+    ['Q', 0.605, 1.01, 0.598, 1.03],                 // do painel direto para a tela, sem vão
+    [SCREEN_TOP[0], SCREEN_TOP[1]], [FACE_BOTTOM[0], FACE_BOTTOM[1]], [FACE_TOP[0], FACE_TOP[1]],
+    [0.60, 2.035], [0.60, 2.072], [0.06, 2.12], [0, 2.02],  // chapéu
+  ]);
+  const left = extrude(sideShape, T, [M.body, M.trim], 0.006);
+  left.position.x = -W / 2;
+  const right = extrude(sideShape, T, [M.body, M.trim], 0.006);
+  right.position.x = W / 2 + T;
+  cab.add(left, right);
+
+  // peças da frente, de lado a lado (face visível = parede da extrusão: material 1)
+  const IW = W - 0.002; // 1 mm de folga: nada encosta coplanar nas laterais
+  const slab = (pts, mat) => { const m = extrude(slabPts(pts), IW, [M.bodyDark, mat]); m.position.x = IW / 2; cab.add(m); return m; };
+  slab([[0.60, 0.0], [0.72, 0.0], [0.72, 0.84], [0.60, 0.84]], M.body);                                   // frente de baixo
+  slab([[0.56, 0.84], [0.72, 0.84], [0.86, 0.89], [0.86, 0.955], [0.63, 1.005], [0.56, 1.005]], M.panel);  // painel (borda mais alta)
+  slab([[0.40, 1.69], [0.59, 1.737], [0.511, 2.012], [0.40, 2.012]], M.bodyDark);                          // miolo atrás dos alto-falantes
+  slab([[0.40, 2.01], [0.511, 2.01], [0.54, 2.02], [0.60, 2.035], [0.60, 2.072], [0.06, 2.12], [0.06, 2.0], [0.40, 2.0]], M.body); // chapéu
+
+  // ---- tela: moldura com recorte, caixa discreta, CRT abaulado que sai um pouco para fora ----
+  const screen = faceGroup(SCREEN_BOTTOM, SCREEN_TOP);
+  const L = screen.userData.length;
+  const HW = 0.465, HB = -L / 2 + 0.012, HT = L / 2 - 0.085;
+  const yc = (HB + HT) / 2, HH = (HT - HB) / 2;
+  const bezelShape = new THREE.Shape();
+  bezelShape.moveTo(-IW / 2, -L / 2); bezelShape.lineTo(IW / 2, -L / 2); bezelShape.lineTo(IW / 2, L / 2); bezelShape.lineTo(-IW / 2, L / 2); bezelShape.closePath();
+  const hole = new THREE.Path();
+  hole.moveTo(-HW, HB); hole.lineTo(-HW, HT); hole.lineTo(HW, HT); hole.lineTo(HW, HB); hole.closePath();
+  bezelShape.holes.push(hole);
+  const bezel = shade(new THREE.Mesh(new THREE.ExtrudeGeometry(bezelShape, { depth: 0.03, bevelEnabled: false }), [M.bezel, M.recessEdge]));
+  bezel.position.z = -0.03;
+  screen.add(bezel);
+  const recess = new THREE.Mesh(new THREE.BoxGeometry(HW * 2, HH * 2, 0.06), M.recess);
+  recess.position.set(0, yc, -0.06);
+  recess.receiveShadow = true;
+  screen.add(recess);
+  const crtY = yc - 0.01;
+  // vidro bem abaulado: o meio da tela fica quase na frente da moldura, as bordas lá dentro da caixa
+  const crt = new THREE.Mesh(bulgedPlane(CRT_W, CRT_H, 0.05), crtMat);
+  crt.name = 'crt';
+  crt.position.set(0, crtY, -0.074);
+  screen.add(crt);
+  const glass = new THREE.Mesh(bulgedPlane(CRT_W, CRT_H, 0.052), glassMat);
+  glass.position.set(0, crtY, -0.0725);
+  glass.renderOrder = 2;
+  screen.add(glass);
+  const glow = new THREE.RectAreaLight('#b6ff58', 3.4, CRT_W * 0.95, CRT_H * 0.95);
+  glow.position.set(0, crtY, -0.05);
+  glow.rotation.y = Math.PI; // a luz de área sai pelo -z dela: assim sai para a frente da tela
+  screen.add(glow);
+  cab.add(screen);
+
+  // ---- alto-falantes: moldura arredondada e lisa saindo da face, filete cromado por dentro e grade de metal
+  //      perfurado levemente abaulada (como alto-falante de verdade, sem buraco preto) ----
+  const face = faceGroup(FACE_BOTTOM, FACE_TOP);
+  const FL = face.userData.length;
+  const faceShape = new THREE.Shape();
+  faceShape.moveTo(-IW / 2, -FL / 2); faceShape.lineTo(IW / 2, -FL / 2); faceShape.lineTo(IW / 2, FL / 2); faceShape.lineTo(-IW / 2, FL / 2); faceShape.closePath();
+  const SPK = { x: 0.29, r: 0.096 };
+  for (const sx of [-SPK.x, SPK.x]) {
+    const h = new THREE.Path();
+    h.absarc(sx, 0, SPK.r, 0, Math.PI * 2, true);
+    faceShape.holes.push(h);
+  }
+  const facePanel = shade(new THREE.Mesh(new THREE.ExtrudeGeometry(faceShape, { depth: 0.03, bevelEnabled: false, curveSegments: 64 }), [M.body, M.bowl]));
+  facePanel.position.z = -0.03;
+  face.add(facePanel);
+  const grilleGeo = new THREE.RingGeometry(0.0005, SPK.r, 72, 10);
+  {
+    const pos = grilleGeo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const rr = Math.hypot(pos.getX(i), pos.getY(i)) / SPK.r;
+      pos.setZ(i, 0.007 * (1 - rr * rr)); // abaulada para fora
+    }
+    grilleGeo.computeVertexNormals();
+  }
+  for (const sx of [-SPK.x, SPK.x]) {
+    const sp = new THREE.Group();
+    sp.position.set(sx, 0, 0);
+    const bezel = lathe([[0.118, -0.001], [0.117, 0.006], [0.113, 0.0115], [0.107, 0.0145], [0.1015, 0.0145], [0.098, 0.011], [0.0965, 0.004], [0.0962, -0.012]], M.lip, 96);
+    bezel.geometry.rotateX(Math.PI / 2);
+    const lip = shade(new THREE.Mesh(new THREE.TorusGeometry(0.0962, 0.0022, 10, 96), M.speakerRing));
+    lip.position.z = -0.006;
+    const grille = new THREE.Mesh(grilleGeo, M.grille);
+    grille.position.z = -0.012;
+    grille.receiveShadow = true;
+    sp.add(bezel, lip, grille);
+    face.add(sp);
+  }
+  cab.add(face);
+
+  // ---- painel: manches baixos estilo "bat" (pegada com sulcos) e botões grandes ----
+  // origem no meio do tampo; +y = normal do tampo, -z = para trás (rumo à tela), +x = direita
+  const panel = new THREE.Group();
+  panel.position.set(0, 0.98, 0.745);
+  panel.rotation.x = Math.atan2(0.05, 0.23);
+  const batGeo = new THREE.LatheGeometry([[0, 0], [0.0072, 0], [0.008, 0.006], [0.0115, 0.016], [0.0165, 0.029], [0.0195, 0.043], [0.0205, 0.055], [0.019, 0.065], [0.0145, 0.073], [0.0075, 0.0775], [0, 0.079]].map(([r, h]) => new V2(r, h)), 48);
+  const stick = (x) => {
+    const z = -0.03;
+    const base = cyl(0.05, 0.053, 0.006, M.black, 48); base.position.set(x, 0.0035, z);
+    const ring = shade(new THREE.Mesh(new THREE.TorusGeometry(0.048, 0.0035, 10, 64), M.plate));
+    ring.rotation.x = Math.PI / 2; ring.position.set(x, 0.0068, z);
+    const washer = cyl(0.017, 0.02, 0.006, M.chrome); washer.position.set(x, 0.0095, z);
+    const shaft = cyl(0.0078, 0.0078, 0.036, M.chrome, 24); shaft.position.set(x, 0.03, z);
+    const top = shade(new THREE.Mesh(batGeo, M.ball)); top.position.set(x, 0.046, z);
+    panel.add(base, ring, washer, shaft, top);
+  };
+  stick(-0.21); stick(0.21);
+  const capGeo = new THREE.LatheGeometry([[0.021, 0], [0.021, 0.009], [0.0198, 0.0128], [0.0145, 0.0138], [0, 0.0122]].map(([r, h]) => new V2(r, h)), 40);
+  const button = (x, z, mat) => {
+    const ring = cyl(0.0262, 0.0262, 0.005, M.black, 40); ring.position.set(x, 0.003, z);
+    const cap = shade(new THREE.Mesh(capGeo, mat)); cap.position.set(x, 0.0045, z);
+    panel.add(ring, cap);
+  };
+  [-1, 1].forEach((side) => {
+    [0.355, 0.41, 0.465].forEach((ax) => {
+      button(side * ax, -0.03, M.purple);
+      button(side * ax, 0.03, M.green);
+    });
+  });
+  cab.add(panel);
+
+  // ---- legenda escrita à mão na borda do painel, perto dos cantos ----
+  const legend = new THREE.Mesh(new THREE.PlaneGeometry(IW, 0.06), legendMaterial(IW));
+  legend.position.set(0, 0.9225, 0.8606);
+  legend.receiveShadow = true;
+  cab.add(legend);
+
+  // ---- portas de ficha prateadas, logo abaixo do painel, nos cantos ----
+  for (const x of [-0.487, 0.487]) {
+    const plate = shade(new THREE.Mesh(new RoundedBoxGeometry(0.08, 0.24, 0.014, 4, 0.005), M.plate));
+    plate.position.set(x, 0.72, 0.728);
+    cab.add(plate);
+    cab.add(box(0.011, 0.07, 0.008, M.black, x, 0.8, 0.736));
+    cab.add(box(0.013, 0.05, 0.008, M.black, x, 0.64, 0.736));
+    const knob = cyl(0.0135, 0.0135, 0.012, M.chrome, 28);
+    knob.rotation.x = Math.PI / 2;
+    knob.position.set(x, 0.722, 0.738);
+    cab.add(knob);
+  }
+
+  return { cab, crt, screen, glow, legend, legendWidth: IW };
+}
+
+// Legenda riscada à mão na tinta do painel: traço claro (a tinta raspada mostra o material de baixo),
+// textura de risco dentro das letras, sombra de profundidade e um mapa de relevo para a luz reagir.
+function legendMaterial(width) {
+  const PX = 2200, PY = 120;
+  const toX = (x) => (x / width + 0.5) * PX;
+  const FONT = '700 72px Caveat, "Segoe Print", cursive';
+  // perto dos cantos, sob os botões
+  const groups = [
+    { x: -0.41, parts: [['key', '←'], ['key', '→'], ['text', 'escolher']] },
+    { x: 0.41, parts: [['key', 'A'], ['text', 'jogar']] },
+  ];
+  const write = (g, color, dy, keyColor) => {
+    g.font = FONT;
+    g.textBaseline = 'middle';
+    for (const grp of groups) {
+      const widths = grp.parts.map(([kind, label]) => (kind === 'key' ? 68 : g.measureText(label).width));
+      const total = widths.reduce((a, b) => a + b, 0) + 14 * (grp.parts.length - 1);
+      let x = toX(grp.x) - total / 2;
+      grp.parts.forEach(([kind, label], i) => {
+        if (kind === 'key') {
+          // círculo feito à mão: duas voltas levemente tortas
+          g.strokeStyle = keyColor || color; g.lineWidth = 4; g.lineCap = 'round';
+          for (let k = 0; k < 2; k++) {
+            g.beginPath();
+            for (let a = 0; a <= Math.PI * 2.08; a += 0.2) {
+              const r = 29 + Math.sin(a * 3 + k * 2) * 1.5 + k * 1.2;
+              const px = x + 34 + Math.cos(a - 0.4) * r, py = PY / 2 + dy + Math.sin(a - 0.4) * r * 0.94;
+              a === 0 ? g.moveTo(px, py) : g.lineTo(px, py);
+            }
+            g.stroke();
+          }
+          const cx0 = x + 34, cy0 = PY / 2 + dy;
+          if (label === '←' || label === '→') {
+            // seta riscada à mão: traço grosso com uma ponta
+            const d = label === '→' ? 1 : -1;
+            g.lineWidth = 5.5; g.lineJoin = 'round';
+            g.beginPath(); g.moveTo(cx0 - 12 * d, cy0 + 1); g.lineTo(cx0 + 12 * d, cy0 - 1); g.stroke();
+            g.beginPath(); g.moveTo(cx0 + 2 * d, cy0 - 10); g.lineTo(cx0 + 13 * d, cy0 - 1); g.lineTo(cx0 + 3 * d, cy0 + 9); g.stroke();
+          } else {
+            g.fillStyle = color;
+            g.font = '700 48px Caveat, "Segoe Print", cursive';
+            g.textAlign = 'center';
+            g.fillText(label, cx0, cy0 + 3);
+            g.textAlign = 'left';
+          }
+          g.font = FONT;
+        } else {
+          g.fillStyle = color;
+          g.fillText(label, x, PY / 2 + dy + 2);
+        }
+        x += widths[i] + 20;
+      });
+    }
+  };
+  const colorC = mkCanvas(PX, PY), cg = colorC.getContext('2d');
+  write(cg, 'rgba(0, 0, 0, 0.55)', 3);                 // sombra: o risco tem fundo
+  write(cg, '#dcefc4', 0);                             // traço claro, bem legível no verde
+  cg.globalCompositeOperation = 'source-atop';          // textura de risco só dentro das letras
+  cg.strokeStyle = 'rgba(60, 86, 34, 0.45)'; cg.lineWidth = 1.2;
+  for (let i = 0; i < 900; i++) {
+    const x = Math.random() * PX, y = Math.random() * PY, l = 4 + Math.random() * 10;
+    cg.beginPath(); cg.moveTo(x, y); cg.lineTo(x + l, y - l * 0.35); cg.stroke();
+  }
+  cg.globalCompositeOperation = 'source-over';
+  const bumpC = mkCanvas(PX, PY), bg = bumpC.getContext('2d');
+  bg.fillStyle = '#fff'; bg.fillRect(0, 0, PX, PY);
+  bg.filter = 'blur(1.2px)';
+  write(bg, '#000', 0);
+  return new THREE.MeshStandardMaterial({
+    map: tex(colorC, true), bumpMap: tex(bumpC, false), bumpScale: 1.6, roughness: 0.65,
+    transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2,
+  });
+}
+
+const main = buildCabinet();
+scene.add(main.cab);
+
+// sala (só aparece nos movimentos de câmera)
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), M.floor);
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+const wall = new THREE.Mesh(new THREE.PlaneGeometry(16, 9), M.wall);
+wall.position.set(-0.6, 3.5, -1.4);
+wall.receiveShadow = true;
+scene.add(wall);
+
+// luz direta: fraca e macia, de cima e da esquerda (faz a sombra do capuz e dos manches)
+scene.add(new THREE.HemisphereLight('#c8ff92', '#132b0b', 0.18));
+const key = new THREE.DirectionalLight('#f1ffe2', 1.25);
+key.position.set(-1.6, 4.2, 3.4);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+Object.assign(key.shadow.camera, { left: -1.2, right: 1.2, top: 2.4, bottom: -0.2, near: 1, far: 9 });
+key.shadow.bias = -0.0003;
+key.shadow.normalBias = 0.015;
+scene.add(key);
+
+// ---------- pós-processamento ----------
+const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+const composer = new EffectComposer(renderer, rt);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new V2(1, 1), 0.36, 0.7, 0.72);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+// granulação de filme e vinheta, num passe só
+const grain = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, time: { value: 0 }, amount: { value: 0.075 }, vignette: { value: 0.55 }, blur: { value: 0 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: /* glsl */`
+    uniform sampler2D tDiffuse; uniform float time, amount, vignette, blur; varying vec2 vUv;
+    float rand(vec2 co) { return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453); }
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv);
+      // desfoque radial só enquanto a câmera anda (combina com o zoom-in); parado, custa nada
+      if (blur > 0.0004) {
+        vec2 step = (vUv - 0.5) * blur / 7.0;
+        for (int i = 1; i < 8; i++) c += texture2D(tDiffuse, vUv - step * float(i));
+        c /= 8.0;
+      }
+      float n = rand(floor(gl_FragCoord.xy) + fract(time * 7.13) * 91.7) - 0.5;
+      vec2 d = vUv - 0.5;
+      c.rgb = c.rgb * (1.0 - dot(d, d) * vignette) + n * amount;
+      gl_FragColor = c;
+    }`,
+});
+composer.addPass(grain);
+
+// ===================================================================================
+// Conteúdo da tela: cards dos jogos (capa + nome)
+// ===================================================================================
+const S = { games: [], coverFn: null, index: 0, pos: 0, covers: new Map(), pages: new Map() };
+const INK = 'rgba(36, 60, 17, 0.9)';
+const INK_SOFT = 'rgba(36, 60, 17, 0.62)';
+function canvasTexture(c) {
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.generateMipmaps = false;
+  t.minFilter = THREE.LinearFilter;
+  return t;
+}
+
+// camadas fixas da tela, desenhadas uma vez
+const baseLayer = (() => {
+  const c = mkCanvas(PW, PH), g = c.getContext('2d');
+  g.save();
+  tvPath(g, ...TV.rim);
+  g.shadowColor = 'rgba(60, 255, 80, 1)'; g.shadowBlur = 38;
+  g.lineWidth = 18; g.strokeStyle = '#3ef05a'; g.stroke();
+  g.shadowBlur = 0; g.lineWidth = 5; g.strokeStyle = 'rgba(205, 255, 195, .9)'; g.stroke();
+  g.restore();
+  tvPath(g, ...TV.gap); g.fillStyle = '#23501a'; g.fill();
+  g.save();
+  tvPath(g, ...TV.glass); g.clip();
+  const bg = g.createRadialGradient(PW * 0.5, PH * 0.44, 80, PW * 0.5, PH * 0.5, PW * 0.64);
+  bg.addColorStop(0, '#bdef4c'); bg.addColorStop(0.7, '#ade643'); bg.addColorStop(1, '#88c932');
+  g.fillStyle = bg; g.fillRect(0, 0, PW, PH);
+  g.restore();
+  return c;
+})();
+const topLayer = (() => {
+  const c = mkCanvas(PW, PH), g = c.getContext('2d');
+  tvPath(g, ...TV.glass); g.clip();
+  // reflexo diagonal da referência, com a borda esfumada (um polígono chapado deixava um traço na tela)
+  const refl = g.createLinearGradient(PW * 0.36, PH * 0.62, PW * 0.72, PH * 0.12);
+  refl.addColorStop(0, 'rgba(255, 255, 255, 0)');
+  refl.addColorStop(0.55, 'rgba(255, 255, 255, .035)');
+  refl.addColorStop(1, 'rgba(255, 255, 255, .06)');
+  g.fillStyle = refl; g.fillRect(0, 0, PW, PH);
+  const vig = g.createRadialGradient(PW / 2, PH / 2, PH * 0.34, PW / 2, PH / 2, PW * 0.64);
+  vig.addColorStop(0, 'rgba(0,0,0,0)'); vig.addColorStop(1, 'rgba(14, 40, 0, .32)');
+  g.fillStyle = vig; g.fillRect(0, 0, PW, PH);
+  return c;
+})();
+const maskLayer = (() => {
+  const c = mkCanvas(PW, PH), g = c.getContext('2d');
+  tvPath(g, ...TV.glass); g.fillStyle = '#fff'; g.fill();
+  return c;
+})();
+crtUniforms.baseMap.value = canvasTexture(baseLayer);
+crtUniforms.topMap.value = canvasTexture(topLayer);
+crtUniforms.maskMap.value = canvasTexture(maskLayer);
+// meia resolução: só textos pequenos e setas, e assim cada troca de jogo envia 1/4 dos dados
+const chromeCanvas = mkCanvas(PW / 2, PH / 2);
+const chromeTex = canvasTexture(chromeCanvas);
+crtUniforms.chromeMap.value = chromeTex;
+
+function roundRect(g, x, y, w, h, r) {
+  g.beginPath();
+  g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+}
+
+// Layout de console dentro do CRT: capa grande à esquerda; à direita, título enorme e condensado (o
+// "LET'S PLAY A GAME." da referência), jogadores, descrição e o botão JOGAR. A seta → da referência leva
+// ao próximo jogo. Tudo pensado para ser lido de longe, na TV.
+// Página: a imagem do jogo preenche a direita da tela; as informações ficam à esquerda, sobre o verde,
+// com um fade suave do fundo para a imagem.
+// a imagem começa cedo e o fade avança bem sobre ela; o texto fica embaixo, acima dos manches
+const LAY = { textX: 104, textW: 480, imgX: 300, fade: 620, bottomY: 712 };
+
+function prepCover(game) {
+  if (!S.coverFn || S.covers.has(game.id)) return;
+  S.covers.set(game.id, null);
+  const loaded = (img, real) => {
+    S.covers.set(game.id, { img, real });
+    if (S.pages.has(game.id)) buildPage(game);
+  };
+  const generated = () => {
+    let svg = S.coverFn(game);
+    if (!/xmlns=/.test(svg)) svg = svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+    const img = new Image();
+    img.onload = () => loaded(img, false);
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  };
+  if (game.image) {
+    const img = new Image();
+    img.onload = () => loaded(img, true);
+    img.onerror = generated; // sem a imagem (ex.: página aberta sem o servidor): capa gerada
+    img.src = game.image;
+  } else generated();
+}
+
+function titleLines(name) {
+  const words = name.toUpperCase().split(/\s+/).filter(Boolean);
+  let lines = words;
+  if (words.length > 3) {
+    const per = Math.ceil(words.length / 3);
+    lines = [];
+    for (let i = 0; i < words.length; i += per) lines.push(words.slice(i, i + per).join(' '));
+  }
+  lines = lines.slice();
+  // o ponto final do estilo "GAME.": só quando o nome não termina em pontuação ou número
+  if (!/[.!?0-9]$/.test(lines[lines.length - 1])) lines[lines.length - 1] += '.';
+  return lines;
+}
+
+function wrap(g, text, maxW, maxLines) {
+  const out = [];
+  let line = '';
+  for (const w of text.split(' ')) {
+    const t = line ? line + ' ' + w : w;
+    if (g.measureText(t).width > maxW && line) { out.push(line); line = w; } else line = t;
+    if (out.length === maxLines) return out;
+  }
+  if (line) out.push(line);
+  return out.slice(0, maxLines);
+}
+
+function drawArrow(g, x, y, len, thick) {
+  const head = thick * 3.6;
+  g.save();
+  g.strokeStyle = INK; g.lineWidth = thick; g.lineCap = 'butt'; g.lineJoin = 'miter'; g.miterLimit = 10;
+  g.beginPath(); g.moveTo(x, y); g.lineTo(x + len - thick * 0.7, y); g.stroke();
+  g.beginPath(); g.moveTo(x + len - head, y - head); g.lineTo(x + len, y); g.lineTo(x + len - head, y + head); g.stroke();
+  g.restore();
+}
+
+// Filtro da tela: a imagem do jogo vira monocromática nas cores do tubo (sombras verde-escuras, luzes
+// verde-limão), e se dissolve no fundo da esquerda para a direita (o próprio alfa da imagem, sem cor por
+// cima: o fundo da tela continua o mesmo em todo lugar).
+function screenArt(cover, w, h) {
+  const { img, real } = cover;
+  // recorte "cover": preenche a área sem distorcer. Nas capas geradas, fica de fora a faixa com o nome.
+  const iw = real ? img.naturalWidth : 600, ih = real ? img.naturalHeight : 560;
+  const k = Math.max(w / iw, h / ih);
+  const sw = w / k, sh = h / k, sx = (iw - sw) / 2, sy = (ih - sh) / 2;
+  const c = mkCanvas(Math.round(w), Math.round(h)), g = c.getContext('2d');
+  g.filter = 'grayscale(1) contrast(1.2) brightness(1.06)';
+  g.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  g.filter = 'none';
+  g.globalCompositeOperation = 'multiply';   // claro → verde-limão
+  g.fillStyle = '#c3f052'; g.fillRect(0, 0, c.width, c.height);
+  g.globalCompositeOperation = 'lighten';    // escuro → verde-escuro (nada de preto puro)
+  g.fillStyle = '#25420f'; g.fillRect(0, 0, c.width, c.height);
+  g.globalCompositeOperation = 'destination-in'; // dissolve: transparente à esquerda, inteira à direita
+  const fade = g.createLinearGradient(0, 0, LAY.fade, 0);
+  fade.addColorStop(0, 'rgba(0,0,0,0)');
+  fade.addColorStop(0.35, 'rgba(0,0,0,0.25)');
+  fade.addColorStop(0.7, 'rgba(0,0,0,0.75)');
+  fade.addColorStop(1, 'rgba(0,0,0,1)');
+  g.fillStyle = fade; g.fillRect(0, 0, c.width, c.height);
+  g.globalCompositeOperation = 'source-over';
+  return c;
+}
+// o mesmo fundo do tubo (baseLayer), para cada página ser uma peça inteira: na troca não aparece emenda
+function paintScreenBackground(g) {
+  const bg = g.createRadialGradient(PW * 0.5, PH * 0.44, 80, PW * 0.5, PH * 0.5, PW * 0.64);
+  bg.addColorStop(0, '#bdef4c'); bg.addColorStop(0.7, '#ade643'); bg.addColorStop(1, '#88c932');
+  g.fillStyle = bg; g.fillRect(0, 0, PW, PH);
+}
+
+// A página de um jogo. O bloco de texto é medido antes de desenhar e centralizado na altura; os espaços
+// são fixos, então nada se sobrepõe.
+function drawPage(g, game) {
+  paintScreenBackground(g);
+  const cover = S.covers.get(game.id);
+  if (cover) g.drawImage(screenArt(cover, PW - LAY.imgX, PH), LAY.imgX, 0);
+
+  const X = LAY.textX;
+  g.textBaseline = 'alphabetic';
+  const lines = titleLines(game.name);
+  g.font = '100px Anton, Impact, sans-serif';
+  const widest = Math.max(...lines.map((l) => g.measureText(l).width));
+  const size = Math.min(134, (LAY.textW / widest) * 100, 250 / (lines.length * 0.92));
+  g.font = '500 36px Inter, sans-serif';
+  const tag = wrap(g, game.tagline, LAY.textW, 3);
+  // não cabe em 3 linhas: corta na palavra e põe reticências
+  if (tag.join(' ').length < game.tagline.length) tag[tag.length - 1] = tag[tag.length - 1].replace(/\s*\S*$/, '') + '…';
+  const GAP = { badge: 22, title: 22, players: 14 };
+  const hTitle = size * 0.92 * (lines.length - 1) + size * 0.78;
+  const total = 46 + GAP.badge + hTitle + GAP.title + 38 + GAP.players + tag.length * 46;
+  // bloco ancorado embaixo
+  let y = Math.max(96, LAY.bottomY - total);
+
+  const badge = game.badge === 'ok' ? 'VERIFICADO' : game.badge === 'pc' ? `${(game.store || 'PC').toUpperCase()} · MODO UNIVERSAL` : 'DA COMUNIDADE';
+  g.font = '800 27px Inter, sans-serif';
+  const bw = g.measureText(badge).width + 40;
+  g.lineWidth = 3; g.strokeStyle = INK_SOFT; g.fillStyle = INK_SOFT;
+  roundRect(g, X, y, bw, 46, 23); g.stroke();
+  g.fillText(badge, X + 20, y + 32);
+  y += 46 + GAP.badge;
+
+  g.fillStyle = INK;
+  g.font = `${size}px Anton, Impact, sans-serif`;
+  let ty = y + size * 0.78;
+  for (const l of lines) { g.fillText(l, X - 2, ty); ty += size * 0.92; }
+  y += hTitle + GAP.title;
+
+  g.font = '800 36px Inter, sans-serif';
+  g.fillText(game.players.toUpperCase(), X, y + 33);
+  y += 38 + GAP.players;
+  g.font = '500 36px Inter, sans-serif';
+  g.fillStyle = INK_SOFT;
+  tag.forEach((l, k) => g.fillText(l, X, y + 35 + k * 46));
+  return {};
+}
+
+// Cor média da página sobre o verde do tubo: é a cor da luz que a tela joga no painel e nos manches.
+const lightProbe = mkCanvas(16, 10).getContext('2d', { willReadFrequently: true });
+function averageLight(c) {
+  lightProbe.clearRect(0, 0, 16, 10);
+  lightProbe.drawImage(c, 0, 0, 16, 10);
+  const d = lightProbe.getImageData(0, 0, 16, 10).data;
+  let r = 0, g = 0, b = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    const a = d[i + 3] / 255;
+    r += d[i] * a + 176 * (1 - a); g += d[i + 1] * a + 229 * (1 - a); b += d[i + 2] * a + 68 * (1 - a);
+  }
+  const n = d.length / 4;
+  return new THREE.Color().setRGB(r / n / 255, g / n / 255, b / n / 255, THREE.SRGBColorSpace);
+}
+const LIME = new THREE.Color().setRGB(176 / 255, 229 / 255, 68 / 255, THREE.SRGBColorSpace);
+
+// Páginas só para o jogo em foco e os vizinhos (±2); as de longe são liberadas da placa de vídeo.
+// A página nova já sobe para a GPU na hora (initTexture), antes de aparecer no deslize.
+function buildPage(game) {
+  const c = mkCanvas(PW, PH);
+  drawPage(c.getContext('2d'), game);
+  const old = S.pages.get(game.id);
+  const tex = canvasTexture(c);
+  renderer.initTexture(tex);
+  S.pages.set(game.id, { tex, light: averageLight(c) });
+  if (old) old.tex.dispose();
+}
+// os vizinhos são montados depois do deslize (em tempo ocioso), para não pesar no quadro do toque
+let pagesTimer = 0;
+function schedulePages() {
+  clearTimeout(pagesTimer);
+  pagesTimer = setTimeout(() => (window.requestIdleCallback || setTimeout)(refreshPages), 480);
+}
+function refreshPages() {
+  S.games.forEach((game, j) => {
+    const near = Math.abs(j - S.index) <= 2;
+    const page = S.pages.get(game.id);
+    if (near && !page) { prepCover(game); buildPage(game); }
+    if (!near && page) { page.tex.dispose(); S.pages.delete(game.id); }
+  });
+}
+
+// partes fixas que só mudam quando o jogo em foco muda: contador e setas discretas nas bordas
+function drawChrome() {
+  const g = chromeCanvas.getContext('2d');
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(0, 0, chromeCanvas.width, chromeCanvas.height);
+  g.setTransform(0.5, 0, 0, 0.5, 0, 0);
+  const n = S.games.length;
+  if (n) {
+    g.fillStyle = INK_SOFT;
+    g.font = '800 28px Inter, sans-serif';
+    g.fillText(`${String(S.index + 1).padStart(2, '0')} / ${String(n).padStart(2, '0')}`, 108, 104);
+    g.globalAlpha = 1;
+  }
+  chromeTex.needsUpdate = true;
+}
+
+// a cada quadro: só uniforms (qual página está em A e B, quanto cada uma deslizou)
+function updateScreen() {
+  const n = S.games.length;
+  if (!n) return;
+  const i0 = Math.max(0, Math.min(n - 1, Math.floor(S.pos)));
+  const f = Math.min(1, Math.max(0, S.pos - i0));
+  const A = S.pages.get(S.games[i0].id);
+  const B = S.games[i0 + 1] ? S.pages.get(S.games[i0 + 1].id) : null;
+  crtUniforms.pageA.value = A ? A.tex : blankTex;
+  crtUniforms.pageB.value = B ? B.tex : blankTex;
+  // as páginas são inteiras e opacas: a de saída desliza um pouco e a de entrada aparece por cima,
+  // num cruzamento suave; como o fundo é o mesmo, não aparece emenda
+  const e = f * f * (3 - 2 * f);
+  crtUniforms.slideA.value = e * 0.12;
+  crtUniforms.slideB.value = -(1 - e) * 0.12;
+  crtUniforms.alphaA.value = 1;
+  crtUniforms.alphaB.value = B ? e : 0;
+  // a luz da tela acompanha a imagem (mistura das duas páginas durante a troca)
+  main.glow.color.copy(A ? A.light : LIME);
+  if (B) main.glow.color.lerp(B.light, f);
+}
+
+// áreas clicáveis (em pixels do canvas da tela)
+function currentHits() {
+  const hits = [];
+  const n = S.games.length;
+  if (!n) return hits;
+  // sem setas na tela: as bordas continuam clicáveis (anterior/próximo) e o resto joga
+  if (S.index > 0) hits.push({ step: -1, x0: 0, y0: 0, w: 90, h: PH });
+  if (S.index < n - 1) hits.push({ step: 1, x0: PW - 150, y0: 0, w: 150, h: PH });
+  if (Math.abs(S.pos - S.index) < 0.02) hits.push({ play: true, x0: 0, y0: 0, w: PW, h: PH });
+  return hits;
+}
+
+// ===================================================================================
+// Câmera: posição fixa da referência; o ângulo de visão se ajusta à área livre da página
+// ===================================================================================
+let front = { pos: CAM.clone(), target: LOOK.clone(), fov: 50, offsetY: 0 };
+function applyView(fov, offsetY) {
+  const w = stage.clientWidth || 1, h = stage.clientHeight || 1;
+  camera.fov = fov;
+  camera.aspect = w / h;
+  camera.setViewOffset(w, h, 0, offsetY, w, h); // também atualiza a projeção
+}
+function computeFront() {
+  const w = stage.clientWidth || 1, h = stage.clientHeight || 1, aspect = w / h;
+  const header = document.querySelector('header.top');
+  // o topo do gabinete pode ficar atrás da linha das abas (só texto); a linha do logo e dos botões, não
+  const top = Math.min(0.22, (header ? header.offsetHeight * 0.55 : 0) / h);
+  const bottom = Math.min(0.05, 14 / h);
+  const free = 1 - top - bottom;
+  // ângulos medidos a partir do eixo da câmera, que olha um pouco para cima
+  const pitch = Math.atan2(LOOK.y - CAM.y, CAM.z - LOOK.z);
+  const ang = (pt) => Math.atan2(pt.y - CAM.y, CAM.z - pt.z) - pitch;
+  const tanT = Math.tan(ang(CORE_TOP));
+  const tanB = -Math.tan(ang(CORE_BOTTOM));
+  // largura: as laterais perto das bordas, como na referência
+  const byWidth = FIT_HALF_WIDTH / ((CAM.z - FIT_Z) / Math.cos(pitch)) / aspect;
+  const V = Math.max(byWidth, (tanT + tanB) / (2 * free));
+  // centro da área livre = meio da faixa que precisa aparecer
+  const s = (tanB - tanT) / 2 + 2 * V * (free / 2 + bottom - 0.5);
+  front = {
+    pos: CAM.clone(), target: LOOK.clone(),
+    fov: THREE.MathUtils.radToDeg(2 * Math.atan(V)), offsetY: (s / (2 * V)) * h,
+  };
+}
+
+let mode = 'hidden'; // hidden | moving | front | inside
+const camTarget = new V3();
+const easeInOut3 = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+
+function bez(p0, p1, p2, p3, t, out) {
+  const u = 1 - t;
+  return out.set(0, 0, 0)
+    .addScaledVector(p0, u * u * u).addScaledVector(p1, 3 * u * u * t)
+    .addScaledVector(p2, 3 * u * t * t).addScaledVector(p3, t * t * t);
+}
+function tween(ms, ease, onK) {
+  return new Promise((resolve) => {
+    const t0 = performance.now();
+    const step = (now) => {
+      const k = Math.min(1, (now - t0) / ms);
+      onK(ease(k), k);
+      if (k < 1) requestAnimationFrame(step); else resolve();
+    };
+    requestAnimationFrame(step);
+  });
+}
+function fly(path, ms, onK) {
+  return tween(ms, easeInOut3, (e, k) => {
+    bez(path.p0, path.p1, path.p2, path.p3, e, camera.position);
+    bez(path.t0, path.t1, path.t2, path.t3, e, camTarget);
+    camera.lookAt(camTarget);
+    if (onK) onK(e, k);
+  });
+}
+const reversePath = (p) => ({ p0: p.p3, p1: p.p2, p2: p.p1, p3: p.p0, t0: p.t3, t1: p.t2, t2: p.t1, t3: p.t0 });
+
+// Trocar de aba: a câmera se aproxima do fliperama como um zoom-in. Começa de trás, com o gabinete
+// pequeno, um pouco de lado (só ~20°) e um pouco mais alta, e vem chegando até a frente, desacelerando
+// no fim. Ao sair, faz o caminho contrário: recua e escorrega para o lado da aba nova.
+const VIEW_MS = 1200;
+const PIVOT = LOOK; // a câmera chega e sai sempre olhando para o meio da tela
+const APPROACH = { angle: THREE.MathUtils.degToRad(12), distance: 1.6, lift: 0.14 };
+const easeOut5 = (k) => 1 - Math.pow(1 - k, 5);
+const easeOut3 = (k) => 1 - Math.pow(1 - k, 3);
+const easeIn3 = (k) => k * k * k;
+// p = 0: longe e de lado; p = 1: de frente, no enquadramento da biblioteca
+function retreat(side, ms) {
+  const R = front.pos.z - PIVOT.z;
+  const from = camera.position.clone(), look = camTarget.clone();
+  return tween(ms, (k) => k, (k) => {
+    const e = easeOut3(k);
+    const th = side * THREE.MathUtils.degToRad(5) * e;
+    const r = R * (1 + 0.16 * e);
+    const goal = new V3(PIVOT.x + Math.sin(th) * r, front.pos.y + 0.03 * e, PIVOT.z + Math.cos(th) * r);
+    camera.position.copy(from).lerp(goal, e);
+    camTarget.copy(look).lerp(new V3(PIVOT.x + side * 0.05 * e, front.target.y, PIVOT.z), e);
+    camera.lookAt(camTarget);
+    stage.style.opacity = 1 - easeInOut3(Math.min(1, k / 0.85));
+  });
+}
+function approach(side, fromP, toP, ms, ease, onK) {
+  const R = front.pos.z - PIVOT.z;
+  return tween(ms, ease, (e, k) => {
+    const q = 1 - (fromP + (toP - fromP) * e); // quanto falta para chegar
+    const th = side * APPROACH.angle * q;
+    const r = R * (1 + (APPROACH.distance - 1) * q);
+    const lift = APPROACH.lift * q;
+    camera.position.set(PIVOT.x + Math.sin(th) * r, front.pos.y + lift, PIVOT.z + Math.cos(th) * r);
+    camTarget.set(PIVOT.x, front.target.y + lift * 0.25, PIVOT.z);
+    camera.lookAt(camTarget);
+    if (onK) onK(e, k);
+  });
+}
+
+let running = false;
+function show() {
+  stage.classList.add('on');
+  if (!running) { running = true; last = performance.now(); renderer.setAnimationLoop(frame); }
+}
+function hide() {
+  stage.classList.remove('on');
+  stage.style.opacity = 0;
+  running = false;
+  renderer.setAnimationLoop(null);
+}
+
+// paralaxe suave com o mouse quando a câmera está parada na frente
+const pointer = { x: 0, y: 0, sx: 0, sy: 0 };
+const lastCam = new V3();
+let last = 0;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  const t = now / 1000;
+  crtUniforms.time.value = t;
+  grain.uniforms.time.value = t;
+  // velocidade da câmera → desfoque de movimento (sobe e desce suave)
+  const speed = camera.position.distanceTo(lastCam) / Math.max(dt, 0.001);
+  lastCam.copy(camera.position);
+  const blurTarget = mode === 'moving' ? Math.min(0.028, speed * 0.007) : 0;
+  grain.uniforms.blur.value += (blurTarget - grain.uniforms.blur.value) * 0.3;
+
+  // carrossel: anda até o card escolhido com amortecimento; só redesenha enquanto anda
+  const diff = S.index - S.pos;
+  if (Math.abs(diff) > 0.0008) S.pos += diff * (1 - Math.exp(-dt * 12));
+  else S.pos = S.index;
+  updateScreen();
+
+  if (mode === 'front') {
+    pointer.sx += (pointer.x - pointer.sx) * (1 - Math.exp(-dt * 3));
+    pointer.sy += (pointer.y - pointer.sy) * (1 - Math.exp(-dt * 3));
+    camera.position.set(front.pos.x + pointer.sx * 0.05, front.pos.y - pointer.sy * 0.025 + Math.sin(t * 0.7) * 0.004, front.pos.z);
+    camTarget.copy(front.target);
+    camera.lookAt(camTarget);
+  }
+  composer.render();
+}
+
+function resize() {
+  const w = stage.clientWidth || 1, h = stage.clientHeight || 1;
+  renderer.setSize(w, h, false);
+  composer.setSize(w, h);
+  computeFront();
+  if (mode !== 'inside') applyView(front.fov, front.offsetY);
+}
+new ResizeObserver(resize).observe(stage);
+resize();
+
+// ---------- mouse, clique e rolagem ----------
+const ray = new THREE.Raycaster();
+const ndc = new V2();
+function screenPoint(e) {
+  const r = stage.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObject(main.crt)[0];
+  return hit ? { x: hit.uv.x * PW, y: (1 - hit.uv.y) * PH } : null;
+}
+function hitAt(p) {
+  return p ? currentHits().find((h) => p.x >= h.x0 && p.x <= h.x0 + h.w && p.y >= h.y0 && p.y <= h.y0 + h.h) : null;
+}
+stage.addEventListener('pointermove', (e) => {
+  const r = stage.getBoundingClientRect();
+  pointer.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+  pointer.y = ((e.clientY - r.top) / r.height) * 2 - 1;
+  stage.style.cursor = mode === 'front' && hitAt(screenPoint(e)) ? 'pointer' : 'default';
+});
+stage.addEventListener('click', (e) => {
+  if (mode !== 'front') return;
+  const h = hitAt(screenPoint(e));
+  if (!h) return;
+  if (h.step) api.step(h.step);
+  else if (h.play) window.dispatchEvent(new CustomEvent('arcade:play'));
+  else if (h.focus !== undefined) api.focus(h.focus);
+});
+// rolagem (roda do mouse ou dois dedos no trackpad, vertical ou horizontal) troca de jogo
+let wheelAcc = 0, wheelLock = 0, wheelIdle = 0;
+stage.addEventListener('wheel', (e) => {
+  if (mode !== 'front') return;
+  e.preventDefault();
+  const now = performance.now();
+  if (now - wheelIdle > 250) wheelAcc = 0;
+  wheelIdle = now;
+  wheelAcc += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+  if (now >= wheelLock && Math.abs(wheelAcc) >= 45) {
+    api.step(Math.sign(wheelAcc));
+    wheelAcc = 0;
+    wheelLock = now + 170;
+  }
+}, { passive: false });
+
+// ---------- ligar / desligar o tubo ----------
+function powerTo(target, ms) {
+  const start = crtUniforms.power.value;
+  return tween(ms, (k) => k, (k) => {
+    const p = start + (target - start) * k;
+    const f = target === 0 ? Math.max(0, 0.6 * Math.sin(Math.min(1, k * 2.2) * Math.PI)) : 0.5 * Math.sin(k * Math.PI);
+    crtUniforms.power.value = p;
+    crtUniforms.flash.value = f;
+    main.glow.intensity = 3.4 * Math.max(0.04, p) + 6 * f; // apagada, a tela para de iluminar o painel
+  }).then(() => { crtUniforms.flash.value = 0; });
+}
+
+// ===================================================================================
+// API para a página
+// ===================================================================================
+let launchPath = null;
+const api = {
+  setGames(list, coverFn) {
+    S.games = list.slice();
+    if (coverFn) S.coverFn = coverFn;
+    // jogos que saíram da lista: libera as páginas da placa de vídeo
+    const ids = new Set(S.games.map((g) => g.id));
+    for (const [id, page] of S.pages) if (!ids.has(id)) { page.tex.dispose(); S.pages.delete(id); }
+    S.index = Math.max(0, Math.min(S.index, S.games.length - 1));
+    S.pos = Math.min(S.pos, S.games.length - 1);
+    refreshPages();
+    drawChrome();
+  },
+  focus(i) {
+    if (i < 0 || i >= S.games.length || i === S.index) return;
+    S.index = i;
+    // a página do jogo em foco precisa existir já; as outras ficam para depois do deslize
+    const game = S.games[i];
+    if (!S.pages.has(game.id)) { prepCover(game); buildPage(game); }
+    drawChrome();
+    schedulePages();
+  },
+  step(d) { api.focus(S.index + d); },
+  current() { return S.games[S.index]; },
+  // um jogo editado: capa e página são refeitas no próximo setGames
+  invalidate(id) {
+    S.covers.delete(id);
+    const page = S.pages.get(id);
+    if (page) { page.tex.dispose(); S.pages.delete(id); }
+  },
+
+  async enter(side) {
+    computeFront();
+    applyView(front.fov, front.offsetY);
+    show();
+    mode = 'moving';
+    pointer.sx = pointer.sy = 0;
+    // o começo (rápido) acontece ainda invisível; o que se vê é a chegada desacelerando
+    stage.style.opacity = 0;
+    await approach(side, 0, 1, 1500, easeOut5, (e, k) => { stage.style.opacity = Math.min(1, Math.max(0, (k - 0.1) / 0.3)); });
+    stage.style.opacity = 1;
+    mode = 'front';
+  },
+
+  // Saída leve: a câmera recua um pouco (desacelerando) e inclina de leve para o lado da aba nova,
+  // enquanto o fliperama esmaece. Curto, sem arrancada.
+  async leave(side) {
+    mode = 'moving';
+    await retreat(side, 520);
+    hide();
+    mode = 'hidden';
+  },
+
+  // a câmera entra na tela e o tubo apaga; a página mostra o jogo por cima
+  async launch() {
+    if (mode !== 'front') return;
+    mode = 'moving';
+    const c = main.crt.getWorldPosition(new V3());
+    const nrm = new V3(0, 0, 1).applyQuaternion(main.crt.getWorldQuaternion(new THREE.Quaternion()));
+    const tan = Math.tan(THREE.MathUtils.degToRad(front.fov / 2));
+    const fill = Math.min((CRT_H / 2) / tan, (CRT_W / 2) / (tan * camera.aspect)) * 0.82;
+    const end = c.clone().addScaledVector(nrm, fill);
+    const start = camera.position.clone();
+    launchPath = {
+      p0: start, p1: start.clone().lerp(end, 0.35), p2: c.clone().addScaledVector(nrm, fill + 0.35), p3: end,
+      t0: camTarget.clone(), t1: camTarget.clone().lerp(c, 0.6), t2: c.clone(), t3: c.clone(),
+    };
+    await fly(launchPath, 1250, (e) => applyView(front.fov, front.offsetY * (1 - e))); // centraliza o tubo
+    await powerTo(0, 380);
+    mode = 'inside';
+  },
+
+  async exitGame() {
+    if (mode !== 'inside') return;
+    mode = 'moving';
+    await powerTo(1, 420);
+    computeFront();
+    const back = reversePath(launchPath);
+    back.p3 = front.pos.clone();
+    back.t3 = front.target.clone();
+    await fly(back, 1300, (e) => applyView(front.fov, front.offsetY * e));
+    pointer.sx = pointer.sy = 0;
+    mode = 'front';
+  },
+};
+
+// Prepara tudo com a página ainda no lobby, nesta ordem: fontes (a legenda e as páginas já nascem com a
+// tipografia certa), depois shaders e sombra. Nada é trocado durante a compilação, e a primeira entrada não engasga.
+const fontsReady = Promise.race([
+  Promise.all(['100px Anton', '800 22px Inter', '900 32px Inter', '700 72px Caveat'].map((f) => document.fonts.load(f))),
+  new Promise((r) => setTimeout(r, 2500)), // sem internet para as fontes: segue com as de reserva
+]).catch(() => {});
+fontsReady.then(() => {
+  const oldLegend = main.legend.material;
+  main.legend.material = legendMaterial(main.legendWidth);
+  oldLegend.map.dispose(); oldLegend.bumpMap.dispose(); oldLegend.dispose();
+  S.games.forEach((game) => { if (S.pages.has(game.id)) buildPage(game); });
+  drawChrome();
+  camera.position.copy(front.pos);
+  camera.lookAt(front.target);
+  composer.setSize(stage.clientWidth || 1, stage.clientHeight || 1);
+  renderer.setRenderTarget(composer.readBuffer);
+  const compiling = renderer.compileAsync(scene, camera);
+  renderer.setRenderTarget(null);
+  return compiling.catch(() => {});
+}).finally(() => {
+  renderer.shadowMap.needsUpdate = true;
+  composer.render();
+  window.__resolveArcade(api);
+});
+</script>
+</body>
+</html>

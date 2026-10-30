@@ -1,0 +1,30 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/pa-core",
+    "crates/pa-phone",
+    "crates/pa-virtualpad",
+    "spikes/latency",
+]
+
+[workspace.package]
+edition = "2021"
+version = "0.0.1"
+publish = false
+
+[workspace.dependencies]
+pa-core = { path = "crates/pa-core" }
+pa-phone = { path = "crates/pa-phone" }
+pa-virtualpad = { path = "crates/pa-virtualpad" }
+
+axum = { version = "0.8", features = ["ws"] }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+if-addrs = "0.13"
+qrcode = { version = "0.14", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time", "signal"] }
+vigem-client = "0.1"
+
+[profile.release]
+debug = 1

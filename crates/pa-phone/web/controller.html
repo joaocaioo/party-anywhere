@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0c0f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Party Anywhere</title>
+<!--
+  Controle do celular (protocolo v1, ver crates/pa-phone/src/protocol.rs).
+  Servido pelo Hub na rede local; não depende de internet (sem fontes nem scripts externos).
+  Cada mudança vai como STATE_T com o instante do toque, para o Hub medir a latência.
+-->
+<style>
+:root {
+  --bg: #0b0c0f;
+  --panel: #15161a;
+  --line: rgba(255, 255, 255, .1);
+  --text: #f4f4f5;
+  --muted: #9b9ca5;
+  --neon: #3cf060;
+  --seat: #3cf060;
+  --a: #22c55e; --b: #ef4444; --x: #3b82f6; --y: #eab308;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; height: 100%; overflow: hidden;
+  background: var(--bg); color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  overscroll-behavior: none; touch-action: none;
+}
+button { font: inherit; color: inherit; border: 0; background: none; padding: 0; }
+
+.pad {
+  position: fixed; inset: 0;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  grid-template-rows: auto auto 1fr;
+  padding: max(10px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  background: radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, var(--seat) 14%, transparent), transparent 70%), var(--bg);
+}
+
+/* topo */
+.bar { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; height: 40px; }
+.who { display: flex; align-items: center; gap: 8px; font-weight: 800; }
+.who i { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 13px; background: var(--seat); color: rgba(0, 0, 0, .78); box-shadow: 0 0 16px var(--seat); }
+.who span { font-size: 14px; }
+.net { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.net b { width: 8px; height: 8px; border-radius: 50%; background: var(--neon); }
+.net.warn b { background: #facc15; } .net.bad b { background: #ef4444; }
+.chip { height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+
+/* gatilhos e ombros */
+.shoulders { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 10px; margin-top: 6px; }
+.shoulders .side { display: flex; gap: 8px; }
+.sh { width: 74px; height: 38px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); font-weight: 800; font-size: 13px; color: var(--muted); }
+
+/* zonas */
+.stick-zone { position: relative; grid-row: 3; grid-column: 1; }
+.stick-zone .hint { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 12px; color: rgba(255, 255, 255, .25); text-align: center; pointer-events: none; }
+.base, .knob { position: absolute; border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); }
+.base { width: 128px; height: 128px; border: 2px solid rgba(255, 255, 255, .14); background: rgba(255, 255, 255, .04); }
+.knob { width: 62px; height: 62px; background: color-mix(in srgb, var(--seat) 70%, white 10%); box-shadow: 0 0 24px color-mix(in srgb, var(--seat) 60%, transparent); }
+
+.mid { grid-row: 3; grid-column: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+.small { width: 54px; height: 30px; border-radius: 15px; background: var(--panel); border: 1px solid var(--line); font-size: 11px; font-weight: 800; color: var(--muted); }
+
+.face { grid-row: 3; grid-column: 3; position: relative; }
+.abxy { position: absolute; right: 6%; top: 50%; width: 210px; height: 210px; transform: translateY(-50%); }
+.fb {
+  position: absolute; width: 78px; height: 78px; border-radius: 50%;
+  font-size: 26px; font-weight: 900;
+  background: color-mix(in srgb, var(--c) 18%, var(--panel));
+  border: 2px solid color-mix(in srgb, var(--c) 70%, transparent);
+  color: var(--c);
+}
+.fb[data-b="Y"] { left: 66px; top: 0; --c: var(--y); }
+.fb[data-b="X"] { left: 0; top: 66px; --c: var(--x); }
+.fb[data-b="B"] { right: 0; top: 66px; --c: var(--b); }
+.fb[data-b="A"] { left: 66px; bottom: 0; --c: var(--a); }
+.down { filter: brightness(1.6); transform: scale(.94); }
+.fb.down { background: var(--c); color: rgba(0, 0, 0, .75); }
+.sh.down, .small.down { background: var(--seat); color: rgba(0, 0, 0, .78); }
+
+/* camadas */
+.layer { position: fixed; inset: 0; display: none; place-content: center; text-align: center; gap: 10px; padding: 24px; background: rgba(11, 12, 15, .94); z-index: 10; }
+.layer.on { display: grid; }
+.layer h2 { margin: 0; font-size: 20px; }
+.layer p { margin: 0; color: var(--muted); font-size: 14px; }
+.spinner { width: 36px; height: 36px; margin: 0 auto 6px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .15); border-top-color: var(--neon); animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.rotate { display: none; }
+@media (orientation: portrait) { .rotate { display: grid; } }
+
+.test { position: fixed; left: 50%; top: 52px; transform: translateX(-50%); width: min(560px, calc(100% - 24px)); z-index: 5; display: none; padding: 14px 16px; border-radius: 18px; background: rgba(21, 22, 26, .96); border: 1px solid var(--line); box-shadow: 0 20px 50px rgba(0, 0, 0, .6); }
+.test.on { display: block; }
+.test h3 { margin: 0 0 8px; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; }
+.rows { display: grid; grid-template-columns: auto 1fr 1fr 1fr auto; gap: 4px 12px; font-size: 13px; align-items: baseline; }
+.rows .h { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+.rows b { font-variant-numeric: tabular-nums; }
+.test .actions { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+.go { height: 36px; padding: 0 16px; border-radius: 999px; background: var(--neon); color: #04140a; font-weight: 800; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+.go[disabled] { opacity: .5; }
+.test small { color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="pad" id="pad">
+  <div class="bar">
+    <div class="who"><i id="seatNum">·</i><span id="seatName">Conectando...</span></div>
+    <div class="net" id="net"><b></b><span id="netTxt">--</span></div>
+    <button class="chip" id="testBtn">Teste</button>
+    <button class="chip" id="fsBtn" aria-label="Tela cheia">⛶</button>
+  </div>
+  <div class="shoulders">
+    <div class="side"><button class="sh" data-b="LT">LT</button><button class="sh" data-b="LB">LB</button></div>
+    <div class="side"><button class="sh" data-b="RB">RB</button><button class="sh" data-b="RT">RT</button></div>
+  </div>
+  <div class="stick-zone" id="stickZone"><div class="hint">Toque e arraste<br>em qualquer lugar aqui</div></div>
+  <div class="mid">
+    <button class="small" data-b="BACK">VOLTAR</button>
+    <button class="small" data-b="START">START</button>
+  </div>
+  <div class="face">
+    <div class="abxy">
+      <button class="fb" data-b="Y">Y</button>
+      <button class="fb" data-b="X">X</button>
+      <button class="fb" data-b="B">B</button>
+      <button class="fb" data-b="A">A</button>
+    </div>
+  </div>
+</div>
+
+<div class="test" id="test">
+  <h3>Teste de latência</h3>
+  <div class="rows">
+    <span class="h"></span><span class="h">p50</span><span class="h">p95</span><span class="h">p99</span><span class="h">amostras</span>
+    <span>Toque → PC</span><b id="t50">--</b><b id="t95">--</b><b id="t99">--</b><b id="tn">0</b>
+    <span>Rede (rajada)</span><b id="r50">--</b><b id="r95">--</b><b id="r99">--</b><b id="rn">0</b>
+    <span>Ida e volta</span><b id="i50">--</b><b id="i95">--</b><b id="i99">--</b><b id="in">0</b>
+  </div>
+  <div class="actions">
+    <button class="go" id="burstBtn">Rajada automática (30 s)</button>
+    <small id="burstTxt">Ou só jogue: cada toque é medido.</small>
+  </div>
+</div>
+
+<div class="layer" id="offline"><div class="spinner"></div><h2>Reconectando...</h2><p>O celular está no mesmo Wi-Fi do PC?</p></div>
+<div class="layer" id="rejected"><h2 id="rejTitle">Não deu para entrar</h2><p id="rejText"></p></div>
+<div class="layer rotate"><h2>Gire o celular</h2><p>O controle funciona deitado.</p></div>
+
+<script>
+'use strict';
+const BIT = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, BACK: 6, START: 7, LS: 8, RS: 9, UP: 10, DOWN: 11, LEFT: 12, RIGHT: 13 };
+const KIND = { heartbeat: 0, touch: 1, burst: 2 };
+const HEARTBEAT_MS = 100;
+const STICK_RADIUS = 60;
+const DEADZONE = 0.12;
+
+const pad = { buttons: 0, lx: 0, ly: 0, rx: 0, ry: 0, lt: 0, rt: 0 };
+let ws = null;
+let seq = 0;
+let lastSend = 0;
+let syncId = 0;
+const syncSent = new Map();
+const rtts = [];
+let syncTimer = null;
+let burstTimer = null;
+let stopped = false;
+
+const $ = (id) => document.getElementById(id);
+
+// ---------------------------------------------------------------- conexão
+function deviceName() {
+  const ua = navigator.userAgent;
+  if (/iPhone/.test(ua)) return 'iPhone';
+  if (/iPad/.test(ua)) return 'iPad';
+  const m = ua.match(/Android [\d.]+; ([^;)]+)/);
+  if (m) return m[1].replace(/ Build.*/, '').trim();
+  if (/Android/.test(ua)) return 'Android';
+  return 'Navegador';
+}
+
+function connect() {
+  if (stopped || document.hidden) return;
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.binaryType = 'arraybuffer';
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ t: 'hello', v: 1, device: deviceName() }));
+    $('offline').classList.remove('on');
+    // rajada de sincronização para achar logo uma ida e volta curta; depois, uma a cada 2 s
+    let n = 0;
+    clearInterval(syncTimer);
+    syncTimer = setInterval(() => {
+      sendSync();
+      if (++n === 12) { clearInterval(syncTimer); syncTimer = setInterval(sendSync, 2000); }
+    }, 60);
+  };
+  ws.onmessage = (ev) => (typeof ev.data === 'string' ? onText(JSON.parse(ev.data)) : onBinary(new DataView(ev.data)));
+  ws.onclose = () => {
+    clearInterval(syncTimer);
+    stopBurst();
+    if (stopped) return;
+    $('offline').classList.add('on');
+    setTimeout(connect, 1000);
+  };
+}
+
+function onText(m) {
+  if (m.t === 'welcome') {
+    document.documentElement.style.setProperty('--seat', m.color);
+    $('seatNum').textContent = m.seat;
+    $('seatName').textContent = `P${m.seat} · ${m.name}`;
+    vibrate(60);
+  } else if (m.t === 'reject') {
+    const texts = { full: 'O lobby está cheio (10 de 10).', version: 'Atualize a página.', closed: 'O lobby está fechado agora.' };
+    $('rejText').textContent = texts[m.reason] || m.reason;
+    $('rejected').classList.add('on');
+    if (m.reason === 'version') { stopped = true; setTimeout(() => location.reload(), 1500); }
+  } else if (m.t === 'stats') {
+    showStats(m.data);
+  } else if (m.t === 'toast') {
+    $('burstTxt').textContent = m.text;
+  }
+}
+
+function onBinary(dv) {
+  const type = dv.getUint8(0);
+  if (type === 0x85) { // SYNC_REPLY
+    const id = dv.getUint16(1, true);
+    const t0 = syncSent.get(id);
+    if (t0 === undefined) return;
+    syncSent.delete(id);
+    const t1 = performance.now();
+    const b = new DataView(new ArrayBuffer(11));
+    b.setUint8(0, 0x07); b.setUint16(1, id, true); b.setFloat64(3, t1, true);
+    sendRaw(b.buffer);
+    rtts.push(t1 - t0);
+    if (rtts.length > 30) rtts.shift();
+    showNet();
+  } else if (type === 0x84) { // RUMBLE
+    vibrate(dv.getUint16(1, true));
+  }
+}
+
+function sendRaw(buf) {
+  if (ws && ws.readyState === 1) ws.send(buf);
+}
+
+function sendSync() {
+  syncId = (syncId + 1) & 0xffff;
+  const t0 = performance.now();
+  syncSent.set(syncId, t0);
+  if (syncSent.size > 16) syncSent.delete(syncSent.keys().next().value);
+  const b = new DataView(new ArrayBuffer(11));
+  b.setUint8(0, 0x06); b.setUint16(1, syncId, true); b.setFloat64(3, t0, true);
+  sendRaw(b.buffer);
+}
+
+// STATE_T: [05][seq u16][botões u16][lx][ly][rx][ry][lt][rt][tipo u8][t f64]
+function sendState(kind, t) {
+  const b = new DataView(new ArrayBuffer(20));
+  const axis = (v) => Math.round(Math.max(-1, Math.min(1, v)) * 127);
+  const trig = (v) => Math.round(Math.max(0, Math.min(1, v)) * 255);
+  b.setUint8(0, 0x05);
+  b.setUint16(1, seq, true);
+  b.setUint16(3, pad.buttons & 0x7fff, true);
+  b.setInt8(5, axis(pad.lx)); b.setInt8(6, axis(pad.ly)); b.setInt8(7, axis(pad.rx)); b.setInt8(8, axis(pad.ry));
+  b.setUint8(9, trig(pad.lt)); b.setUint8(10, trig(pad.rt));
+  b.setUint8(11, kind);
+  b.setFloat64(12, t, true);
+  sendRaw(b.buffer);
+  seq = (seq + 1) & 0xffff;
+  lastSend = performance.now();
+}
+
+// Instante do toque. event.timeStamp usa a mesma origem de performance.now() nos navegadores atuais;
+// se vier em outra base (navegador antigo), cai para agora.
+function touchTime(e) {
+  const now = performance.now();
+  const t = e && e.timeStamp;
+  return t && t <= now + 5 && t > now - 5000 ? t : now;
+}
+
+setInterval(() => {
+  if (performance.now() - lastSend >= HEARTBEAT_MS) sendState(KIND.heartbeat, performance.now());
+}, 25);
+
+// ---------------------------------------------------------------- botões
+document.querySelectorAll('[data-b]').forEach((el) => {
+  const name = el.dataset.b;
+  const set = (on, e) => {
+    if (name === 'LT') pad.lt = on ? 1 : 0;
+    else if (name === 'RT') pad.rt = on ? 1 : 0;
+    else if (on) pad.buttons |= 1 << BIT[name];
+    else pad.buttons &= ~(1 << BIT[name]);
+    el.classList.toggle('down', on);
+    sendState(KIND.touch, touchTime(e));
+  };
+  el.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    capture(el, e);
+    set(true, e);
+    vibrate(8);
+    keepAwake();
+  });
+  const up = (e) => { if (el.classList.contains('down')) set(false, e); };
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', up);
+  el.addEventListener('lostpointercapture', up);
+});
+
+// ---------------------------------------------------------------- analógico flutuante
+const zone = $('stickZone');
+let stickId = null, ox = 0, oy = 0, base = null, knob = null;
+zone.addEventListener('pointerdown', (e) => {
+  if (stickId !== null) return;
+  e.preventDefault();
+  capture(zone, e);
+  stickId = e.pointerId;
+  const r = zone.getBoundingClientRect();
+  ox = e.clientX - r.left; oy = e.clientY - r.top;
+  base = document.createElement('div'); base.className = 'base';
+  knob = document.createElement('div'); knob.className = 'knob';
+  base.style.left = knob.style.left = ox + 'px';
+  base.style.top = knob.style.top = oy + 'px';
+  zone.append(base, knob);
+  zone.querySelector('.hint').style.display = 'none';
+  keepAwake();
+});
+zone.addEventListener('pointermove', (e) => {
+  if (e.pointerId !== stickId) return;
+  const r = zone.getBoundingClientRect();
+  let dx = e.clientX - r.left - ox, dy = e.clientY - r.top - oy;
+  const len = Math.hypot(dx, dy);
+  if (len > STICK_RADIUS) { dx *= STICK_RADIUS / len; dy *= STICK_RADIUS / len; }
+  knob.style.left = ox + dx + 'px';
+  knob.style.top = oy + dy + 'px';
+  // zona morta radial, reescalada para o eixo ainda chegar a 1
+  const mag = Math.min(1, len / STICK_RADIUS);
+  const k = mag < DEADZONE ? 0 : (mag - DEADZONE) / (1 - DEADZONE) / (mag || 1);
+  const lx = (dx / STICK_RADIUS) * k, ly = (-dy / STICK_RADIUS) * k;
+  if (Math.abs(lx - pad.lx) < 0.01 && Math.abs(ly - pad.ly) < 0.01) return;
+  pad.lx = lx; pad.ly = ly;
+  sendState(KIND.touch, touchTime(e));
+});
+const stickUp = (e) => {
+  if (e.pointerId !== stickId) return;
+  stickId = null;
+  base && base.remove(); knob && knob.remove();
+  pad.lx = 0; pad.ly = 0;
+  sendState(KIND.touch, touchTime(e));
+};
+zone.addEventListener('pointerup', stickUp);
+zone.addEventListener('pointercancel', stickUp);
+
+// ---------------------------------------------------------------- teste
+$('testBtn').addEventListener('click', () => $('test').classList.toggle('on'));
+$('burstBtn').addEventListener('click', () => {
+  if (burstTimer) return;
+  const until = performance.now() + 30000;
+  $('burstBtn').disabled = true;
+  burstTimer = setInterval(() => {
+    const now = performance.now();
+    if (now >= until) { stopBurst(); $('burstTxt').textContent = 'Rajada concluída.'; return; }
+    sendState(KIND.burst, now);
+    $('burstTxt').textContent = `Enviando... ${Math.ceil((until - now) / 1000)} s`;
+  }, 16);
+});
+function stopBurst() {
+  clearInterval(burstTimer);
+  burstTimer = null;
+  $('burstBtn').disabled = false;
+}
+
+const fmt = (v) => (v == null ? '--' : v < 10 ? v.toFixed(1) : Math.round(v)) + (v == null ? '' : ' ms');
+function showStats(d) {
+  const put = (p, s) => {
+    $(p + '50').textContent = fmt(s && s.p50);
+    $(p + '95').textContent = fmt(s && s.p95);
+    $(p + '99').textContent = fmt(s && s.p99);
+    $(p + 'n').textContent = s ? s.n : 0;
+  };
+  put('t', d.touch); put('r', d.burst); put('i', d.rtt);
+}
+function showNet() {
+  const sorted = [...rtts].sort((a, b) => a - b);
+  const med = sorted[Math.floor(sorted.length / 2)];
+  const net = $('net');
+  net.className = 'net' + (med > 60 ? ' bad' : med > 30 ? ' warn' : '');
+  $('netTxt').textContent = `${Math.round(med)} ms`;
+}
+
+// ---------------------------------------------------------------- tela
+let wakeLock = null;
+async function keepAwake() {
+  if (wakeLock || !navigator.wakeLock) return;
+  try { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } catch (_) {}
+}
+$('fsBtn').addEventListener('click', () => {
+  const el = document.documentElement;
+  if (document.fullscreenElement) document.exitFullscreen();
+  else (el.requestFullscreen || el.webkitRequestFullscreen || (() => {})).call(el);
+  if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
+});
+// A captura garante o "soltou" mesmo se o dedo escorregar para fora; se falhar, o botão ainda funciona.
+function capture(el, e) { try { el.setPointerCapture(e.pointerId); } catch (_) {} }
+function vibrate(ms) { if (navigator.vibrate) navigator.vibrate(ms); }
+
+// Em segundo plano o celular fecha a conexão; ao voltar, reconecta (docs/ARCHITECTURE.md).
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { if (ws) ws.close(); }
+  else if (!ws || ws.readyState > 1) connect();
+});
+
+connect();
+</script>
+</body>
+</html>

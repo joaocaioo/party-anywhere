@@ -1,0 +1,157 @@
+# Party Anywhere SDK (v1, rascunho)
+
+Para quem cria jogos e mods co-op. Com o SDK, o seu jogo **não tem código de controle**: o Hub
+descobre controles e celulares, organiza o lobby (P1..P10) e reconecta quem cai. O jogo só lê.
+
+> Status: contrato em rascunho. Os nomes podem mudar até a v1 sair (ver [ROADMAP.md](ROADMAP.md)).
+
+## Por que um cabeçalho C
+
+- Um arquivo, `party_anywhere.h`, no estilo stb: inclua em qualquer lugar e, em **um** arquivo `.c/.cpp`,
+  defina `PARTY_ANYWHERE_IMPLEMENTATION` antes do include.
+- ABI C: funciona em C e C++ e, por FFI, em C#, Lua, Rust, Godot (GDExtension) e Unity.
+- Compila em **x86 e x64** (mods de jogos antigos são 32 bits). Só depende da API do Windows.
+- Sem DLL para distribuir, sem thread escondida, sem alocação depois do `pa_connect`.
+
+## Exemplo mínimo
+
+```c
+#define PARTY_ANYWHERE_IMPLEMENTATION
+#include "party_anywhere.h"
+
+pa_client* pa = NULL;
+
+void game_start(void) {
+    pa_game_info info = {
+        .struct_size = sizeof info,
+        .game_id     = "com.exemplo.arena-blast",   // o mesmo id do party-anywhere.json
+        .game_name   = "Arena Blast",
+        .min_players = 1,
+        .max_players = 10,
+    };
+    if (pa_connect(&info, &pa) != PA_OK) {
+        // Hub fechado ou versão incompatível: avise o jogador ou use controles próprios.
+    }
+    pa_set_accepting_players(pa, true);        // lobby aberto: celulares novos podem entrar
+}
+
+void game_frame(void) {
+    pa_poll(pa);                               // uma vez por frame, na thread do jogo
+
+    pa_event ev;
+    while (pa_next_event(pa, &ev)) {
+        switch (ev.type) {
+        case PA_EVENT_SEAT_JOINED:       spawn_player(ev.seat);      break;
+        case PA_EVENT_SEAT_RECONNECTING: pause_player(ev.seat);      break;
+        case PA_EVENT_SEAT_RESUMED:      resume_player(ev.seat);     break;
+        case PA_EVENT_SEAT_LEFT:         despawn_player(ev.seat);    break;
+        case PA_EVENT_HUB_LOST:          show_hub_closed_message();  break;
+        default: break;
+        }
+    }
+
+    for (int s = 0; s < PA_MAX_SEATS; ++s) {
+        pa_pad pad;
+        if (pa_get_pad(pa, s, &pad)) {
+            move_player(s, pad.lx, pad.ly);
+            if (pad.pressed & PA_BTN_A) jump(s);  // "pressed" = apertou neste frame
+        }
+    }
+}
+
+void game_end(void) { pa_disconnect(pa); }
+```
+
+## API
+
+### Conexão
+
+```c
+pa_result pa_connect(const pa_game_info* info, pa_client** out);
+void      pa_disconnect(pa_client* pa);
+void      pa_poll(pa_client* pa);              // lê eventos do pipe e atualiza "pressed/released"
+bool      pa_is_connected(const pa_client* pa);
+const char* pa_join_url(const pa_client* pa);  // URL do QR, para o jogo desenhar o próprio lobby
+```
+
+`pa_result`: `PA_OK`, `PA_ERR_HUB_NOT_RUNNING`, `PA_ERR_VERSION`, `PA_ERR_BUSY` (outro jogo já está
+conectado), `PA_ERR_INVALID_ARG`.
+
+### Vagas (jogadores)
+
+```c
+#define PA_MAX_SEATS 10
+
+typedef struct pa_seat_info {
+    uint8_t     index;          // 0..9 → P1..P10
+    pa_seat_state state;        // PA_SEAT_EMPTY | PA_SEAT_ACTIVE | PA_SEAT_RECONNECTING
+    pa_device_kind device;      // PA_DEVICE_GAMEPAD | PA_DEVICE_PHONE | PA_DEVICE_KEYBOARD_MOUSE
+    uint8_t     r, g, b;        // cor do jogador (fixa por índice)
+    char        name[32];       // UTF-8, ex.: "João"
+} pa_seat_info;
+
+bool pa_get_seat(const pa_client* pa, int seat, pa_seat_info* out);
+int  pa_active_seat_count(const pa_client* pa);
+```
+
+### Estado do controle
+
+```c
+enum {
+    PA_BTN_A = 1u << 0,  PA_BTN_B = 1u << 1,  PA_BTN_X = 1u << 2,  PA_BTN_Y = 1u << 3,
+    PA_BTN_LB = 1u << 4, PA_BTN_RB = 1u << 5, PA_BTN_BACK = 1u << 6, PA_BTN_START = 1u << 7,
+    PA_BTN_LS = 1u << 8, PA_BTN_RS = 1u << 9,
+    PA_BTN_UP = 1u << 10, PA_BTN_DOWN = 1u << 11, PA_BTN_LEFT = 1u << 12, PA_BTN_RIGHT = 1u << 13,
+    PA_BTN_GUIDE = 1u << 14,
+};
+
+typedef struct pa_pad {
+    uint32_t buttons;           // seguros agora
+    uint32_t pressed;           // apertados desde o pa_poll anterior
+    uint32_t released;          // soltos desde o pa_poll anterior
+    float lx, ly, rx, ry;       // -1..1, direita e cima positivos, zona morta aplicada
+    float lt, rt;               // 0..1
+} pa_pad;
+
+bool pa_get_pad(const pa_client* pa, int seat, pa_pad* out);  // false (e zerado) se a vaga não está ativa
+```
+
+Regras:
+- Sempre o formato de controle de Xbox, venha de um DualSense, de um Switch Pro ou de um celular.
+- Vaga em `RECONNECTING` devolve `false`: o jogo recebe controle neutro, nunca o último estado preso.
+
+### Do jogo para o jogador
+
+```c
+void pa_set_accepting_players(pa_client* pa, bool accepting);
+void pa_set_layout(pa_client* pa, int seat, pa_layout layout);                 // GAMEPAD | SIMPLE | DRIVING | MENU
+void pa_set_label(pa_client* pa, int seat, uint32_t button, const char* label); // "Correr", "Atirar"
+void pa_toast(pa_client* pa, int seat, const char* text);                      // aviso curto no celular
+void pa_rumble(pa_client* pa, int seat, float low, float high, int duration_ms);
+void pa_set_light(pa_client* pa, int seat, uint8_t r, uint8_t g, uint8_t b);   // luz do controle, se houver
+```
+
+`seat = PA_ALL_SEATS` (-1) aplica a todos. Chamadas repetidas com o mesmo valor não geram tráfego.
+
+## Garantias do Hub
+
+- `pa_get_pad` não faz chamada de sistema: lê memória compartilhada (custo de nanossegundos).
+- A ordem dos eventos é a ordem real; `SEAT_JOINED` sempre vem antes do primeiro `pa_get_pad` válido daquela vaga.
+- O índice da vaga é estável durante a sessão. P3 continua P3 depois de cair e voltar.
+- Enquanto o jogo está conectado, o Hub desliga os controles virtuais do Modo Universal (sem entrada dupla).
+- ABI versionada: um Hub novo aceita jogos com SDK da mesma versão maior.
+
+## Integração por tipo de projeto
+
+| Projeto | Como usar |
+|---|---|
+| Jogo em C/C++ | Inclua o cabeçalho. |
+| Mod por DLL/ASI (ex.: GTA SA com plugin-sdk) | Inclua no plugin e chame `pa_poll` no mesmo ponto em que o jogo lê os pads. |
+| Unity / BepInEx | Binding C# (`PartyAnywhere.cs`, previsto) por `DllImport` de uma DLL fina gerada do cabeçalho. |
+| Godot | GDExtension fina (prevista). |
+| Lua (REFramework, UE4SS) | FFI sobre a DLL fina. |
+
+## Publicar
+
+Junto do código, o repositório precisa de um `party-anywhere.json` e de uma capa. Ver
+[GAME-MANIFEST.md](GAME-MANIFEST.md).

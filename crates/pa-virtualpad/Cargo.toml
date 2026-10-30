@@ -1,0 +1,12 @@
+[package]
+name = "pa-virtualpad"
+description = "Controles virtuais para o Modo Universal (ViGEmBus no Windows), atrás de uma interface trocável."
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[dependencies]
+pa-core.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+vigem-client.workspace = true

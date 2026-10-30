@@ -1,0 +1,8 @@
+[package]
+name = "pa-core"
+description = "Modelo comum do Party Anywhere: estado de controle, vagas e regras do lobby. Sem I/O."
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[dependencies]
