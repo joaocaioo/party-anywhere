@@ -13,6 +13,7 @@ use serde_json::{json, Value};
 use crate::{new_project, pack_dir, validate_dir, BaseGameSpec, NewOptions};
 
 const SDK_DOCS: &str = include_str!("../../../docs/SDK.md");
+const COOP_GUIDE: &str = include_str!("../../../docs/MOD-COOP-LOCAL.md");
 const MANIFEST_DOCS: &str = include_str!("../../../docs/GAME-MANIFEST.md");
 const MANIFEST_SCHEMA: &str = include_str!("../../../schema/game-manifest.v1.json");
 const SUPPORTED_PROTOCOLS: [&str; 3] = ["2025-06-18", "2025-03-26", "2024-11-05"];
@@ -119,7 +120,9 @@ impl Server {
                 JOGAR um mod que a pessoa achou (um link de repositório): inspect_published_game e add_to_library. O Hub \
                 abre com a prévia, acha o jogo original da pessoa (Steam, Epic ou a pasta que ela escolher) e ela confirma \
                 em 'Instalar o mod'. Nunca baixe o jogo original. \
-                CRIAR um mod: find_installed_games e create_game com base_game; leia get_sdk_docs antes de escrever código \
+                CRIAR um mod: find_installed_games e create_game com base_game; leia get_coop_guide (como transformar o \
+                multiplayer online em co-op local sem perder jogabilidade e como passar do limite de jogadores) e \
+                get_sdk_docs antes de escrever código \
                 de controle (o mod lê os jogadores só pelo SDK); validate_game; publicar é opcional (pack_release e um \
                 release no GitHub), mas ajuda outras pessoas a jogar. A capa (retrato 3:4) é obrigatória; peça a arte ao \
                 criador. Jogos com anti-cheat ficam de fora."
@@ -170,6 +173,11 @@ impl Server {
                     "from": { "type": "string", "description": "Pasta do build, relativa ao projeto. Padrão: build" },
                     "tag": { "type": "string", "description": "Tag do release (ex.: v0.2.0); precisa bater com version." }
                 }}
+            }),
+            json!({
+                "name": "get_coop_guide",
+                "description": "Como transformar o multiplayer online de um jogo em co-op local sem perder jogabilidade (um jogo com vários jogadores ou várias cópias do jogo), e como passar do limite de jogadores do jogo (onde o limite fica e o método). Leia antes de propor o caminho técnico de um mod.",
+                "inputSchema": { "type": "object", "properties": {} }
             }),
             json!({
                 "name": "get_sdk_docs",
@@ -275,6 +283,7 @@ impl Server {
                 })
             }
             "get_sdk_docs" => Ok(text(SDK_DOCS)),
+            "get_coop_guide" => Ok(text(COOP_GUIDE)),
             "get_manifest_spec" => Ok(text(&format!("{MANIFEST_DOCS}\n\n## Esquema JSON\n\n```json\n{MANIFEST_SCHEMA}```\n"))),
             "inspect_published_game" => {
                 let Some(repo) = s("repo") else { return Err((-32602, "falta \"repo\"".into())) };
@@ -301,6 +310,7 @@ impl Server {
 fn resources() -> Vec<Value> {
     vec![
         json!({ "uri": "party-anywhere://docs/sdk", "name": "SDK (party_anywhere.h)", "mimeType": "text/markdown" }),
+        json!({ "uri": "party-anywhere://docs/coop-local", "name": "Online → co-op local e mais jogadores", "mimeType": "text/markdown" }),
         json!({ "uri": "party-anywhere://docs/game-manifest", "name": "Manifesto de jogo", "mimeType": "text/markdown" }),
         json!({ "uri": "party-anywhere://schema/game-manifest.v1.json", "name": "Esquema do manifesto", "mimeType": "application/schema+json" }),
     ]
@@ -310,6 +320,7 @@ fn read_resource(params: &Value) -> Result<Value, (i64, String)> {
     let uri = params.get("uri").and_then(Value::as_str).unwrap_or_default();
     let (mime, body) = match uri {
         "party-anywhere://docs/sdk" => ("text/markdown", SDK_DOCS),
+        "party-anywhere://docs/coop-local" => ("text/markdown", COOP_GUIDE),
         "party-anywhere://docs/game-manifest" => ("text/markdown", MANIFEST_DOCS),
         "party-anywhere://schema/game-manifest.v1.json" => ("application/schema+json", MANIFEST_SCHEMA),
         _ => return Err((-32602, format!("recurso desconhecido: {uri}"))),
@@ -364,6 +375,7 @@ mod tests {
                 "create_game",
                 "validate_game",
                 "pack_release",
+                "get_coop_guide",
                 "get_sdk_docs",
                 "get_manifest_spec",
                 "add_to_library",

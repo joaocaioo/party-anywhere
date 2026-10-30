@@ -51,8 +51,10 @@ pa games
    > Quero transformar o **<nome do jogo>** em co-op local para o Party Anywhere: **<quantos>** jogadores no
    > mesmo PC, **<tela dividida / mesma tela>**, cada um com o próprio personagem. Use o MCP `party-anywhere`:
    > confira o Hub (`hub_status`), crie o projeto nesta pasta com o jogo-base (`create_game`), leia o SDK
-   > (`get_sdk_docs`) e me proponha o caminho técnico para entrar no jogo antes de escrever código. Nada de
-   > anti-cheat e nada de copiar arquivos do jogo original para o repositório.
+   > (`get_sdk_docs`) e o guia de co-op local (`get_coop_guide`) e me proponha o caminho técnico antes de
+   > escrever código: um jogo com vários jogadores dentro ou várias cópias do jogo. Quero tudo o que o online
+   > tem, sem perder jogabilidade, e **<N>** jogadores (o jogo aceita **<M>**). Nada de anti-cheat e nada de
+   > copiar arquivos do jogo original para o repositório.
 
 3. O que esperar: o agente cria o projeto (ficha, capa provisória, SDK, `AGENTS.md`), e então vem a parte
    difícil, que é específica de cada jogo: como o mod entra no jogo (uma DLL carregada por proxy, ASI loader

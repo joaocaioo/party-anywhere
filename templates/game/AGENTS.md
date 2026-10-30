@@ -29,6 +29,9 @@ tem o mod. Jogos com anti-cheat ficam de fora.
 Use a skill `.claude/skills/party-anywhere-game` e as ferramentas `pa`/MCP: `get_sdk_docs` antes de mexer em
 controles (o mod lê os jogadores só pelo SDK), `validate_game` antes de publicar.
 
+**Jogo com multiplayer online?** Leia `get_coop_guide` (MCP) antes de propor o caminho: o mod reaproveita o
+multiplayer do jogo (nada de jogabilidade perdida) e, para passar do limite de jogadores, segue o método do guia.
+
 **Padrão de todo mod: a tela do jogo no celular.** Para cada jogador com `pa_view_wanted` verdadeiro, o mod
 não desenha a parte dele na TV e entrega a visão dele com `pa_submit_view` (ver "Tela do jogo no celular" no
 SDK). Implemente junto com a tela dividida, não depois.

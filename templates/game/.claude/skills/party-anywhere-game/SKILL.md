@@ -19,12 +19,20 @@ chegam sozinhas.
 | Jogos instalados que podem virar co-op | `find_installed_games` | `pa games [busca]` |
 | Começar um jogo novo | `create_game` | `pa new <pasta> --name "..."` |
 | Começar o mod co-op de um jogo do PC | `create_game` com `base_game` | `pa new <pasta> --name "..." --base-game "<nome ou appid>"` |
+| Online → co-op local e passar do limite de jogadores | `get_coop_guide` | — |
 | Ler o contrato do SDK | `get_sdk_docs` | — |
 | Ver o formato do manifesto | `get_manifest_spec` | — |
 | Conferir manifesto e capa | `validate_game` | `pa validate` |
 | Gerar o pacote do release | `pack_release` | `pa pack --from build` |
 | Conferir o jogo publicado (como o Hub lê) | `inspect_published_game` | `pa inspect <dono/repo>` |
 | Levar um mod publicado para a Biblioteca (para jogar) | `add_to_library` | `pa add <dono/repo>` |
+
+## Mod de um jogo com multiplayer online
+
+Leia `get_coop_guide` antes de propor o caminho técnico. Regra de ouro: **não reescreva o multiplayer,
+reaproveite** (os jogadores, a sincronia e as regras são do jogo; o mod muda a entrada, a imagem e quem
+hospeda). Escolha entre um jogo com vários jogadores dentro dele e várias cópias do jogo pela regra de decisão
+do guia, e para passar do limite de jogadores ache todos os lugares do limite antes de mudar um.
 
 ## Padrão: a tela do jogo no celular
 

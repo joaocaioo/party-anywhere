@@ -64,7 +64,9 @@ Party Anywhere tem três peças, nesta ordem de importância:
 
 ## O que NÃO é (por enquanto)
 
-- Não é um launcher de múltiplas instâncias estilo Nucleus Co-op (pode virar adaptador no futuro).
+- Não é um launcher genérico de múltiplas instâncias. Quando um mod precisa de várias cópias do jogo (um
+  jogador por cópia, pelo multiplayer do próprio jogo), o Hub dá esse suporte para aquele mod (ver
+  MOD-COOP-LOCAL.md), sem contornar DRM nem anti-cheat.
 - Não contorna anti-cheat nem entra em serviços online de terceiros. GTA Online e afins estão fora.
 - Não distribui arquivos de jogos. Mods exigem a cópia do jogo que o usuário já tem.
 - Não é multiplataforma no início: Windows primeiro; Linux/Steam Deck depois.
