@@ -1,0 +1,28 @@
+{
+  "three": "three@0.160.0",
+  "qrcode": "qrcode-generator@1.4.4",
+  "fonts": {
+    "anton": [
+      400
+    ],
+    "bungee": [
+      400
+    ],
+    "caveat": [
+      700
+    ],
+    "doto": [
+      900
+    ],
+    "dotgothic16": [
+      400
+    ],
+    "inter": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ]
+  }
+}

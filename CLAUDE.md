@@ -17,8 +17,9 @@ Comece por [docs/VISION.md](docs/VISION.md), [docs/UX.md](docs/UX.md) e [docs/AR
   código de lá; reimplemente.
 - **Nada de** contornar anti-cheat, distribuir arquivos de jogos ou dados pessoais em commits.
 - Pergunte antes de commitar, publicar releases ou instalar drivers.
-- **Interface aprovada:** [prototype/hub](prototype/hub/index.html) é a referência visual e de comportamento do
-  Hub. O app reproduz o protótipo fielmente; não redesenhe sem pedido do dono.
+- **Interface aprovada:** [apps/hub/ui](apps/hub/ui/index.html) é a UI do Hub (aprovada pelo dono). É a mesma
+  no navegador (modo demonstração, com o painel Demo) e no app (dados reais, via `bridge.js`). Não redesenhe
+  sem pedido do dono; mudou a UI, confira nos dois modos.
 
 ## Repositório e publicação
 
@@ -26,4 +27,4 @@ Comece por [docs/VISION.md](docs/VISION.md), [docs/UX.md](docs/UX.md) e [docs/AR
 - Commits usam o e-mail noreply do GitHub (já configurado neste repositório). Nunca use o e-mail pessoal.
 - **Nunca torne este repositório público.** O histórico inteiro iria junto. Na primeira versão, o público
   recebe um histórico novo e limpo só com o produto: Hub, SDK, template e docs para usuários e criadores.
-  Ficam de fora o protótipo, os spikes, VISION, ROADMAP, UX, ARCHITECTURE e este arquivo. Licença: MIT.
+  Ficam de fora os spikes, as amostras de arte, VISION, ROADMAP, UX, ARCHITECTURE e este arquivo. Licença: MIT.

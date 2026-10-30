@@ -341,18 +341,22 @@ exatamente como estavam.
 
 ```
 party-anywhere/
-  apps/
-    hub/              Tauri: src-tauri (Rust) + ui (React/TS)
-    phone/            página do controle (TS), embutida no Hub
+  apps/hub/
+    ui/               UI do Hub (HTML/JS, sem build): no navegador roda em modo demo; no app, bridge.js
+                      liga a UI ao núcleo Rust. vendor/ = Three.js, QR e fontes locais (sem internet)
+    src-tauri/        app desktop (Tauri 2): lobby, celulares, controles, biblioteca, atualizações
+    tools/            vendor_ui.py (atualiza vendor/)
   crates/
-    pa-core/ pa-input/ pa-phone/ pa-bluetooth/ pa-virtualpad/ pa-ipc/ pa-library/
-  sdk/
-    c/party_anywhere.h
-    examples/
-  templates/
-    game/             party-anywhere.json + capa modelo + README modelo
-  .claude/skills/     skills para agentes ajudarem a criar jogos co-op com o SDK
-  prototype/hub/      protótipo navegável da UI
+    pa-core/          Pad, vagas e regras do lobby (puro, testado)
+    pa-phone/         servidor do celular (HTTP + WebSocket) e página do controle
+    pa-virtualpad/    controles virtuais (ViGEmBus) atrás de uma interface
+    pa-manifest/      party-anywhere.json e party-anywhere.release.json (puro, testado)
+    pa-library/       GitHub: prévia por link, Descobrir, instalação com hash, library.json, atualizações
+    pa-cli/           `pa` para criadores (new, validate, pack, inspect) e servidor MCP (`pa mcp`)
+  sdk/c/              party_anywhere.h (SDK, stb-style) e exemplo
+  schema/             game-manifest.v1.json (esquema publicado)
+  templates/game/     projeto modelo: manifesto, capa, workflow de release, .mcp.json, skill para agentes
+  spikes/latency/     medidor de latência da fase 1
   docs/
 ```
 

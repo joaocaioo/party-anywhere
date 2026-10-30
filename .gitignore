@@ -2,4 +2,4 @@
 /.downloads
 /spikes/latency/reports/*.json
 # capas de jogos reais usadas só para visualizar o protótipo (arte com direitos autorais: não versionar)
-/prototype/hub/sample-art/
+/apps/hub/ui/sample-art/

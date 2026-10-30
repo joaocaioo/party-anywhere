@@ -3,7 +3,7 @@
 UX first: este documento manda nas decisões de produto. Quando a arquitetura atrapalha a
 experiência, muda a arquitetura. Os princípios estão em [VISION.md](VISION.md#princípios-de-ux-valem-mais-que-qualquer-feature).
 
-O protótipo navegável está em [`prototype/hub/index.html`](../prototype/hub/index.html).
+A UI está em [`apps/hub/ui/index.html`](../apps/hub/ui/index.html): no navegador ela roda em modo demonstração (painel "Demo"), no app usa os dados reais.
 
 ## Direção visual
 

@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "hub-prototype",
+      "name": "hub-ui",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "5173", "--bind", "127.0.0.1", "--directory", "prototype/hub"],
+      "runtimeArgs": ["-m", "http.server", "5173", "--bind", "127.0.0.1", "--directory", "apps/hub/ui"],
       "port": 5173
     }
   ]
