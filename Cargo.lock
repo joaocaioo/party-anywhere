@@ -2650,6 +2650,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pa-sdk"
+version = "0.0.1"
+dependencies = [
+ "cc",
+ "pa-core",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
 name = "pa-virtualpad"
 version = "0.0.1"
 dependencies = [
@@ -2721,6 +2730,7 @@ dependencies = [
  "pa-library",
  "pa-manifest",
  "pa-phone",
+ "pa-sdk",
  "pa-virtualpad",
  "semver",
  "serde",
@@ -2729,6 +2739,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-dialog",
  "tauri-plugin-opener",
+ "tauri-plugin-single-instance",
  "tempfile",
  "windows-sys 0.59.0",
  "winreg 0.52.0",
@@ -4034,6 +4045,22 @@ dependencies = [
  "thiserror 2.0.21",
  "url",
  "windows",
+ "zbus",
+]
+
+[[package]]
+name = "tauri-plugin-single-instance"
+version = "2.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "726b6da0dd5bd1344f84f4108a622c07d01923baacb5c803a605189672c5352f"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+ "windows-sys 0.61.2",
  "zbus",
 ]
 

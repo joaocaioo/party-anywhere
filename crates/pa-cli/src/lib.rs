@@ -52,6 +52,8 @@ pub fn new_project(dir: &Path, opts: &NewOptions) -> Result<Vec<PathBuf>, String
         (".mcp.json", template::MCP_JSON.as_bytes().to_vec()),
         (".github/workflows/release.yml", template::RELEASE_WORKFLOW.as_bytes().to_vec()),
         (".claude/skills/party-anywhere-game/SKILL.md", template::SKILL.as_bytes().to_vec()),
+        ("sdk/party_anywhere.h", template::SDK_HEADER.as_bytes().to_vec()),
+        ("sdk/examples/arena_console.c", template::SDK_EXAMPLE.as_bytes().to_vec()),
     ];
     let mut created = Vec::new();
     for (rel, bytes) in files {
@@ -245,7 +247,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let opts = NewOptions { name: "Arena Blast".into(), id: Some("com.joao.arena-blast".into()), tagline: None };
         let created = new_project(dir.path(), &opts).unwrap();
-        assert!(created.len() >= 8);
+        assert!(created.len() >= 10);
         dir
     }
 

@@ -17,6 +17,7 @@ pa-core.workspace = true
 pa-library.workspace = true
 pa-manifest.workspace = true
 pa-phone.workspace = true
+pa-sdk.workspace = true
 pa-virtualpad.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -24,6 +25,7 @@ semver.workspace = true
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
+tauri-plugin-single-instance = "2"
 gilrs = "0.11"
 base64 = "0.22"
 

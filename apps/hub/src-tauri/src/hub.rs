@@ -3,6 +3,7 @@
 //! (evento `lobby`) sempre que algo muda.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -41,6 +42,10 @@ pub struct Hub {
     removed: Mutex<Vec<Seat>>,
     /// Avisa a thread dos controles (vibrar, ligar o eco dos virtuais).
     pub gamepad_tx: Mutex<Option<std::sync::mpsc::Sender<crate::gamepads::Command>>>,
+    /// Memória do SDK (jogos co-op leem as vagas daqui).
+    pub sdk: Mutex<Option<pa_sdk::HubShm>>,
+    /// Um jogo do SDK está conectado: os controles virtuais ficam desligados (sem entrada dupla).
+    pub game_connected: AtomicBool,
 }
 
 #[derive(Clone, Serialize)]
@@ -89,6 +94,8 @@ impl Hub {
             plugged: Mutex::new([false; MAX_SEATS]),
             removed: Mutex::new(Vec::new()),
             gamepad_tx: Mutex::new(None),
+            sdk: Mutex::new(None),
+            game_connected: AtomicBool::new(false),
         })
     }
 
@@ -153,6 +160,9 @@ impl Hub {
             return;
         }
         self.pads.lock().unwrap()[seat] = pad;
+        if let Some(shm) = self.sdk.lock().unwrap().as_ref() {
+            shm.write_pad(seat, pad);
+        }
         if self.plugged.lock().unwrap()[seat] {
             if let Some(v) = &self.virtual_pads {
                 v.update(seat as u8, pad);
@@ -163,6 +173,9 @@ impl Hub {
     /// Celulares e teclados viram controles de Xbox virtuais (os jogos já veem os controles físicos).
     pub fn plug(&self, seat: usize) {
         let (Some(v), true) = (&self.virtual_pads, seat < MAX_SEATS) else { return };
+        if self.game_connected.load(Ordering::Acquire) {
+            return; // o jogo do SDK lê as vagas direto
+        }
         let mut plugged = self.plugged.lock().unwrap();
         if !plugged[seat] {
             plugged[seat] = true;
@@ -226,7 +239,23 @@ impl Hub {
     }
 
     pub fn emit_lobby(&self) {
+        crate::sdk::write_seats(self);
         let _ = self.app.emit("lobby", self.snapshot());
+    }
+
+    /// Liga de novo os controles virtuais de quem precisa (celulares e teclados ativos).
+    pub fn replug_all(&self) {
+        let need: Vec<usize> = self
+            .lobby
+            .lock()
+            .unwrap()
+            .seats()
+            .filter(|s| s.state == SeatState::Active && s.kind != DeviceKind::Gamepad)
+            .map(|s| s.index)
+            .collect();
+        for i in need {
+            self.plug(i);
+        }
     }
 
     pub fn remove_seat(&self, index: usize) -> bool {

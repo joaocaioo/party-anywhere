@@ -1,0 +1,16 @@
+[package]
+name = "pa-sdk"
+description = "Lado do Hub do SDK: a memória compartilhada que o party_anywhere.h lê (ABI 1). Testado contra o cabeçalho C de verdade."
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+links = "pa_sdk_shim"
+
+[dependencies]
+pa-core.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Memory", "Win32_System_Threading"] }
+
+[build-dependencies]
+cc = "1"

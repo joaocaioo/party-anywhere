@@ -9,6 +9,7 @@ mod gamepads;
 mod hub;
 mod keyboards;
 mod pcscan;
+mod sdk;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -29,6 +30,13 @@ const UPDATE_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
 
 fn main() {
     tauri::Builder::default()
+        // abrir o Hub de novo traz a janela que já está aberta (um lobby, uma porta do celular, um SDK)
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
@@ -38,6 +46,7 @@ fn main() {
             }
             gamepads::start(hub.clone());
             keyboards::start(hub.clone());
+            sdk::start(hub.clone());
             app.manage(hub);
 
             let (roaming, local) = dirs();

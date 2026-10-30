@@ -8,6 +8,8 @@ pub const GITIGNORE: &str = include_str!("../../../templates/game/.gitignore");
 pub const MCP_JSON: &str = include_str!("../../../templates/game/.mcp.json");
 pub const RELEASE_WORKFLOW: &str = include_str!("../../../templates/game/.github/workflows/release.yml");
 pub const SKILL: &str = include_str!("../../../templates/game/.claude/skills/party-anywhere-game/SKILL.md");
+pub const SDK_HEADER: &str = include_str!("../../../sdk/c/party_anywhere.h");
+pub const SDK_EXAMPLE: &str = include_str!("../../../sdk/c/examples/arena_console.c");
 
 pub fn manifest(id: &str, name: &str, tagline: &str, slug: &str) -> Result<String, String> {
     let (mut m, _) = GameManifest::parse(MANIFEST).map_err(|_| "o template embutido está inválido".to_string())?;

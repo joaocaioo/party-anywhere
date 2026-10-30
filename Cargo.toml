@@ -7,6 +7,7 @@ members = [
     "crates/pa-library",
     "crates/pa-manifest",
     "crates/pa-phone",
+    "crates/pa-sdk",
     "crates/pa-virtualpad",
     "spikes/latency",
 ]
@@ -22,6 +23,7 @@ pa-core = { path = "crates/pa-core" }
 pa-library = { path = "crates/pa-library" }
 pa-manifest = { path = "crates/pa-manifest" }
 pa-phone = { path = "crates/pa-phone" }
+pa-sdk = { path = "crates/pa-sdk" }
 pa-virtualpad = { path = "crates/pa-virtualpad" }
 
 axum = { version = "0.8", features = ["ws"] }
