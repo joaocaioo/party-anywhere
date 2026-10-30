@@ -161,7 +161,8 @@ async fn main() {
         }
     };
     let clock = Instant::now();
-    let config = ServerConfig { port: args.port, loopback_only: args.loopback, page: CONTROLLER_PAGE };
+    let lobby = std::sync::Arc::new(std::sync::Mutex::new(pa_core::Lobby::default()));
+    let config = ServerConfig { port: args.port, loopback_only: args.loopback, page: CONTROLLER_PAGE, lobby };
     let (server, mut events) = match PhoneServer::start(config, clock).await {
         Ok(s) => s,
         Err(e) => {
@@ -245,9 +246,9 @@ async fn main() {
 
 fn handle_event(ev: PhoneEvent, seats: &mut [SeatStats], pads: Option<&VirtualPads>) {
     match ev {
-        PhoneEvent::Connected { seat, device, peer } => {
+        PhoneEvent::Connected { seat, device, peer, rejoined } => {
             let s = &mut seats[seat as usize];
-            let returning = !s.device.is_empty() && s.device == device;
+            let returning = rejoined && s.device == device;
             if !returning {
                 *s = SeatStats { device: device.clone(), ..Default::default() };
             }

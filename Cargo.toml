@@ -25,6 +25,7 @@ pa-virtualpad = { path = "crates/pa-virtualpad" }
 
 axum = { version = "0.8", features = ["ws"] }
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+getrandom = "0.2"
 if-addrs = "0.13"
 imagesize = "0.13"
 png = "0.17"

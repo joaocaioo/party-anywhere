@@ -184,7 +184,8 @@ pub enum ClientText {
 #[derive(Debug, Serialize)]
 #[serde(tag = "t", rename_all = "snake_case")]
 pub enum ServerText<'a> {
-    Welcome { seat: u8, color: &'a str, name: &'a str },
+    /// `token`: guardado pela página e mandado no próximo `hello`; é a identidade do celular (volta para a mesma vaga).
+    Welcome { seat: u8, color: &'a str, name: &'a str, token: &'a str },
     Reject { reason: &'a str },
     Toast { text: &'a str },
     /// Resultado da medição, para a página mostrar ao vivo. Formato livre (JSON do spike).

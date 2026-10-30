@@ -207,6 +207,11 @@ impl Lobby {
         self.occupied() == MAX_SEATS
     }
 
+    /// Vaga do aparelho, se ele tem uma (ativa ou reconectando).
+    pub fn seat_of_device(&self, key: &DeviceKey) -> Option<usize> {
+        self.seat_of(key)
+    }
+
     fn seat_of(&self, key: &DeviceKey) -> Option<usize> {
         self.seats.iter().position(|s| s.as_ref().is_some_and(|s| &s.device == key))
     }

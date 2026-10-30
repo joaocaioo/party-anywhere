@@ -103,6 +103,10 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 .go { height: 36px; padding: 0 16px; border-radius: 999px; background: var(--neon); color: #04140a; font-weight: 800; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
 .go[disabled] { opacity: .5; }
 .test small { color: var(--muted); font-size: 12px; }
+#toast { position: fixed; top: 14px; left: 50%; transform: translate(-50%, -140%); max-width: 80vw; padding: 10px 18px;
+  border-radius: 999px; background: rgba(12, 16, 12, .92); color: #eef7e2; font: 600 14px system-ui, sans-serif;
+  border: 1px solid rgba(60, 240, 96, .4); transition: transform .3s; z-index: 50; pointer-events: none; }
+#toast.on { transform: translate(-50%, 0); }
 </style>
 </head>
 <body>
@@ -187,7 +191,10 @@ function connect() {
   ws = new WebSocket(`ws://${location.host}/ws`);
   ws.binaryType = 'arraybuffer';
   ws.onopen = () => {
-    ws.send(JSON.stringify({ t: 'hello', v: 1, device: deviceName() }));
+    // o token guardado faz o Hub devolver a mesma vaga, mesmo reabrindo a página
+    let token = null;
+    try { token = localStorage.getItem('pa.token'); } catch (_) {}
+    ws.send(JSON.stringify({ t: 'hello', v: 1, device: deviceName(), token }));
     $('offline').classList.remove('on');
     // rajada de sincronização para achar logo uma ida e volta curta; depois, uma a cada 2 s
     let n = 0;
@@ -209,6 +216,7 @@ function connect() {
 
 function onText(m) {
   if (m.t === 'welcome') {
+    try { if (m.token) localStorage.setItem('pa.token', m.token); } catch (_) {}
     document.documentElement.style.setProperty('--seat', m.color);
     $('seatNum').textContent = m.seat;
     $('seatName').textContent = `P${m.seat} · ${m.name}`;
@@ -221,8 +229,19 @@ function onText(m) {
   } else if (m.t === 'stats') {
     showStats(m.data);
   } else if (m.t === 'toast') {
-    $('burstTxt').textContent = m.text;
+    showToast(m.text);
   }
+}
+
+// aviso curto no topo (o Hub ou o jogo mandam: "Você saiu do lobby...", pa_toast do SDK)
+let toastTimer = 0;
+function showToast(text) {
+  let el = $('toast');
+  if (!el) { el = document.createElement('div'); el.id = 'toast'; document.body.appendChild(el); }
+  el.textContent = text;
+  el.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('on'), 4000);
 }
 
 function onBinary(dv) {

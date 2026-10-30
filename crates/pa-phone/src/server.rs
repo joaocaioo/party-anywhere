@@ -1,11 +1,16 @@
 //! Servidor do celular: entrega a página do controle em `/` e fala o protocolo v1 em `/ws`.
 //!
 //! Quem usa o servidor recebe [`PhoneEvent`]s por um canal e responde pelos métodos de
-//! [`PhoneServer`]. O servidor não sabe nada de controle virtual nem de jogo.
+//! [`PhoneServer`]. O servidor não sabe nada de controle virtual nem de jogo. As vagas vêm do
+//! [`Lobby`] compartilhado com os outros aparelhos (controles, teclados): o celular é só mais um.
+//!
+//! Identidade: na primeira conexão o celular recebe um token no `welcome` e o guarda; nas próximas
+//! ele manda o token no `hello` e volta para a mesma vaga, mesmo reabrindo a página.
 
 use std::collections::VecDeque;
 use std::io;
 use std::net::{Ipv4Addr, SocketAddr};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -17,7 +22,7 @@ use axum::routing::get;
 use axum::serve::ListenerExt;
 use axum::Router;
 use futures_util::{SinkExt, StreamExt};
-use pa_core::{Pad, MAX_SEATS, SEAT_COLORS};
+use pa_core::{Device, DeviceKey, DeviceKind, JoinOutcome, Lobby, Pad, MAX_SEATS, SEAT_COLORS};
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio::time::timeout;
@@ -39,11 +44,14 @@ pub struct ServerConfig {
     pub loopback_only: bool,
     /// HTML da página do controle.
     pub page: &'static str,
+    /// Lobby de onde saem as vagas, compartilhado com quem lê controles e teclados.
+    pub lobby: Arc<Mutex<Lobby>>,
 }
 
 #[derive(Debug, Clone)]
 pub enum PhoneEvent {
-    Connected { seat: u8, device: String, peer: SocketAddr },
+    /// `rejoined`: o mesmo celular voltou para a vaga que já era dele.
+    Connected { seat: u8, device: String, peer: SocketAddr, rejoined: bool },
     Disconnected { seat: u8 },
     /// Estado novo do controle. `at_ms` é o instante da chegada no relógio do servidor
     /// ([`PhoneServer::now_ms`]), tomado antes de qualquer outro processamento.
@@ -57,7 +65,10 @@ type Outbox = mpsc::UnboundedSender<Message>;
 
 struct Shared {
     clock: Instant,
-    seats: Mutex<[Option<Outbox>; MAX_SEATS]>,
+    /// Conexão dona de cada vaga: (id da conexão, caixa de saída).
+    seats: Mutex<[Option<(u64, Outbox)>; MAX_SEATS]>,
+    lobby: Arc<Mutex<Lobby>>,
+    next_conn: AtomicU64,
     events: mpsc::UnboundedSender<PhoneEvent>,
     page: &'static str,
 }
@@ -81,7 +92,14 @@ impl PhoneServer {
         clock: Instant,
     ) -> io::Result<(PhoneServer, mpsc::UnboundedReceiver<PhoneEvent>)> {
         let (events, rx) = mpsc::unbounded_channel();
-        let shared = Arc::new(Shared { clock, seats: Mutex::new(Default::default()), events, page: config.page });
+        let shared = Arc::new(Shared {
+            clock,
+            seats: Mutex::new(Default::default()),
+            lobby: config.lobby,
+            next_conn: AtomicU64::new(1),
+            events,
+            page: config.page,
+        });
 
         let host = if config.loopback_only { Ipv4Addr::LOCALHOST } else { Ipv4Addr::UNSPECIFIED };
         let listener = bind_with_fallback(host, config.port).await?;
@@ -122,9 +140,18 @@ impl PhoneServer {
         self.send(seat, Message::Binary(protocol::encode_rumble(ms, strength).into()));
     }
 
+    /// O jogador saiu do lobby (removido no Hub). O celular continua conectado e volta ao apertar um botão.
+    pub fn release_seat(&self, seat: u8) {
+        let taken = self.shared.seats.lock().unwrap().get_mut(seat as usize).and_then(Option::take);
+        if let Some((_, out)) = taken {
+            let toast = ServerText::Toast { text: "Você saiu do lobby. Aperte qualquer botão para voltar." };
+            let _ = out.send(Message::Text(serde_json::to_string(&toast).unwrap().into()));
+        }
+    }
+
     fn send(&self, seat: u8, msg: Message) {
         let seats = self.shared.seats.lock().unwrap();
-        if let Some(Some(out)) = seats.get(seat as usize) {
+        if let Some(Some((_, out))) = seats.get(seat as usize) {
             let _ = out.send(msg);
         }
     }
@@ -157,9 +184,9 @@ async fn ws_upgrade(
 async fn connection(socket: WebSocket, shared: Arc<Shared>, peer: SocketAddr) {
     let (mut sink, mut stream) = socket.split();
 
-    let device = match timeout(HELLO_TIMEOUT, stream.next()).await {
+    let (device, token) = match timeout(HELLO_TIMEOUT, stream.next()).await {
         Ok(Some(Ok(Message::Text(t)))) => match serde_json::from_str::<ClientText>(t.as_str()) {
-            Ok(ClientText::Hello { v, device, .. }) if v == protocol::PROTOCOL_VERSION => device,
+            Ok(ClientText::Hello { v, device, token }) if v == protocol::PROTOCOL_VERSION => (device, token),
             Ok(ClientText::Hello { .. }) => {
                 let _ = sink.send(reject("version")).await;
                 return;
@@ -168,26 +195,23 @@ async fn connection(socket: WebSocket, shared: Arc<Shared>, peer: SocketAddr) {
         },
         _ => return,
     };
+    // token do celular, ou um novo de 128 bits; formato inválido é tratado como celular novo
+    let token = token.filter(|t| t.len() == 32 && t.bytes().all(|b| b.is_ascii_hexdigit())).unwrap_or_else(new_token);
+    let key = DeviceKey(format!("phone:{token}"));
+    let conn = shared.next_conn.fetch_add(1, Ordering::Relaxed);
+
+    let outcome = shared.lobby.lock().unwrap().connected(Device { key: key.clone(), kind: DeviceKind::Phone, name: None });
+    let (mut seat, rejoined) = match outcome {
+        JoinOutcome::Joined(i) => (i as u8, false),
+        JoinOutcome::Rejoined(i) => (i as u8, true),
+        JoinOutcome::Full | JoinOutcome::Waiting => {
+            shared.lobby.lock().unwrap().disconnected(&key, shared.now_ms() as u64);
+            let _ = sink.send(reject("full")).await;
+            return;
+        }
+    };
 
     let (out, mut outbox) = mpsc::unbounded_channel::<Message>();
-    let seat = {
-        let mut seats = shared.seats.lock().unwrap();
-        let free = seats.iter().position(Option::is_none);
-        if let Some(i) = free {
-            seats[i] = Some(out.clone());
-        }
-        free
-    };
-    let Some(seat) = seat else {
-        let _ = sink.send(reject("full")).await;
-        return;
-    };
-    let seat = seat as u8;
-    let name = format!("Jogador {}", seat + 1);
-    let welcome = ServerText::Welcome { seat: seat + 1, color: SEAT_COLORS[seat as usize], name: &name };
-    let _ = out.send(Message::Text(serde_json::to_string(&welcome).unwrap().into()));
-    let _ = shared.events.send(PhoneEvent::Connected { seat, device, peer });
-
     let writer = tokio::spawn(async move {
         while let Some(m) = outbox.recv().await {
             if sink.send(m).await.is_err() {
@@ -196,6 +220,10 @@ async fn connection(socket: WebSocket, shared: Arc<Shared>, peer: SocketAddr) {
         }
         let _ = sink.close().await;
     });
+    claim_seat(&shared, seat, conn, &out, &token);
+    let _ = shared.events.send(PhoneEvent::Connected { seat, device: device.clone(), peer, rejoined });
+    // sem vaga = removido do lobby; aperta um botão para voltar
+    let mut has_seat = true;
 
     // SYNC aguardando o SYNC_DONE: (id, t0 no celular, chegada no servidor)
     let mut pending_sync: VecDeque<(u16, f64, f64)> = VecDeque::with_capacity(8);
@@ -221,11 +249,15 @@ async fn connection(socket: WebSocket, shared: Arc<Shared>, peer: SocketAddr) {
         match msg {
             Message::Binary(bytes) => match protocol::decode_client(&bytes) {
                 Ok(ClientMsg::State { seq, pad }) => {
-                    let _ = shared.events.send(PhoneEvent::State { seat, seq, pad, at_ms, timing: None });
+                    if owns(&shared, &mut has_seat, &mut seat, conn, &key, &out, &token, &device, peer, pad) {
+                        let _ = shared.events.send(PhoneEvent::State { seat, seq, pad, at_ms, timing: None });
+                    }
                 }
                 Ok(ClientMsg::StateTimed { seq, pad, kind, phone_ms }) => {
-                    let timing = Some((kind, phone_ms));
-                    let _ = shared.events.send(PhoneEvent::State { seat, seq, pad, at_ms, timing });
+                    if owns(&shared, &mut has_seat, &mut seat, conn, &key, &out, &token, &device, peer, pad) {
+                        let timing = Some((kind, phone_ms));
+                        let _ = shared.events.send(PhoneEvent::State { seat, seq, pad, at_ms, timing });
+                    }
                 }
                 Ok(ClientMsg::Ping { t }) => {
                     let _ = out.send(Message::Binary(protocol::encode_pong(t).into()));
@@ -257,11 +289,81 @@ async fn connection(socket: WebSocket, shared: Arc<Shared>, peer: SocketAddr) {
         }
     }
 
-    shared.seats.lock().unwrap()[seat as usize] = None;
+    // a vaga só cai se ainda é desta conexão (se o mesmo celular já reconectou, a vaga é da conexão nova)
+    let still_mine = {
+        let mut seats = shared.seats.lock().unwrap();
+        let mine = seats[seat as usize].as_ref().is_some_and(|(id, _)| *id == conn);
+        if mine {
+            seats[seat as usize] = None;
+        }
+        mine
+    };
+    {
+        let mut lobby = shared.lobby.lock().unwrap();
+        if still_mine || lobby.seat_of_device(&key).is_none() {
+            lobby.disconnected(&key, shared.now_ms() as u64);
+        }
+    }
     drop(out);
-    let _ = shared.events.send(PhoneEvent::Disconnected { seat });
+    if still_mine {
+        let _ = shared.events.send(PhoneEvent::Disconnected { seat });
+    }
     // o escritor termina sozinho quando a última cópia da caixa de saída some
     let _ = timeout(Duration::from_secs(1), writer).await;
+}
+
+/// Esta conexão passa a ser a dona da vaga (a antiga, se houver, perde a caixa de saída e fecha).
+fn claim_seat(shared: &Shared, seat: u8, conn: u64, out: &Outbox, token: &str) {
+    shared.seats.lock().unwrap()[seat as usize] = Some((conn, out.clone()));
+    let name = shared
+        .lobby
+        .lock()
+        .unwrap()
+        .seat(seat as usize)
+        .map(|s| s.name.clone())
+        .unwrap_or_else(|| format!("Jogador {}", seat + 1));
+    let welcome = ServerText::Welcome { seat: seat + 1, color: SEAT_COLORS[seat as usize], name: &name, token };
+    let _ = out.send(Message::Text(serde_json::to_string(&welcome).unwrap().into()));
+}
+
+/// A conexão ainda tem vaga? Se foi removida do lobby, um botão apertado a traz de volta.
+#[allow(clippy::too_many_arguments)]
+fn owns(
+    shared: &Shared,
+    has_seat: &mut bool,
+    seat: &mut u8,
+    conn: u64,
+    key: &DeviceKey,
+    out: &Outbox,
+    token: &str,
+    device: &str,
+    peer: SocketAddr,
+    pad: Pad,
+) -> bool {
+    if *has_seat {
+        let mine = shared.seats.lock().unwrap()[*seat as usize].as_ref().is_some_and(|(id, _)| *id == conn);
+        if mine {
+            return true;
+        }
+        *has_seat = false;
+    }
+    if pad.buttons == 0 {
+        return false;
+    }
+    match shared.lobby.lock().unwrap().pressed(key) {
+        Some(JoinOutcome::Joined(i) | JoinOutcome::Rejoined(i)) => *seat = i as u8,
+        _ => return false,
+    }
+    claim_seat(shared, *seat, conn, out, token);
+    *has_seat = true;
+    let _ = shared.events.send(PhoneEvent::Connected { seat: *seat, device: device.to_string(), peer, rejoined: false });
+    false // o toque que fez entrar não vira entrada no jogo
+}
+
+fn new_token() -> String {
+    let mut b = [0u8; 16];
+    getrandom::getrandom(&mut b).expect("o sistema sempre tem fonte de aleatoriedade");
+    b.iter().map(|x| format!("{x:02x}")).collect()
 }
 
 fn reject(reason: &str) -> Message {
