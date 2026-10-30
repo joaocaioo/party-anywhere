@@ -1,8 +1,9 @@
 <p align="center">
-  <img src="assets/brand/mascot.png" alt="Quatro camaleões jogando juntos no sofá" width="280">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/logo-stacked-dark.png">
+    <img src="assets/brand/logo-stacked-light.png" alt="Party Anywhere: quatro camaleões jogando juntos no sofá" width="460">
+  </picture>
 </p>
-
-<h1 align="center">Party Anywhere</h1>
 
 <p align="center"><b>Qualquer jogo. Qualquer controle. Até 10 pessoas no mesmo sofá.</b></p>
 
@@ -272,7 +273,7 @@ Uma tag `vX.Y.Z` publica o instalador e a `pa` pelo workflow `.github/workflows/
 | `sdk/c` | O `party_anywhere.h` e o exemplo |
 | `templates/game` | O projeto modelo que o `pa new` cria |
 | `schema/` | O esquema da ficha (autocompletar no editor) |
-| `assets/brand` | Mascote e ícone do app |
+| `assets/brand` | Marca: mascote, ícone do app e a logo empilhada e deitada, para fundo escuro e claro |
 
 </details>
 
