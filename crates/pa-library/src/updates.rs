@@ -49,17 +49,26 @@ pub fn check_games(http: &dyn Http, library: &mut Library) -> Vec<GameUpdate> {
     found
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HubUpdate {
     pub version: String,
     pub installer_url: String,
+    /// `<instalador>.sha256` publicado junto, quando o release tem.
+    pub sha256_url: Option<String>,
     pub notes: String,
     pub etag: Option<String>,
 }
 
 /// Há um Hub mais novo que `current`? `Ok(None)` também quando nada mudou desde `etag`.
 pub fn check_hub(http: &dyn Http, current: &str, etag: Option<&str>) -> Result<Option<HubUpdate>, String> {
+    let Some(latest) = latest_hub(http, etag)? else { return Ok(None) };
+    let (Some(l), Some(c)) = (parse(&latest.version), parse(current)) else { return Ok(None) };
+    Ok((l > c).then_some(latest))
+}
+
+/// O último Hub publicado, com instalador. `Ok(None)`: nada publicado ainda, ou nada mudou desde `etag`.
+pub fn latest_hub(http: &dyn Http, etag: Option<&str>) -> Result<Option<HubUpdate>, String> {
     #[derive(serde::Deserialize)]
     struct Rel {
         tag_name: String,
@@ -82,14 +91,13 @@ pub fn check_hub(http: &dyn Http, current: &str, etag: Option<&str>) -> Result<O
         return Err(format!("o GitHub respondeu {}.", resp.status));
     }
     let rel: Rel = serde_json::from_slice(&resp.body).map_err(|_| "resposta inesperada do GitHub.".to_string())?;
-    let (Some(latest), Some(current)) = (parse(&rel.tag_name), parse(current)) else { return Ok(None) };
-    if latest <= current {
-        return Ok(None);
-    }
+    let Some(version) = parse(&rel.tag_name) else { return Ok(None) };
     let Some(installer) = rel.assets.iter().find(|a| a.name.ends_with(HUB_INSTALLER_SUFFIX)) else { return Ok(None) };
+    let sha = format!("{}.sha256", installer.name);
+    let sha256_url = rel.assets.iter().find(|a| a.name == sha).map(|a| a.browser_download_url.clone());
     // notas curtas: as 3 primeiras linhas com conteúdo (UX: notas da versão em 3 linhas)
     let notes = rel.body.unwrap_or_default().lines().map(str::trim).filter(|l| !l.is_empty()).take(3).collect::<Vec<_>>().join("\n");
-    Ok(Some(HubUpdate { version: latest.to_string(), installer_url: installer.browser_download_url.clone(), notes, etag: resp.etag }))
+    Ok(Some(HubUpdate { version: version.to_string(), installer_url: installer.browser_download_url.clone(), sha256_url, notes, etag: resp.etag }))
 }
 
 fn parse(v: &str) -> Option<semver::Version> {

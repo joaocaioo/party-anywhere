@@ -8,7 +8,6 @@ mod commands;
 mod gamepads;
 mod hub;
 mod keyboards;
-mod pcscan;
 mod sdk;
 
 use std::path::PathBuf;
@@ -127,6 +126,7 @@ fn main() {
             commands::hub_apply_update,
             commands::installed_info,
             commands::open_url,
+            commands::game_art,
         ])
         .run(tauri::generate_context!())
         .expect("o Hub não conseguiu abrir");

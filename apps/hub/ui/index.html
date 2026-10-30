@@ -1764,7 +1764,7 @@ function sourceLabel(g) {
   return g.badge === 'ok' ? 'Comunidade · verificado' : 'Comunidade';
 }
 function thumbHTML(g) {
-  return g.image ? `<img src="${g.image}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{innerHTML:coverSvg(games.find(x=>x.id==='${g.id}')||PC_GAMES[0])}).firstChild)">` : coverSvg(g);
+  return g.image ? `<img src="${g.image}" alt="" ${coverAttrs(g.image)} onerror="this.replaceWith(Object.assign(document.createElement('div'),{innerHTML:coverSvg(games.find(x=>x.id==='${g.id}')||PC_GAMES[0])}).firstChild)">` : coverSvg(g);
 }
 function renderLibraryList() {
   const list = document.getElementById('libList');
@@ -1856,7 +1856,7 @@ function openEditGame(id) {
       const f = e.target.files[0];
       if (!f) return;
       const r = new FileReader();
-      r.onload = () => { image = r.result; thumb.innerHTML = `<img src="${image}" alt="">`; };
+      r.onload = () => { image = r.result; thumb.innerHTML = `<img src="${image}" alt="" onload="fitCover(this)">`; };
       r.readAsDataURL(f);
     });
     document.getElementById('editReset').addEventListener('click', () => { image = null; thumb.innerHTML = coverSvg({ ...g, image: null }); });
@@ -1890,7 +1890,7 @@ function openScanGames() {
       body.innerHTML = `<div class="scan-head"><b>${PC_GAMES.length} jogos encontrados</b><input class="scan-search" id="scanSearch" placeholder="Buscar" autocomplete="off"></div>
         <div class="pc-grid">${PC_GAMES.map((g) => `
           <button class="pc-card${inLib.has(g.id) ? ' added' : ''}" data-id="${g.id}" ${inLib.has(g.id) ? 'disabled' : ''}>
-            <div class="cv">${g.image ? `<img src="${g.image}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{innerHTML:coverSvg(PC_GAMES.find(x=>x.id==='${g.id}'))}).firstChild)">` : coverSvg(g)}</div>
+            <div class="cv">${g.image ? `<img src="${g.image}" alt="" ${coverAttrs(g.image)} onerror="this.replaceWith(Object.assign(document.createElement('div'),{innerHTML:coverSvg(PC_GAMES.find(x=>x.id==='${g.id}'))}).firstChild)">` : coverSvg(g)}</div>
             <span class="tick">${icon('check')}</span>
             <div class="meta"><b>${escapeHtml(g.name)}</b><small><i style="background:${STORE_COLORS[g.store]}"></i>${g.store} · ${escapeHtml(g.players)}</small></div>
             ${inLib.has(g.id) ? '<span class="in-lib">Na biblioteca</span>' : ''}
@@ -2310,6 +2310,66 @@ function qrSvg(text) {
     return `<svg viewBox="0 0 25 25"><g fill="#0b0c0f">${cells}</g></svg>`;
   }
 }
+// Capa que não preenche: algumas imagens têm a arte só numa faixa e o resto borrado ou liso (várias capas
+// da Steam são uma arte deitada no topo de um fundo borrado). Achamos a faixa com detalhe e recortamos nela;
+// o object-fit: cover (ou o recorte da tela do fliperama) expande para preencher, sem distorcer.
+const artBoundsCache = new Map();
+function artBounds(img) {
+  const key = img.currentSrc || img.src;
+  if (artBoundsCache.has(key)) return artBoundsCache.get(key);
+  const iw = img.naturalWidth, ih = img.naturalHeight;
+  let out = { sx: 0, sy: 0, sw: iw, sh: ih, cropped: false };
+  try {
+    const k = 96 / Math.max(iw, ih);
+    const w = Math.max(8, Math.round(iw * k)), h = Math.max(8, Math.round(ih * k));
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    g.drawImage(img, 0, 0, w, h);
+    const d = g.getImageData(0, 0, w, h).data;
+    const lum = (x, y) => { const i = (y * w + x) * 4; return d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11; };
+    const rows = new Array(h).fill(0), cols = new Array(w).fill(0);
+    for (let y = 1; y < h; y++) {
+      for (let x = 1; x < w; x++) {
+        const e = Math.abs(lum(x, y) - lum(x - 1, y)) + Math.abs(lum(x, y) - lum(x, y - 1));
+        rows[y] += e / w; cols[x] += e / h;
+      }
+    }
+    // a faixa nítida: do primeiro ao último trecho com detalhe de verdade
+    const band = (v) => {
+      const sm = v.map((_, i) => ((v[i - 1] ?? v[i]) + v[i] + (v[i + 1] ?? v[i])) / 3);
+      const p90 = [...sm].sort((a, b) => a - b)[Math.floor(sm.length * 0.9)] || 0;
+      const on = sm.map((x) => x > p90 * 0.18);
+      const a = on.indexOf(true), b = on.lastIndexOf(true);
+      return a < 0 ? [0, v.length - 1] : [a, b];
+    };
+    const [y0, y1] = band(rows), [x0, x1] = band(cols);
+    const fy = (y1 - y0 + 1) / h, fx = (x1 - x0 + 1) / w;
+    if ((fy < 0.8 && fy > 0.2) || (fx < 0.8 && fx > 0.2)) {
+      const sy = fy < 0.8 ? (y0 / h) * ih : 0, sh = fy < 0.8 ? fy * ih : ih;
+      const sx = fx < 0.8 ? (x0 / w) * iw : 0, sw = fx < 0.8 ? fx * iw : iw;
+      out = { sx, sy, sw, sh, cropped: true };
+    }
+  } catch (e) { /* imagem de outra origem sem permissão de leitura: fica como está */ }
+  artBoundsCache.set(key, out);
+  return out;
+}
+// <img onload="fitCover(this)">: troca pela faixa nítida, se a capa tiver uma
+function fitCover(el) {
+  if (el.dataset.fit) return;
+  el.dataset.fit = '1';
+  const b = artBounds(el);
+  if (!b.cropped) return;
+  try {
+    const c = document.createElement('canvas');
+    c.width = Math.round(b.sw); c.height = Math.round(b.sh);
+    c.getContext('2d').drawImage(el, b.sx, b.sy, b.sw, b.sh, 0, 0, c.width, c.height);
+    el.src = c.toDataURL('image/jpeg', 0.9);
+  } catch (e) { /* sem permissão de leitura: mantém a original */ }
+}
+// atributos de uma capa: lê do GitHub com CORS (para poder medir) e expande quando precisa
+const coverAttrs = (src) => `${/^https?:/.test(src) ? 'crossorigin="anonymous" ' : ''}onload="fitCover(this)"`;
+
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 }
@@ -3105,13 +3165,15 @@ function prepCover(game) {
     img.onload = () => loaded(img, false);
     img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   };
-  if (game.image) {
+  // a arte larga sem logo (hero) combina com a tela deitada; senão, a capa
+  const src = game.hero || game.image;
+  if (src) {
     const img = new Image();
     // capas do GitHub: sem isto o WebGL recusa a imagem de outra origem
-    if (/^https?:/.test(game.image)) img.crossOrigin = 'anonymous';
+    if (/^https?:/.test(src)) img.crossOrigin = 'anonymous';
     img.onload = () => loaded(img, true);
     img.onerror = generated; // sem a imagem (ex.: página aberta sem o servidor): capa gerada
-    img.src = game.image;
+    img.src = src;
   } else generated();
 }
 
@@ -3156,9 +3218,10 @@ function drawArrow(g, x, y, len, thick) {
 function screenArt(cover, w, h) {
   const { img, real } = cover;
   // recorte "cover": preenche a área sem distorcer. Nas capas geradas, fica de fora a faixa com o nome.
-  const iw = real ? img.naturalWidth : 600, ih = real ? img.naturalHeight : 560;
-  const k = Math.max(w / iw, h / ih);
-  const sw = w / k, sh = h / k, sx = (iw - sw) / 2, sy = (ih - sh) / 2;
+  // Arte que ocupa só uma faixa da imagem (o resto borrado): o recorte parte só da faixa nítida.
+  const b = real ? artBounds(img) : { sx: 0, sy: 0, sw: 600, sh: 560 };
+  const k = Math.max(w / b.sw, h / b.sh);
+  const sw = w / k, sh = h / k, sx = b.sx + (b.sw - sw) / 2, sy = b.sy + (b.sh - sh) / 2;
   const c = mkCanvas(Math.round(w), Math.round(h)), g = c.getContext('2d');
   g.filter = 'grayscale(1) contrast(1.2) brightness(1.06)';
   g.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
@@ -3203,7 +3266,10 @@ function drawPage(g, game) {
   if (tag.join(' ').length < game.tagline.length) tag[tag.length - 1] = tag[tag.length - 1].replace(/\s*\S*$/, '') + '…';
   const GAP = { badge: 22, title: 22, players: 14 };
   const hTitle = size * 0.92 * (lines.length - 1) + size * 0.78;
-  const total = 46 + GAP.badge + hTitle + GAP.title + 38 + GAP.players + tag.length * 46;
+  // a área do título tem sempre a mesma altura (a de duas linhas grandes): um nome de uma palavra que não
+  // quebra (SPEEDRUNNERS.) fica centralizado nela, e o bloco começa na mesma altura em todos os jogos
+  const TITLE_BOX = Math.max(hTitle, 134 * 0.92 + 134 * 0.78);
+  const total = 46 + GAP.badge + TITLE_BOX + GAP.title + 38 + GAP.players + tag.length * 46;
   // bloco ancorado embaixo
   let y = Math.max(96, LAY.bottomY - total);
 
@@ -3217,9 +3283,9 @@ function drawPage(g, game) {
 
   g.fillStyle = INK;
   g.font = `${size}px Anton, Impact, sans-serif`;
-  let ty = y + size * 0.78;
+  let ty = y + (TITLE_BOX - hTitle) / 2 + size * 0.78;
   for (const l of lines) { g.fillText(l, X - 2, ty); ty += size * 0.92; }
-  y += hTitle + GAP.title;
+  y += TITLE_BOX + GAP.title;
 
   g.font = '800 36px Inter, sans-serif';
   g.fillText(game.players.toUpperCase(), X, y + 33);

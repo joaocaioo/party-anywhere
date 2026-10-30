@@ -1,6 +1,7 @@
 //! Operações de quem cria jogos: criar o projeto, validar e empacotar um release. A CLI `pa` e o servidor
 //! MCP (`pa mcp`) chamam as mesmas funções, então humano e agente veem as mesmas regras e mensagens.
 
+pub mod host;
 pub mod mcp;
 mod template;
 
@@ -21,6 +22,45 @@ pub struct NewOptions {
     pub name: String,
     pub id: Option<String>,
     pub tagline: Option<String>,
+    /// Mod co-op de um jogo instalado: o projeto já nasce apontando para ele.
+    pub base_game: Option<BaseGameSpec>,
+}
+
+/// O jogo-base de um mod, achado na Steam ou na Epic deste PC.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BaseGameSpec {
+    pub name: String,
+    pub steam_app_id: Option<u32>,
+    /// Executável, relativo à pasta do jogo.
+    pub exe: String,
+}
+
+/// Acha o jogo instalado (nome ou appid da Steam) e confere se dá para fazer um mod co-op dele.
+pub fn resolve_base_game(query: &str) -> Result<BaseGameSpec, String> {
+    use pa_library::pcgames;
+    let found = pcgames::find(query);
+    let game = match found.as_slice() {
+        [] => return Err(format!("não achei \"{query}\" na Steam nem na Epic deste PC. `pa games` lista o que está instalado.")),
+        [one] => one.clone(),
+        many => match many.iter().find(|g| g.name.eq_ignore_ascii_case(query.trim())) {
+            Some(exact) => exact.clone(),
+            None => {
+                let names: Vec<String> = many.iter().map(|g| format!("{} ({})", g.name, g.steam_app_id.map(|i| i.to_string()).unwrap_or(g.store.clone()))).collect();
+                return Err(format!("\"{query}\" combina com vários jogos: {}. Seja mais específico ou use o appid.", names.join(", ")));
+            }
+        },
+    };
+    let dir = game.install_dir.clone().ok_or_else(|| format!("não sei onde {} está instalado.", game.name))?;
+    if let Some(ac) = pcgames::anti_cheat(&dir) {
+        return Err(format!(
+            "{} usa anti-cheat ({ac}). O Party Anywhere não faz mods para esses jogos: contornar anti-cheat está fora do \
+             escopo e pode banir a conta de quem joga. Escolha um jogo sem anti-cheat.",
+            game.name
+        ));
+    }
+    let exe = pcgames::exe_candidates(&dir).into_iter().next().ok_or_else(|| format!("não achei o executável de {} em {}.", game.name, dir.display()))?;
+    Ok(BaseGameSpec { name: game.name, steam_app_id: game.steam_app_id, exe })
 }
 
 /// Cria um projeto de jogo já válido: manifesto, capa provisória, workflow de release, MCP e skill.
@@ -41,11 +81,11 @@ pub fn new_project(dir: &Path, opts: &NewOptions) -> Result<Vec<PathBuf>, String
         return Err(format!("\"{id}\" não é um id válido. Use com.seu-usuario.{slug}."));
     }
     let tagline = opts.tagline.clone().unwrap_or_else(|| "Uma frase curta que vende o jogo.".into());
-    let manifest = template::manifest(&id, name, &tagline, &slug)?;
+    let manifest = template::manifest(&id, name, &tagline, &slug, opts.base_game.as_ref())?;
 
     let files: Vec<(&str, Vec<u8>)> = vec![
         (MANIFEST_FILE, manifest.into_bytes()),
-        ("README.md", template::readme(name, &tagline).into_bytes()),
+        ("README.md", template::readme(name, &tagline, opts.base_game.as_ref()).into_bytes()),
         ("assets/cover.png", template::placeholder_cover()?),
         ("assets/cover.svg", template::COVER_SVG.as_bytes().to_vec()),
         (".gitignore", template::GITIGNORE.as_bytes().to_vec()),
@@ -245,7 +285,7 @@ mod tests {
 
     fn project() -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
-        let opts = NewOptions { name: "Arena Blast".into(), id: Some("com.joao.arena-blast".into()), tagline: None };
+        let opts = NewOptions { name: "Arena Blast".into(), id: Some("com.joao.arena-blast".into()), ..Default::default() };
         let created = new_project(dir.path(), &opts).unwrap();
         assert!(created.len() >= 10);
         dir
@@ -301,6 +341,28 @@ mod tests {
         // mesmo build, mesmo hash
         let again = pack_dir(dir.path(), None, None).unwrap();
         assert_eq!(again.release.sha256, p.release.sha256);
+    }
+
+    #[test]
+    fn coop_mod_of_an_installed_game_points_at_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = BaseGameSpec { name: "Grand Theft Auto: San Andreas".into(), steam_app_id: Some(12120), exe: "gta_sa.exe".into() };
+        let opts = NewOptions { name: "San Andreas Party".into(), base_game: Some(base), ..Default::default() };
+        new_project(dir.path(), &opts).unwrap();
+        let v = validate_dir(dir.path());
+        assert!(v.ok, "{:?}", v.issues);
+        let m = v.manifest.unwrap();
+        let b = m.requires.unwrap().base_game.unwrap();
+        assert_eq!((b.steam_app_id, b.exe.as_str()), (Some(12120), "gta_sa.exe"));
+        assert_eq!(m.install.target, InstallTarget::BaseGame);
+        assert_eq!(m.install.files[0].from, "san-andreas-party.dll");
+        assert_eq!(m.launch.exe, "gta_sa.exe");
+        assert!(fs::read_to_string(dir.path().join("README.md")).unwrap().contains("Grand Theft Auto: San Andreas"));
+
+        // o build do mod tem a DLL, não o jogo
+        fs::create_dir_all(dir.path().join("build")).unwrap();
+        fs::write(dir.path().join("build/san-andreas-party.dll"), b"MZ").unwrap();
+        assert!(pack_dir(dir.path(), None, None).is_ok());
     }
 
     #[test]

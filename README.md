@@ -30,10 +30,13 @@ o workflow que publica cada versão e a configuração para agentes de IA.
 
 | Ferramenta | Para quê |
 |---|---|
+| `pa hub` | O Party Anywhere está instalado e atualizado? `pa hub install` instala ou atualiza. |
+| `pa games` | Jogos do seu PC (Steam e Epic) que podem virar co-op. |
+| `pa new meu-mod --name "Meu Mod" --base-game "nome do jogo"` | O mod co-op de um jogo instalado, já apontando para ele. |
 | `pa validate` | Confere manifesto e capa, e diz o que fazer em cada problema. |
 | `pa pack --from build --tag v0.1.0` | Gera o pacote e o `party-anywhere.release.json` com o hash. |
 | `pa inspect dono/repo` | Lê o jogo publicado como o Hub lê. |
-| `pa mcp` | As mesmas ferramentas para agentes de IA (Claude Code e outros com MCP). Roda no seu computador, sem servidor e sem custo. |
+| `pa mcp` | As mesmas ferramentas para agentes de IA (Claude Code e outros com MCP). Roda no seu computador, sem servidor e sem custo: peça "transforme o jogo X em co-op para o Party Anywhere" e o agente confere o Hub, acha o jogo e cria o projeto certo. |
 
 Publicar: suba a `version`, crie a tag `v0.1.0` e o workflow do projeto publica o release. Adicione o
 tópico **`party-anywhere-game`** ao repositório para aparecer em "Descobrir" no Hub.

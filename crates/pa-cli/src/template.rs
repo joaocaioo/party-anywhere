@@ -1,6 +1,8 @@
 //! Arquivos do `pa new`, vindos de templates/game (a fonte única do template).
 
-use pa_manifest::{GameManifest, MANIFEST_FILE};
+use pa_manifest::{BaseGame, GameManifest, InstallFile, InstallTarget, Requires, MANIFEST_FILE};
+
+use crate::BaseGameSpec;
 
 const MANIFEST: &str = include_str!("../../../templates/game/party-anywhere.json");
 pub const COVER_SVG: &str = include_str!("../../../templates/game/assets/cover.svg");
@@ -11,7 +13,7 @@ pub const SKILL: &str = include_str!("../../../templates/game/.claude/skills/par
 pub const SDK_HEADER: &str = include_str!("../../../sdk/c/party_anywhere.h");
 pub const SDK_EXAMPLE: &str = include_str!("../../../sdk/c/examples/arena_console.c");
 
-pub fn manifest(id: &str, name: &str, tagline: &str, slug: &str) -> Result<String, String> {
+pub fn manifest(id: &str, name: &str, tagline: &str, slug: &str, base: Option<&BaseGameSpec>) -> Result<String, String> {
     let (mut m, _) = GameManifest::parse(MANIFEST).map_err(|_| "o template embutido está inválido".to_string())?;
     m.id = id.to_string();
     m.name = name.chars().take(pa_manifest::MAX_NAME_CHARS).collect();
@@ -20,6 +22,22 @@ pub fn manifest(id: &str, name: &str, tagline: &str, slug: &str) -> Result<Strin
     m.install.asset = format!("{slug}-{{version}}.zip");
     m.install.files.clear();
     m.launch.exe = format!("{slug}.exe");
+    if let Some(b) = base {
+        // mod co-op: o pacote leva a DLL do mod para a pasta do jogo (com backup) e o Hub abre o próprio jogo
+        m.requires = Some(Requires {
+            base_game: Some(BaseGame {
+                name: b.name.clone(),
+                steam_app_id: b.steam_app_id,
+                exe: b.exe.clone(),
+                accepted_sha256: vec![],
+                help: None,
+            }),
+        });
+        m.install.target = InstallTarget::BaseGame;
+        m.install.files = vec![InstallFile { from: format!("{slug}.dll"), to: format!("{slug}.dll") }];
+        m.launch.exe = b.exe.clone();
+        m.tags = vec!["mod".into(), "co-op".into()];
+    }
     let issues: Vec<_> = m.validate().into_iter().filter(|i| i.is_error()).collect();
     if let Some(i) = issues.first() {
         return Err(format!("{MANIFEST_FILE} gerado ficou inválido: {i}"));
@@ -27,14 +45,32 @@ pub fn manifest(id: &str, name: &str, tagline: &str, slug: &str) -> Result<Strin
     Ok(serde_json::to_string_pretty(&m).expect("manifesto serializa") + "\n")
 }
 
-pub fn readme(name: &str, tagline: &str) -> String {
+pub fn readme(name: &str, tagline: &str, base: Option<&BaseGameSpec>) -> String {
+    let mod_section = base
+        .map(|b| {
+            format!(
+                "## Como este mod funciona\n\n\
+                 Mod co-op local para **{}**. Quem instala precisa ter o jogo{}; o Hub acha a pasta sozinho, \
+                 copia os arquivos do mod com backup e abre o jogo.\n\n\
+                 - O mod é uma DLL carregada pelo jogo (por um proxy como `version.dll`/`dinput8.dll` ou um ASI \
+                 loader). Ajuste `install.files` no `{MANIFEST_FILE}` para o nome que o jogo carrega.\n\
+                 - Os jogadores chegam pelo `sdk/party_anywhere.h`: chame `pa_poll` no mesmo ponto em que o jogo \
+                 lê os controles e use `pa_get_pad` para cada vaga.\n\
+                 - Em `requires.baseGame.acceptedSha256`, coloque o hash do `{}` da versão que o mod suporta.\n\
+                 - Só jogos sem anti-cheat, e nada de distribuir arquivos do jogo original.\n\n",
+                b.name,
+                if b.steam_app_id.is_some() { " na Steam" } else { "" },
+                b.exe
+            )
+        })
+        .unwrap_or_default();
     format!(
         "# {name}\n\n{tagline}\n\n\
          ## Jogar\n\n\
          1. Abra o [Party Anywhere](https://github.com/joaocaioo/party-anywhere).\n\
          2. Na Biblioteca, em **Adicionar jogo → Por link**, cole o link deste repositório.\n\
          3. Conecte os controles ou escaneie o QR com o celular e aperte **Jogar**.\n\n\
-         ## Desenvolver\n\n\
+         {mod_section}## Desenvolver\n\n\
          - `pa validate` confere o manifesto e a capa.\n\
          - Crie a tag `vX.Y.Z` (igual ao `version` do `{MANIFEST_FILE}`) para publicar uma versão.\n"
     )

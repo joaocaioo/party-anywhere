@@ -12,6 +12,10 @@ serde_json.workspace = true
 semver.workspace = true
 ureq.workspace = true
 zip.workspace = true
+base64 = "0.22"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.52"
 
 [dev-dependencies]
 tempfile.workspace = true

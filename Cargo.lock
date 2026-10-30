@@ -2587,6 +2587,7 @@ dependencies = [
  "pa-library",
  "pa-manifest",
  "png 0.17.16",
+ "semver",
  "serde",
  "serde_json",
  "tempfile",
@@ -2614,12 +2615,14 @@ dependencies = [
 name = "pa-library"
 version = "0.0.1"
 dependencies = [
+ "base64 0.22.1",
  "pa-manifest",
  "semver",
  "serde",
  "serde_json",
  "tempfile",
  "ureq",
+ "winreg 0.52.0",
  "zip",
 ]
 
@@ -2724,7 +2727,6 @@ dependencies = [
 name = "party-anywhere-hub"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
  "gilrs",
  "pa-core",
  "pa-library",
@@ -2742,7 +2744,6 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tempfile",
  "windows-sys 0.59.0",
- "winreg 0.52.0",
 ]
 
 [[package]]

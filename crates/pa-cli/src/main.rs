@@ -3,13 +3,18 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use pa_cli::{mcp, new_project, pack_dir, validate_dir, NewOptions};
+use pa_cli::host::{game_json, install_hub, RealHost};
+use pa_cli::{mcp, new_project, pack_dir, resolve_base_game, validate_dir, NewOptions};
 use pa_manifest::{Issue, Severity};
 
 const HELP: &str = "pa: jogos co-op para o Party Anywhere
 
 Uso:
+  pa hub                      o Party Anywhere está instalado e atualizado?
+  pa hub install              baixa e abre o instalador (instala ou atualiza)
+  pa games [busca] [--json]   jogos instalados (Steam e Epic) que podem virar co-op
   pa new <pasta> --name \"Meu Jogo\" [--id com.usuario.jogo] [--tagline \"...\"]
+  pa new <pasta> --name \"Meu Mod\" --base-game \"<nome ou appid>\"   mod co-op de um jogo instalado
   pa validate [pasta] [--json]
   pa pack [pasta] [--from build] [--tag v0.1.0] [--json]
   pa inspect <link do repositório | dono/repo> [--json]
@@ -36,9 +41,13 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
         "new" => {
             let dir = opts.positional.first().ok_or("diga a pasta: pa new <pasta> --name \"Meu Jogo\"")?;
             let name = opts.get("--name").map(str::to_string).unwrap_or_else(|| folder_name(dir));
+            let base_game = opts.get("--base-game").map(resolve_base_game).transpose()?;
+            if let Some(b) = &base_game {
+                println!("Jogo-base: {} ({})", b.name, b.exe);
+            }
             let created = new_project(
                 Path::new(dir),
-                &NewOptions { name, id: opts.get("--id").map(Into::into), tagline: opts.get("--tagline").map(Into::into) },
+                &NewOptions { name, id: opts.get("--id").map(Into::into), tagline: opts.get("--tagline").map(Into::into), base_game },
             )?;
             println!("Projeto criado em {dir} ({} arquivos).", created.len());
             println!("Próximos passos:");
@@ -81,6 +90,37 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
                 }
             }
         }
+        "hub" => {
+            if opts.positional.first().map(String::as_str) == Some("install") {
+                println!("{}", install_hub()?);
+                return Ok(ExitCode::SUCCESS);
+            }
+            let st = pa_library::hubapp::status(&pa_library::http::Ureq::default());
+            if opts.flag("--json") {
+                println!("{}", serde_json::to_string_pretty(&st).expect("serializa"));
+            } else {
+                println!("{}", st.summary);
+            }
+            Ok(if st.installed.is_some() && !st.update_available { ExitCode::SUCCESS } else { ExitCode::FAILURE })
+        }
+        "games" => {
+            let q = opts.positional.join(" ");
+            let games: Vec<_> = pa_library::pcgames::find(&q).iter().map(game_json).collect();
+            if opts.flag("--json") {
+                println!("{}", serde_json::to_string_pretty(&games).expect("serializa"));
+            } else if games.is_empty() {
+                println!("Nenhum jogo da Steam ou da Epic encontrado.");
+            } else {
+                for g in &games {
+                    let id = g["steamAppId"].as_u64().map(|i| format!(" · appid {i}")).unwrap_or_default();
+                    let ac = g["antiCheat"].as_str().map(|a| format!("  ✗ anti-cheat ({a}): fora do Party Anywhere")).unwrap_or_default();
+                    println!("  {} ({}{id}){ac}", g["name"].as_str().unwrap_or(""), g["store"].as_str().unwrap_or(""));
+                }
+                println!("
+Para criar o mod co-op: pa new <pasta> --name \"Meu Mod\" --base-game \"<nome ou appid>\"");
+            }
+            Ok(ExitCode::SUCCESS)
+        }
         "inspect" => {
             let repo = opts.positional.first().ok_or("diga o repositório: pa inspect dono/repo")?;
             let report = pa_library::inspect(&pa_library::http::Ureq::default(), repo)?;
@@ -94,10 +134,7 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
         }
         "mcp" => {
             let root = std::env::current_dir().map_err(|e| e.to_string())?;
-            let server = mcp::Server::new(root).with_inspector(Box::new(|repo| {
-                let report = pa_library::inspect(&pa_library::http::Ureq::default(), repo)?;
-                serde_json::to_value(report).map_err(|e| e.to_string())
-            }));
+            let server = mcp::Server::new(root).with_host(Box::new(RealHost));
             let stdin = std::io::stdin();
             server.serve(stdin.lock(), std::io::stdout()).map_err(|e| e.to_string())?;
             Ok(ExitCode::SUCCESS)
@@ -135,7 +172,7 @@ struct Opts {
 
 impl Opts {
     fn parse(args: &[String]) -> Result<Self, String> {
-        const WITH_VALUE: [&str; 5] = ["--name", "--id", "--tagline", "--from", "--tag"];
+        const WITH_VALUE: [&str; 6] = ["--name", "--id", "--tagline", "--from", "--tag", "--base-game"];
         let mut positional = Vec::new();
         let mut named = Vec::new();
         let mut it = args.iter();

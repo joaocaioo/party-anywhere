@@ -1,5 +1,6 @@
 # Uma tag vX.Y.Z publica:
-#   - PartyAnywhere-X.Y.Z-setup.exe: o instalador do Hub (o aviso de atualização do Hub procura este nome);
+#   - PartyAnywhere-X.Y.Z-setup.exe (+ .sha256): o instalador do Hub (o aviso de atualização e o `pa hub install`
+#     procuram este nome e conferem o hash);
 #   - pa-windows-x64.exe: a ferramenta dos criadores (o workflow do template de jogo baixa este nome).
 # A versão da tag precisa ser igual à de apps/hub/src-tauri/tauri.conf.json.
 name: Release
@@ -45,7 +46,11 @@ jobs:
         run: |
           npx --yes @tauri-apps/cli@2 build
           $setup = Get-ChildItem ../../../target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
-          Copy-Item $setup.FullName "../../../dist/PartyAnywhere-${{ github.ref_name }}-setup.exe".Replace("-v", "-")
+          $out = "../../../dist/PartyAnywhere-${{ github.ref_name }}-setup.exe".Replace("-v", "-")
+          Copy-Item $setup.FullName $out
+          # o Hub e a `pa hub install` conferem o instalador por este hash antes de abrir
+          $hash = (Get-FileHash $out -Algorithm SHA256).Hash.ToLower()
+          "$hash  $(Split-Path $out -Leaf)" | Out-File -Encoding ascii -NoNewline "$out.sha256"
 
       - name: Publicar
         shell: pwsh

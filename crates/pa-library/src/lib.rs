@@ -4,13 +4,15 @@
 
 pub mod github;
 pub mod http;
+pub mod hubapp;
 pub mod install;
+pub mod pcgames;
 pub mod store;
 pub mod updates;
 
 pub use github::{discover, fetch_latest, fetch_manifest, inspect, Discovered, InspectReport, LatestRelease};
 pub use store::{Installed, Library, LibraryEntry, LoadNote, Source};
-pub use updates::{check_games, check_hub, GameUpdate, HubUpdate};
+pub use updates::{check_games, check_hub, latest_hub, GameUpdate, HubUpdate};
 
 /// Entrada da Biblioteca para um jogo publicado (o que a capa e a tela do fliperama mostram).
 pub fn entry_for(report: &InspectReport) -> Option<LibraryEntry> {

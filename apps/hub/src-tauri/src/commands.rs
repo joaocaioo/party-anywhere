@@ -12,7 +12,7 @@ use tauri_plugin_opener::OpenerExt;
 
 use crate::hub::{Hub, LobbyView};
 use crate::keyboards::{self, KeyboardView};
-use crate::pcscan::{self, PcGame};
+use pa_library::pcgames::{self, Art, PcGame};
 
 pub struct LibraryState {
     pub lib: Mutex<Library>,
@@ -208,7 +208,7 @@ pub async fn library_install(
         };
         let base_dir = base_dir.map(PathBuf::from).or_else(|| {
             let appid = manifest.requires.as_ref()?.base_game.as_ref()?.steam_app_id?;
-            pcscan::steam_app_dir(appid)
+            pcgames::steam_app_dir(appid)
         });
         let _ = app.emit("install-progress", InstallProgress { id: manifest.id.clone(), stage: "download" });
         let installed = install(&http, manifest, latest, &libs.games_root, base_dir.as_deref())?;
@@ -313,6 +313,8 @@ pub async fn pick_game_file(app: tauri::AppHandle) -> Option<PcGame> {
         tagline: "Jogo do seu PC, com os celulares como controles.".into(),
         launch: path.to_string_lossy().to_string(),
         image: None,
+        install_dir: path.parent().map(|p| p.to_path_buf()),
+        steam_app_id: None,
     })
 }
 
@@ -434,7 +436,7 @@ pub async fn library_discover() -> Result<Vec<Discovered>, String> {
 
 #[tauri::command]
 pub async fn pc_scan() -> Vec<PcGame> {
-    tauri::async_runtime::spawn_blocking(pcscan::scan).await.unwrap_or_default()
+    tauri::async_runtime::spawn_blocking(pcgames::scan).await.unwrap_or_default()
 }
 
 /// Confere atualizações dos jogos instalados por link; avisa a UI com o evento `game-updates`.
@@ -509,27 +511,23 @@ pub async fn hub_check_update(app: tauri::AppHandle, libs: Libs<'_>) -> Result<O
     Ok(found)
 }
 
-/// Baixa o instalador novo, abre e fecha o Hub (o instalador substitui a versão e reabre).
+/// Baixa o instalador novo (conferindo o hash publicado), abre e fecha o Hub; o instalador substitui a
+/// versão e reabre.
 #[tauri::command]
-pub async fn hub_apply_update(app: tauri::AppHandle, installer_url: String) -> Result<(), String> {
-    let path = tauri::async_runtime::spawn_blocking(move || -> Result<PathBuf, String> {
-        use pa_library::http::Http;
-        if !installer_url.starts_with("https://github.com/") {
-            return Err("endereço de atualização inesperado".into());
-        }
-        let resp = Ureq::default().get(&installer_url, None, 300 * 1024 * 1024)?;
-        if !resp.ok() {
-            return Err(format!("download falhou ({})", resp.status));
-        }
-        let path = std::env::temp_dir().join("PartyAnywhere-setup.exe");
-        std::fs::write(&path, resp.body).map_err(|e| e.to_string())?;
-        Ok(path)
-    })
-    .await
-    .map_err(|e| e.to_string())??;
+pub async fn hub_apply_update(app: tauri::AppHandle, update: HubUpdate) -> Result<(), String> {
+    let path = tauri::async_runtime::spawn_blocking(move || pa_library::hubapp::download_installer(&Ureq::default(), &update))
+        .await
+        .map_err(|e| e.to_string())??;
     std::process::Command::new(&path).spawn().map_err(|e| e.to_string())?;
     app.exit(0);
     Ok(())
+}
+
+/// Arte de um jogo do PC sob demanda: `steam:<appid>` vira a capa ou a arte larga (hero) da Steam.
+#[tauri::command]
+pub async fn game_art(reference: String, hero: bool) -> Option<String> {
+    let art = if hero { Art::Hero } else { Art::Cover };
+    tauri::async_runtime::spawn_blocking(move || pcgames::art_data_url(&reference, art)).await.ok().flatten()
 }
 
 /// Instalado na pasta de um jogo-base? A UI pergunta a pasta quando o mod precisa.

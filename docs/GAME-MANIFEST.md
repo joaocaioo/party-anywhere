@@ -124,7 +124,10 @@ Sem o workflow: `pa pack --from build --tag v0.3.0` e anexe os dois arquivos de 
 
 | Ferramenta | O que faz |
 |---|---|
-| `pa new <pasta> --name "Jogo"` | Projeto pronto: manifesto, capa provisória 900×1200, workflow, `.mcp.json` e skill para agentes. |
+| `pa hub` / `pa hub install` | Confere se o Party Anywhere está instalado e atualizado; instala ou atualiza (instalador conferido pelo hash). |
+| `pa games [busca]` | Jogos instalados (Steam e Epic) com pasta, executável e aviso de anti-cheat. |
+| `pa new <pasta> --name "Jogo"` | Projeto pronto: manifesto, capa provisória 900×1200, SDK com exemplo, workflow, `.mcp.json` e skill para agentes. |
+| `pa new <pasta> --name "Mod" --base-game "<nome ou appid>"` | O mod co-op de um jogo instalado: `requires.baseGame` (nome, appid, executável) e `install.target: "baseGame"` já preenchidos. Recusa jogos com anti-cheat. |
 | `pa validate` | Confere manifesto e capa, com o que fazer em cada problema. |
 | `pa pack --from build --tag vX.Y.Z` | Pacote `.zip` reproduzível + `party-anywhere.release.json`. |
 | `pa inspect dono/repo` | Lê o jogo publicado como o Hub lê e diz se instala. |

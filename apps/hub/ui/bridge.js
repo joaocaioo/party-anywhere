@@ -117,10 +117,24 @@
 
   // ------------------------------------------------------------------ Biblioteca
   const known = new Map(); // id → jogo como o núcleo conhece (para mandar só como abrir os novos do PC)
-  function setGames(list, focusId) {
+  // arte da Steam vem como referência ("steam:331600"): a capa e a arte larga (hero) são lidas sob demanda,
+  // e o library.json guarda só a referência
+  const artCache = new Map();
+  const art = (ref, hero) => {
+    const key = `${ref}|${hero}`;
+    if (!artCache.has(key)) artCache.set(key, invoke('game_art', { reference: ref, hero }).catch(() => null));
+    return artCache.get(key);
+  };
+  async function withArt(g) {
+    if (!g.image || !g.image.startsWith('steam:')) return g;
+    const [cover, hero] = await Promise.all([art(g.image, false), art(g.image, true)]);
+    return { ...g, artRef: g.image, image: cover || undefined, artResolved: cover, hero: hero || undefined };
+  }
+  async function setGames(list, focusId) {
     known.clear();
     list.forEach((g) => known.set(g.id, g));
-    const mapped = list.map((g) => ({ ...g, image: g.image || undefined, tags: g.update ? [...g.tags, `Nova versão ${g.update}`] : g.tags }));
+    const resolved = await Promise.all(list.map(withArt));
+    const mapped = resolved.map((g) => ({ ...g, image: g.image || undefined, tags: g.update ? [...g.tags, `Nova versão ${g.update}`] : g.tags }));
     games.splice(0, games.length, ...mapped);
     if (arcade) {
       arcade.setGames(games, coverSvg);
@@ -131,9 +145,17 @@
   window.saveLibrary = () => {
     const payload = games.map((g) => {
       const pc = PC_GAMES.find((p) => p.id === g.id);
-      return { id: g.id, name: g.name, tagline: g.tagline || '', players: g.players || '', image: g.image || null, store: pc?.store ?? g.store ?? null, launch: pc?.launch ?? null };
+      // arte que não foi editada volta como referência (steam:...), não como a imagem inteira
+      const ref = g.artRef ?? pc?.artRef;
+      const image = ref && (g.image === g.artResolved || g.image === pc?.artResolved) ? ref : (g.image || null);
+      return { id: g.id, name: g.name, tagline: g.tagline || '', players: g.players || '', image, store: pc?.store ?? g.store ?? null, launch: pc?.launch ?? null };
     });
-    invoke('library_sync', { games: payload }).then((list) => list.forEach((g) => known.set(g.id, g))).catch(warn);
+    invoke('library_sync', { games: payload }).then((list) => {
+      list.forEach((g) => known.set(g.id, g));
+      // jogo novo da Steam: recarrega para ganhar a arte larga (hero) na tela do fliperama
+      const fresh = list.find((b) => b.image?.startsWith('steam:') && !games.find((g) => g.id === b.id)?.artRef);
+      if (fresh) setGames(list, fresh.id);
+    }).catch(warn);
   };
   window.forgetLibrary = () => {};
   invoke('library_list').then((list) => setGames(list)).catch(warn);
@@ -144,7 +166,12 @@
   window.openScanGames = async () => {
     try {
       const found = await invoke('pc_scan');
-      PC_GAMES.splice(0, PC_GAMES.length, ...found.map((g) => ({ ...g, art: palette(g.id) })));
+      const withCovers = await Promise.all(found.map(async (g) => {
+        if (!g.image || !g.image.startsWith('steam:')) return { ...g, art: palette(g.id) };
+        const cover = await art(g.image, false);
+        return { ...g, art: palette(g.id), artRef: g.image, image: cover || undefined, artResolved: cover };
+      }));
+      PC_GAMES.splice(0, PC_GAMES.length, ...withCovers);
     } catch (e) { warn(e); }
     scanList();
   };
@@ -225,7 +252,7 @@
     e.stopImmediatePropagation();
     if (hubUpdate) {
       toast(`Baixando a v${hubUpdate.version}... O Hub reabre sozinho.`, null, 'ok');
-      invoke('hub_apply_update', { installerUrl: hubUpdate.installerUrl }).catch(warn);
+      invoke('hub_apply_update', { update: hubUpdate }).catch(warn);
     } else {
       updateState = 'checking'; renderUpdate();
       invoke('hub_check_update').then((u) => {
