@@ -24,6 +24,8 @@ pub trait Host {
     fn install_hub(&self) -> Result<Value, String>;
     fn find_games(&self, query: &str) -> Vec<Value>;
     fn resolve_base_game(&self, query: &str) -> Result<BaseGameSpec, String>;
+    /// Leva um mod (ou jogo) publicado para a Biblioteca: abre o Hub com a prévia; a pessoa confirma lá.
+    fn add_to_library(&self, link: &str) -> Result<Value, String>;
 }
 
 /// Sem acesso ao mundo real (padrão do `Server::new`).
@@ -44,6 +46,9 @@ impl Host for Offline {
     }
     fn resolve_base_game(&self, q: &str) -> Result<BaseGameSpec, String> {
         Err(format!("não achei \"{q}\""))
+    }
+    fn add_to_library(&self, _: &str) -> Result<Value, String> {
+        Err("sem acesso ao sistema".into())
     }
 }
 
@@ -108,11 +113,16 @@ impl Server {
             "protocolVersion": version,
             "capabilities": { "tools": {}, "resources": {} },
             "serverInfo": { "name": "party-anywhere", "version": env!("CARGO_PKG_VERSION") },
-            "instructions": "Ferramentas para criar jogos co-op locais para o Party Anywhere (até 10 jogadores). \
-                Comece por hub_status: sem o Hub instalado e atualizado, ofereça install_hub (peça permissão antes). \
-                Para transformar um jogo do PC em co-op: find_installed_games e create_game com base_game. \
-                Leia get_sdk_docs antes de escrever código de controle: o jogo lê os jogadores só pelo SDK. \
-                A capa (retrato 3:4) é obrigatória; peça a arte ao criador. Jogos com anti-cheat ficam de fora."
+            "instructions": "Party Anywhere: transforma jogos do PC em co-op local (até 10 jogadores no mesmo PC, com \
+                controles, celulares e teclados). Comece sempre por hub_status: sem o Hub instalado ou com versão nova, \
+                ofereça install_hub (peça permissão antes). \
+                JOGAR um mod que a pessoa achou (um link de repositório): inspect_published_game e add_to_library. O Hub \
+                abre com a prévia, acha o jogo original da pessoa (Steam, Epic ou a pasta que ela escolher) e ela confirma \
+                em 'Instalar o mod'. Nunca baixe o jogo original. \
+                CRIAR um mod: find_installed_games e create_game com base_game; leia get_sdk_docs antes de escrever código \
+                de controle (o mod lê os jogadores só pelo SDK); validate_game; publicar é opcional (pack_release e um \
+                release no GitHub), mas ajuda outras pessoas a jogar. A capa (retrato 3:4) é obrigatória; peça a arte ao \
+                criador. Jogos com anti-cheat ficam de fora."
         })
     }
 
@@ -170,6 +180,13 @@ impl Server {
                 "name": "get_manifest_spec",
                 "description": "Especificação do party-anywhere.json e do party-anywhere.release.json, com o esquema JSON.",
                 "inputSchema": { "type": "object", "properties": {} }
+            }),
+            json!({
+                "name": "add_to_library",
+                "description": "Leva um mod (ou jogo) publicado para a Biblioteca do Party Anywhere: abre o Hub com a prévia do link; o Hub acha o jogo original da pessoa e ela confirma em 'Instalar o mod'. Antes: hub_status (e install_hub se faltar).",
+                "inputSchema": { "type": "object", "required": ["repo"], "properties": {
+                    "repo": { "type": "string", "description": "Link do repositório ou dono/repo." }
+                }}
             }),
             json!({
                 "name": "inspect_published_game",
@@ -269,6 +286,13 @@ impl Server {
                     Err(e) => tool_err(e),
                 })
             }
+            "add_to_library" => {
+                let Some(repo) = s("repo") else { return Err((-32602, "falta \"repo\"".into())) };
+                Ok(match self.host.add_to_library(&repo) {
+                    Ok(v) => tool_ok(v.get("summary").and_then(Value::as_str).unwrap_or("Hub aberto.").to_string(), v),
+                    Err(e) => tool_err(e),
+                })
+            }
             _ => Err((-32602, format!("ferramenta desconhecida: {name}"))),
         }
     }
@@ -342,6 +366,7 @@ mod tests {
                 "pack_release",
                 "get_sdk_docs",
                 "get_manifest_spec",
+                "add_to_library",
                 "inspect_published_game"
             ]
         );
@@ -389,6 +414,19 @@ mod tests {
             }
             Ok(BaseGameSpec { name: "GTA San Andreas".into(), steam_app_id: Some(12120), epic_app_name: None, exe: "gta_sa.exe".into() })
         }
+        fn add_to_library(&self, link: &str) -> Result<Value, String> {
+            Ok(json!({ "summary": format!("Party Anywhere aberto com {link}.") }))
+        }
+    }
+
+    #[test]
+    fn agent_takes_a_mod_link_to_the_library() {
+        let s = Server::new(".").with_host(Box::new(FakeHost));
+        let r = call(&s, 1, "tools/call", json!({ "name": "add_to_library", "arguments": { "repo": "autor/mod-coop" } }));
+        assert_eq!(r["result"]["isError"], false);
+        assert!(r["result"]["content"][0]["text"].as_str().unwrap().contains("autor/mod-coop"));
+        let r = call(&s, 2, "tools/call", json!({ "name": "add_to_library", "arguments": {} }));
+        assert!(r["error"].is_object(), "sem repo é erro de parâmetro");
     }
 
     #[test]

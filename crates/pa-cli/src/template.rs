@@ -9,6 +9,8 @@ pub const COVER_SVG: &str = include_str!("../../../templates/game/assets/cover.s
 pub const GITIGNORE: &str = include_str!("../../../templates/game/.gitignore");
 pub const MCP_JSON: &str = include_str!("../../../templates/game/.mcp.json");
 pub const RELEASE_WORKFLOW: &str = include_str!("../../../templates/game/.github/workflows/release.yml");
+pub const AGENTS: &str = include_str!("../../../templates/game/AGENTS.md");
+pub const CLAUDE: &str = include_str!("../../../templates/game/CLAUDE.md");
 pub const SKILL: &str = include_str!("../../../templates/game/.claude/skills/party-anywhere-game/SKILL.md");
 pub const SDK_HEADER: &str = include_str!("../../../sdk/c/party_anywhere.h");
 pub const SDK_EXAMPLE: &str = include_str!("../../../sdk/c/examples/arena_console.c");
@@ -66,12 +68,19 @@ pub fn readme(name: &str, tagline: &str, base: Option<&BaseGameSpec>) -> String 
             )
         })
         .unwrap_or_default();
+    let needs = base
+        .map(|b| format!("Precisa do **{}** (a sua cópia: Steam, Epic ou de onde for). O app acha sozinho ou deixa você escolher a pasta.\n\n", b.name))
+        .unwrap_or_default();
     format!(
         "# {name}\n\n{tagline}\n\n\
          ## Jogar\n\n\
-         1. Abra o [Party Anywhere](https://github.com/joaocaioo/party-anywhere).\n\
+         {needs}\
+         1. Instale o [Party Anywhere](https://github.com/joaocaioo/party-anywhere/releases/latest) (ele avisa quando há versão nova).\n\
          2. Na Biblioteca, em **Adicionar jogo → Por link**, cole o link deste repositório.\n\
          3. Conecte os controles ou escaneie o QR com o celular e aperte **Jogar**.\n\n\
+         Com um agente de IA (Claude e outros), é só pedir *\"instale este mod no Party Anywhere\"* com o link deste \
+         repositório: o `AGENTS.md` diz a ele o que fazer (conferir o app, instalar se faltar e levar o mod para a sua \
+         Biblioteca).\n\n\
          {mod_section}## Desenvolver\n\n\
          - `pa validate` confere o manifesto e a capa.\n\
          - Crie a tag `vX.Y.Z` (igual ao `version` do `{MANIFEST_FILE}`) para publicar uma versão.\n"

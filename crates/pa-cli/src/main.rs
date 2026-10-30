@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use pa_cli::host::{game_json, install_hub, RealHost};
+use pa_cli::host::{add_to_hub, game_json, install_hub, RealHost};
 use pa_cli::{mcp, new_project, pack_dir, resolve_base_game, validate_dir, NewOptions};
 use pa_manifest::{Issue, Severity};
 
@@ -18,6 +18,7 @@ Uso:
   pa validate [pasta] [--json]
   pa pack [pasta] [--from build] [--tag v0.1.0] [--json]
   pa inspect <link do repositório | dono/repo> [--json]
+  pa add <link do repositório | dono/repo | pasta do projeto>   leva o mod para a Biblioteca (abre o Party Anywhere)
   pa mcp                      servidor MCP (stdio) para agentes de IA
   pa --version
 
@@ -131,6 +132,11 @@ Para criar o mod co-op: pa new <pasta> --name \"Meu Mod\" --base-game \"<nome ou
                 print_issues(&report.issues);
             }
             Ok(if report.installable { ExitCode::SUCCESS } else { ExitCode::FAILURE })
+        }
+        "add" => {
+            let link = opts.positional.first().ok_or("diga o mod: pa add dono/repo (ou o link do GitHub)")?;
+            println!("{}", add_to_hub(link)?);
+            Ok(ExitCode::SUCCESS)
         }
         "mcp" => {
             let root = std::env::current_dir().map_err(|e| e.to_string())?;

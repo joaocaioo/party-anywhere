@@ -323,6 +323,18 @@ Regras:
 - O menu abre **segurando** o botão do topo por 0,5 s (um anel enche): sem abrir sem querer no meio do jogo.
   Abrir o menu ou trocar de layout solta todos os botões (nada fica preso no jogo).
 
+## Do link (ou da pasta) à Biblioteca, por fora do Hub
+
+- `party-anywhere --add <link ou pasta>` abre o "Adicionar por link" já lendo (com o Hub aberto, o
+  single-instance repassa o argumento e a janela vem para a frente). A `pa add` e a ferramenta MCP
+  `add_to_library` usam isso: conferem o mod (`inspect`) e abrem o Hub instalado (ou o que está aberto, ou
+  `PA_HUB_EXE`). A pessoa confirma no Hub; nada é instalado sem ela.
+- Pasta do projeto (`inspect_local`): o mesmo relatório do GitHub, lendo o `party-anywhere.json` e o pacote
+  que o `pa pack` gerou em `release/` (`file:///`, mesmo hash conferido). Fica na Biblioteca como
+  `local:<pasta>`, sem aviso de atualização (a versão nova vem de um novo `pa add`). Publicar é opcional.
+- Todo projeto do `pa new` leva `AGENTS.md` (e `CLAUDE.md`, que o importa): qualquer agente de IA que abra o
+  repositório de um mod sabe levar a pessoa a jogar (conferir/instalar o Hub, `pa add`) ou a mexer no mod.
+
 ## Jogo original de um mod (`requires.baseGame`)
 
 O Hub nunca baixa o jogo original: o mod roda sobre a cópia da pessoa. Ao instalar um mod pelo link

@@ -91,6 +91,8 @@ pub fn new_project(dir: &Path, opts: &NewOptions) -> Result<Vec<PathBuf>, String
         ("assets/cover.svg", template::COVER_SVG.as_bytes().to_vec()),
         (".gitignore", template::GITIGNORE.as_bytes().to_vec()),
         (".mcp.json", template::MCP_JSON.as_bytes().to_vec()),
+        ("AGENTS.md", template::AGENTS.as_bytes().to_vec()),
+        ("CLAUDE.md", template::CLAUDE.as_bytes().to_vec()),
         (".github/workflows/release.yml", template::RELEASE_WORKFLOW.as_bytes().to_vec()),
         (".claude/skills/party-anywhere-game/SKILL.md", template::SKILL.as_bytes().to_vec()),
         ("sdk/party_anywhere.h", template::SDK_HEADER.as_bytes().to_vec()),
@@ -145,10 +147,20 @@ pub fn validate_dir(dir: &Path) -> Validation {
         Ok(ok) => ok,
         Err(issues) => return Validation { ok: false, id: None, version: None, issues, manifest: None },
     };
+    // o que o `pa new` deixou para a pessoa trocar: avisa (publicar assim confunde quem vê na Biblioteca)
+    if manifest.id.contains("seu-usuario") || manifest.authors.iter().any(|a| a == "seu-usuario") {
+        issues.push(Issue::warning("id", "troque \"seu-usuario\" pelo seu usuário do GitHub (no id e em authors). O id não muda depois de publicado."));
+    }
+    if manifest.tagline == "Uma frase curta que vende o jogo." {
+        issues.push(Issue::warning("tagline", "escreva a frase que aparece embaixo da capa (ex.: \"Tela dividida para 4 no mundo inteiro\")."));
+    }
     match fs::read(dir.join(&manifest.art.cover)) {
         Ok(bytes) => {
             if let Err(issue) = check_cover(&bytes) {
                 issues.push(issue);
+            }
+            if template::placeholder_cover().is_ok_and(|p| p == bytes) {
+                issues.push(Issue::warning("art.cover", "a capa ainda é a provisória: troque assets/cover.png pela arte do seu mod (retrato 3:4)."));
             }
         }
         Err(_) => issues.push(Issue::error(
@@ -304,7 +316,9 @@ mod tests {
         let dir = project();
         let v = validate_dir(dir.path());
         assert!(v.ok, "{:?}", v.issues);
-        assert!(v.issues.is_empty(), "{:?}", v.issues);
+        // só os lembretes do que trocar antes de publicar (a capa provisória), nenhum erro
+        assert!(v.issues.iter().all(|i| !i.is_error()), "{:?}", v.issues);
+        assert!(v.issues.iter().any(|i| i.field == "art.cover" && i.message.contains("provisória")));
         let m = v.manifest.unwrap();
         assert_eq!((m.id.as_str(), m.name.as_str(), m.launch.exe.as_str()), ("com.joao.arena-blast", "Arena Blast", "arena-blast.exe"));
         assert!(new_project(dir.path(), &NewOptions { name: "x".into(), ..Default::default() }).is_err(), "não sobrescreve");
@@ -319,7 +333,7 @@ mod tests {
         fs::remove_file(dir.path().join("assets/cover.png")).unwrap();
         let v = validate_dir(dir.path());
         assert!(!v.ok);
-        assert_eq!(v.issues[0].field, "art.cover");
+        assert!(v.issues.iter().any(|i| i.field == "art.cover" && i.is_error()));
     }
 
     #[test]

@@ -1066,6 +1066,7 @@ main { perspective: 1800px; }
           <div class="group" id="virtualBox"></div>
           <div class="group-label"><span>Sobre</span></div>
           <div class="group">
+            <div class="row"><span class="row-ic"><span data-icon="link"></span></span><span class="row-t"><b>Atalho na área de trabalho</b><small>Abre o Party Anywhere direto da área de trabalho.</small></span><span class="row-act" id="shortcutAct"><button class="btn-ghost sm" id="mkShortcut">Criar atalho</button></span></div>
             <div class="row"><span class="row-ic"><span data-icon="sparkle"></span></span><span class="row-t"><b id="verTxt">Party Anywhere</b><small id="verSub">O Hub procura atualizações sozinho ao abrir e a cada 6 horas.</small></span><span class="row-act"><button class="btn-ghost sm" id="checkUpd">Procurar agora</button></span></div>
           </div>
         </div></div>
@@ -2375,17 +2376,18 @@ function openPickGame() {
   });
 }
 
-function openAddLink() {
-  openModal(`${head('Jogo co-op por link', 'Cole o link do repositório no GitHub.', true)}
+// `prefill`: o link veio de fora (a `pa add`, um agente de IA, `--add`): já lê sozinho
+function openAddLink(prefill) {
+  openModal(`${head('Mod co-op por link', 'Cole o link do repositório no GitHub.', true)}
     <form class="field" id="linkForm">
-      <input id="linkInput" placeholder="https://github.com/autor/meu-jogo" autocomplete="off" spellcheck="false">
+      <input id="linkInput" placeholder="https://github.com/autor/meu-mod" autocomplete="off" spellcheck="false" value="${escapeHtml(prefill || '')}">
       <button class="btn-neon" style="height:50px">Ler</button>
     </form>
     <div style="margin-top:10px;font-size:12.5px;color:var(--faint)">Dica: experimente <span class="linkish" data-fill="https://github.com/sofagames/kart-caos">github.com/sofagames/kart-caos</span> ou um link com "sem-manifesto" para ver o erro.</div>
     <div id="linkResult"></div>`, () => {
     const form = document.getElementById('linkForm');
     const input = document.getElementById('linkInput');
-    setTimeout(() => input.focus(), 50);
+    setTimeout(() => (prefill ? form.requestSubmit() : input.focus()), 50);
     const fill = (e) => { const f = e.target.closest('[data-fill]'); if (f) { input.value = f.dataset.fill; form.requestSubmit(); } };
     modal.addEventListener('click', fill);
     form.addEventListener('submit', (e) => { e.preventDefault(); readManifest(input.value.trim()); });
@@ -2949,6 +2951,7 @@ const hubData = {
   },
   retryVirtual: async () => false,
   checkUpdate: async () => { updatePill.click(); },
+  desktopShortcut: async (create) => create,
   // no app: o núcleo avisa quando um aparelho aperta algo (deviceActivity); aqui, a Gamepad API faz isso
   watchDevices: () => {},
 };
@@ -3089,7 +3092,7 @@ function openLayoutEditor(layout, base, forGame) {
           </div></div>
         </aside>
       </div>
-      <div class="le-foot"><span class="le-status" id="leStatus"></span><button class="btn-ghost" data-close>Cancelar</button><button class="btn-neon" id="leSave">${icon('check')}Salvar</button></div>
+      <div class="le-foot"><span class="le-status" id="leStatus"></span><button class="btn-ghost" id="leCopy" title="Para quem faz mods: o trecho controls do party-anywhere.json">Copiar para a ficha do mod</button><button class="btn-ghost" data-close>Cancelar</button><button class="btn-neon" id="leSave">${icon('check')}Salvar</button></div>
     </div>`, () => {
     const root = document.getElementById('le');
     const screen = document.getElementById('leScreen');
@@ -3332,6 +3335,14 @@ function openLayoutEditor(layout, base, forGame) {
       if (el) el.outerHTML = pieceHtml(p, st.sel, 'button');
       flags();
     });
+    // quem faz mod: o trecho "controls" do party-anywhere.json, pronto para colar (docs/GAME-MANIFEST.md)
+    document.getElementById('leCopy').addEventListener('click', async () => {
+      const r3 = (v) => Math.round(v * 1000) / 1000;
+      const controls = { modes: st.modes.map((m) => ({ name: m.name.trim(), pieces: m.pieces.map((p) => ({ kind: p.kind, x: r3(p.x), y: r3(p.y), ...(p.s !== 1 ? { s: p.s } : {}), ...(p.label ? { label: p.label } : {}) })) })) };
+      const text = `"controls": ${JSON.stringify(controls, null, 2)}`;
+      try { await navigator.clipboard.writeText(text); toast('Copiado: cole no party-anywhere.json do mod.', null, 'ok'); }
+      catch (err) { toast('Não deu para copiar. Tente de novo.', null, 'warn'); }
+    });
     document.getElementById('leSave').addEventListener('click', async () => {
       const name = nameIn.value.trim();
       try {
@@ -3368,6 +3379,7 @@ async function renderSettings() {
        <div class="row" id="vRow"><span class="row-t"><small>Leva menos de um minuto. O Hub baixa, o Windows pede sua confirmação e pronto.</small></span><span class="row-act"><button class="btn-ghost sm" id="vRetry">Já instalei: conferir</button><button class="btn-neon sm" id="vInstall">${icon('download')}Instalar</button></span></div>
        <div class="row" id="vProgress" hidden><div class="vi" style="width:100%"></div></div>`;
   document.getElementById('verTxt').textContent = `Party Anywhere ${st.version}`;
+  hubData.desktopShortcut(false).then((has) => { if (has) document.getElementById('shortcutAct').innerHTML = '<span class="pill ok">Criado</span>'; }).catch(() => {});
   document.getElementById('vInstall')?.addEventListener('click', async () => {
     const prog = document.getElementById('vProgress');
     prog.hidden = false;
@@ -3395,6 +3407,14 @@ document.getElementById('addrList').addEventListener('click', async (e) => {
   renderSettings();
 });
 document.getElementById('checkUpd').addEventListener('click', () => hubData.checkUpdate());
+document.getElementById('shortcutAct').addEventListener('click', async (e) => {
+  if (!e.target.closest('#mkShortcut')) return;
+  try {
+    await hubData.desktopShortcut(true);
+    document.getElementById('shortcutAct').innerHTML = '<span class="pill ok">Criado</span>';
+    toast('Atalho criado na área de trabalho.', null, 'ok');
+  } catch (err) { toast(String(err), null, 'warn'); }
+});
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));

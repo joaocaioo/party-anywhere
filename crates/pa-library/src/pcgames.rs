@@ -168,7 +168,7 @@ pub fn art_data_url(reference: &str, art: Art) -> Option<String> {
     (art == Art::Cover).then(|| reference.to_string())
 }
 
-fn data_url(path: &Path) -> Option<String> {
+pub(crate) fn data_url(path: &Path) -> Option<String> {
     let bytes = fs::read(path).ok()?;
     if bytes.len() > 4_000_000 {
         return None;

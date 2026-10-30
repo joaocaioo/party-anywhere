@@ -24,6 +24,7 @@ chegam sozinhas.
 | Conferir manifesto e capa | `validate_game` | `pa validate` |
 | Gerar o pacote do release | `pack_release` | `pa pack --from build` |
 | Conferir o jogo publicado (como o Hub lê) | `inspect_published_game` | `pa inspect <dono/repo>` |
+| Levar um mod publicado para a Biblioteca (para jogar) | `add_to_library` | `pa add <dono/repo>` |
 
 ## Fluxo
 

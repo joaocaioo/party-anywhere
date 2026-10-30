@@ -404,6 +404,7 @@ pub struct UiGame {
 
 fn ui_game(e: &LibraryEntry) -> UiGame {
     let (badge, store, tags, repo) = match &e.source {
+        Source::Repo { repo } if repo.starts_with(pa_library::github::LOCAL_PREFIX) => ("comm", None, vec!["Seu mod (do PC)".into()], Some(repo.clone())),
         Source::Repo { repo } => ("comm", None, vec!["Da comunidade".into()], Some(repo.clone())),
         Source::Pc { store, .. } => ("pc", Some(store.clone()), vec!["Seu PC".into(), "Modo Universal".into()], None),
     };
@@ -566,6 +567,64 @@ pub fn library_sync(libs: Libs, games: Vec<SyncGame>) -> Vec<UiGame> {
     lib.games = next;
     libs.save(&lib);
     lib.games.iter().map(ui_game).collect()
+}
+
+// ---------------------------------------------------------------- adicionar pelo link, vindo de fora
+
+static PENDING_ADD: Mutex<Option<String>> = Mutex::new(None);
+
+/// O link de `--add <link>` (repositório de um mod ou jogo), se veio.
+pub fn add_arg(args: &[String]) -> Option<String> {
+    let i = args.iter().position(|a| a == "--add")?;
+    args.get(i + 1).map(|s| s.trim().to_string()).filter(|s| !s.is_empty() && s.len() < 300)
+}
+
+/// Pede à UI para abrir o "Adicionar por link" com este link. Fica guardado também, para o caso de a UI
+/// ainda não ter carregado (ela pega com `take_pending_add`).
+pub fn request_add(app: &tauri::AppHandle, link: String) {
+    *PENDING_ADD.lock().unwrap() = Some(link.clone());
+    let _ = app.emit("add-repo", link);
+}
+
+#[tauri::command]
+pub fn take_pending_add() -> Option<String> {
+    PENDING_ADD.lock().unwrap().take()
+}
+
+/// Ajustes → "Criar atalho na área de trabalho" (o instalador já oferece; isto é para quem pulou).
+/// `create: false` só conta se já existe.
+#[tauri::command]
+pub fn desktop_shortcut(create: bool) -> Result<bool, String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let desktop = std::env::var_os("USERPROFILE").map(|h| PathBuf::from(h).join("Desktop")).ok_or("não achei a área de trabalho")?;
+    // OneDrive pode mover a área de trabalho: vale a que existir
+    let desktop = [desktop.clone(), std::env::var_os("OneDrive").map(|o| PathBuf::from(o).join("Desktop")).unwrap_or(desktop)]
+        .into_iter()
+        .find(|d| d.is_dir())
+        .ok_or("não achei a área de trabalho")?;
+    let lnk = desktop.join("Party Anywhere.lnk");
+    if lnk.exists() || !create {
+        return Ok(lnk.exists());
+    }
+    let ps = format!(
+        "$s=(New-Object -ComObject WScript.Shell).CreateShortcut('{}');$s.TargetPath='{}';$s.WorkingDirectory='{}';$s.Save()",
+        lnk.display().to_string().replace('\'', "''"),
+        exe.display().to_string().replace('\'', "''"),
+        exe.parent().map(|p| p.display().to_string()).unwrap_or_default().replace('\'', "''"),
+    );
+    let mut cmd = std::process::Command::new("powershell");
+    cmd.args(["-NoProfile", "-NonInteractive", "-Command", &ps]);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000); // sem janela de console
+    }
+    let ok = cmd.status().map(|s| s.success()).unwrap_or(false);
+    if ok && lnk.exists() {
+        Ok(true)
+    } else {
+        Err("não consegui criar o atalho.".into())
+    }
 }
 
 // ---------------------------------------------------------------- jogo original de um mod

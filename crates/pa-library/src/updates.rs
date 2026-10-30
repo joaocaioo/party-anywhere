@@ -28,6 +28,10 @@ pub fn check_games(http: &dyn Http, library: &mut Library) -> Vec<GameUpdate> {
     let mut found = Vec::new();
     for entry in &mut library.games {
         let (Source::Repo { repo }, Some(installed)) = (&entry.source, &entry.installed) else { continue };
+        // instalado da pasta do projeto: a versão nova vem de um novo `pa add`, não do GitHub
+        if repo.starts_with(crate::github::LOCAL_PREFIX) {
+            continue;
+        }
         let Some(repo) = RepoRef::parse(repo) else { continue };
         let Ok(resp) = http.get(&repo.api("releases/latest"), entry.etag.as_deref(), MAX_JSON_BYTES) else { continue };
         if resp.status == 304 || !resp.ok() {

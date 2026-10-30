@@ -108,6 +108,12 @@ pub(crate) fn resolve_release(http: &dyn Http, game: &GameManifest, gh: GhReleas
 
 /// Colou o link: lê tudo e diz, em português, se instala.
 pub fn inspect(http: &dyn Http, input: &str) -> Result<InspectReport, String> {
+    // a pasta de um projeto no PC (o criador jogando o próprio mod, sem publicar)
+    let input = input.trim();
+    let path = std::path::Path::new(input.strip_prefix(LOCAL_PREFIX).unwrap_or(input));
+    if !input.contains("github.com") && path.is_dir() {
+        return inspect_local(path);
+    }
     let repo = RepoRef::parse(input).ok_or_else(|| {
         format!("\"{}\" não parece um link do GitHub. Use algo como https://github.com/dono/jogo.", input.trim())
     })?;
@@ -151,6 +157,65 @@ pub fn inspect(http: &dyn Http, input: &str) -> Result<InspectReport, String> {
             report.summary = format!("{}: a última versão publicada tem problemas.", game.name);
             report.issues.extend(issues);
         }
+    }
+    report.manifest = Some(game);
+    Ok(report)
+}
+
+/// Prefixo do "repositório" de um mod instalado da pasta do projeto (sem publicar).
+pub const LOCAL_PREFIX: &str = "local:";
+
+/// O mesmo "colar o link", para a pasta de um projeto no PC: o criador joga o próprio mod sem publicar.
+/// Precisa do `party-anywhere.json` e do pacote que o `pa pack` gera em `release/`.
+pub fn inspect_local(dir: &std::path::Path) -> Result<InspectReport, String> {
+    use pa_manifest::{ReleaseManifest, MANIFEST_FILE, RELEASE_FILE};
+    let dir = dir.canonicalize().map_err(|_| format!("a pasta {} não existe.", dir.display()))?;
+    let shown = dir.display().to_string().trim_start_matches(r"\\?\").to_string();
+    let mut report = InspectReport {
+        repo: format!("{LOCAL_PREFIX}{shown}"),
+        url: shown.clone(),
+        installable: false,
+        summary: String::new(),
+        issues: vec![],
+        manifest: None,
+        cover_url: None,
+        latest: None,
+    };
+    let text = std::fs::read_to_string(dir.join(MANIFEST_FILE)).map_err(|_| format!("{shown} não tem {MANIFEST_FILE}: é a pasta do projeto do mod?"))?;
+    let game = match GameManifest::parse(&text) {
+        Ok((g, _)) => g,
+        Err(issues) => {
+            report.summary = "O party-anywhere.json tem problemas.".into();
+            report.issues = issues;
+            return Ok(report);
+        }
+    };
+    report.cover_url = crate::pcgames::data_url(&dir.join(&game.art.cover));
+    report.issues.extend(game.validate());
+    let release = std::fs::read(dir.join("release").join(RELEASE_FILE))
+        .ok()
+        .and_then(|b| serde_json::from_slice::<ReleaseManifest>(&b).ok());
+    match release {
+        None => report.issues.push(Issue::error("release", "falta o pacote: rode `pa pack --from build` na pasta do projeto.")),
+        Some(rel) => {
+            report.issues.extend(rel.validate(&game, None));
+            let package = dir.join("release").join(&rel.asset);
+            if !package.is_file() {
+                report.issues.push(Issue::error("release", format!("falta {}: rode `pa pack` de novo.", rel.asset)));
+            } else if !report.issues.iter().any(Issue::is_error) {
+                report.installable = true;
+                report.summary = format!("{} {} (do seu PC) pronto para instalar.", game.name, rel.version);
+                report.latest = Some(LatestRelease {
+                    tag: format!("v{}", rel.version),
+                    published_at: None,
+                    package_url: format!("file:///{}", package.display().to_string().trim_start_matches(r"\\?\").replace('\\', "/")),
+                    release: rel,
+                });
+            }
+        }
+    }
+    if !report.installable && report.summary.is_empty() {
+        report.summary = format!("{} ainda não pode entrar na Biblioteca.", game.name);
     }
     report.manifest = Some(game);
     Ok(report)
@@ -212,6 +277,28 @@ fn api_issue(status: u16) -> Issue {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    #[test]
+    fn a_project_folder_installs_like_a_published_repo() {
+        use pa_manifest::ReleaseManifest;
+        let dir = tempfile::tempdir().unwrap();
+        let m = include_str!("../../../templates/game/party-anywhere.json");
+        std::fs::write(dir.path().join("party-anywhere.json"), m).unwrap();
+        let r = super::inspect(&crate::http::Ureq::default(), &dir.path().display().to_string()).unwrap();
+        assert!(!r.installable, "sem pacote");
+        assert!(r.issues.iter().any(|i| i.message.contains("pa pack")));
+        let (game, _) = GameManifest::parse(m).unwrap();
+        std::fs::create_dir_all(dir.path().join("release")).unwrap();
+        let rel = ReleaseManifest::for_package(&game, b"PK zip");
+        std::fs::write(dir.path().join("release").join(&rel.asset), b"PK zip").unwrap();
+        std::fs::write(dir.path().join("release/party-anywhere.release.json"), serde_json::to_vec(&rel).unwrap()).unwrap();
+        let r = super::inspect(&crate::http::Ureq::default(), &dir.path().display().to_string()).unwrap();
+        assert!(r.installable, "{:?}", r.issues);
+        assert!(r.repo.starts_with(super::LOCAL_PREFIX));
+        let latest = r.latest.unwrap();
+        let got = crate::http::Http::get(&crate::http::Ureq::default(), &latest.package_url, None, 1024).unwrap();
+        assert!(latest.release.verify(&got.body), "o pacote lido do disco confere");
+    }
+
     use super::*;
     use crate::http::fake::FakeHttp;
 

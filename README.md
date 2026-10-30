@@ -158,9 +158,18 @@ Abra o Party Anywhere, entre com um controle e um celular e abra o jogo com o mo
 pa validate
 ```
 
-Ele confere a ficha e a capa e diz, em português, o que ajustar.
+Ele confere a ficha e a capa e diz, em português, o que ajustar. Para jogar o seu mod **sem publicar**,
+gere o pacote e leve a pasta para a Biblioteca:
 
-#### 5. Publique
+```bash
+pa pack --from build
+```
+
+```bash
+pa add .
+```
+
+#### 5. Publique (opcional, mas faz o seu mod chegar a todo mundo)
 
 1. Suba o projeto para um repositório **público** no GitHub (só o mod: nada do jogo original).
 2. No `release.yml`, troque o passo **Build** pelo jeito de compilar o seu mod.

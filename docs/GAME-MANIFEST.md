@@ -166,7 +166,8 @@ Sem o workflow: `pa pack --from build --tag v0.3.0` e anexe os dois arquivos de 
 | `pa new <pasta> --name "Mod" --base-game "<nome ou appid>"` | O mod co-op de um jogo instalado: `requires.baseGame` (nome, appid, executável) e `install.target: "baseGame"` já preenchidos. Recusa jogos com anti-cheat. |
 | `pa validate` | Confere manifesto e capa, com o que fazer em cada problema. |
 | `pa pack --from build --tag vX.Y.Z` | Pacote `.zip` reproduzível + `party-anywhere.release.json`. |
-| `pa inspect dono/repo` | Lê o jogo publicado como o Hub lê e diz se instala. |
+| `pa inspect dono/repo` | Lê o jogo publicado como o Hub lê e diz se instala. Também aceita a pasta do projeto. |
+| `pa add <dono/repo ou pasta>` | Leva o mod para a Biblioteca: abre o Hub com a prévia (o Hub acha o jogo original e a pessoa confirma). Com a pasta do projeto, o criador joga o próprio mod **sem publicar** (precisa do `pa pack`). |
 | `pa mcp` | As mesmas ferramentas para agentes de IA (Model Context Protocol, local, por stdio). Também serve a documentação do SDK e do manifesto. |
 
 ## Ser encontrado ("Descobrir")

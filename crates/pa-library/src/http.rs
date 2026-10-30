@@ -72,6 +72,14 @@ impl Ureq {
 
 impl Http for Ureq {
     fn get(&self, url: &str, etag: Option<&str>, max_bytes: u64) -> Result<Response, String> {
+        // o pacote de um mod instalado da pasta do projeto (inspect_local)
+        if let Some(path) = url.strip_prefix("file:///") {
+            let body = std::fs::read(path).map_err(|e| format!("não consegui ler {path}: {e}"))?;
+            if body.len() as u64 > max_bytes {
+                return Err("arquivo maior que o esperado.".into());
+            }
+            return Ok(Response { status: 200, etag: None, body });
+        }
         let mut req = self.agent.get(url);
         if url.starts_with("https://api.github.com/") {
             req = req.set("Accept", "application/vnd.github+json").set("X-GitHub-Api-Version", "2022-11-28");

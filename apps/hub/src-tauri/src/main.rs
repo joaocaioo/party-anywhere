@@ -64,10 +64,14 @@ const UPDATE_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
 fn main() {
     tauri::Builder::default()
         // abrir o Hub de novo traz a janela que já está aberta (um lobby, uma porta do celular, um SDK)
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.unminimize();
                 let _ = w.set_focus();
+            }
+            // `party-anywhere --add dono/repo` com o Hub já aberto (a `pa add`, um agente de IA)
+            if let Some(link) = commands::add_arg(&args) {
+                commands::request_add(app, link);
             }
         }))
         // capas da Steam lidas do disco pelo navegador, sob demanda e com cache (sem base64 pela ponte):
@@ -80,6 +84,10 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             fit_to_screen(app);
+            // aberto com `--add dono/repo`: a UI abre o "Adicionar por link" assim que carregar
+            if let Some(link) = commands::add_arg(&std::env::args().collect::<Vec<_>>()) {
+                commands::request_add(app.handle(), link);
+            }
             let (roaming, local) = dirs();
             let hub = hub::Hub::new(app.handle().clone(), settings::path(&roaming));
             if let Err(e) = hub.start_phones() {
@@ -154,6 +162,8 @@ fn main() {
             commands::library_sync,
             commands::pick_game_file,
             commands::base_game_check,
+            commands::take_pending_add,
+            commands::desktop_shortcut,
             commands::base_game_pick,
             commands::open_bluetooth_settings,
             commands::library_remove,

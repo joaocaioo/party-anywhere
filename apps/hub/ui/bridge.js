@@ -62,6 +62,10 @@
   window.__padNavExternal = true;
   listen('nav', (e) => navAction(e.payload.action, e.payload.color, e.payload.seat));
   listen('virtual-install', (e) => virtualStep(e.payload));
+  // um link de mod vindo de fora (`pa add`, um agente de IA): abre o "Adicionar por link" já lendo
+  const addFromOutside = (link) => { if (link) { invoke('take_pending_add').catch(() => {}); openAddLink(link); } };
+  listen('add-repo', (e) => addFromOutside(e.payload));
+  invoke('take_pending_add').then(addFromOutside).catch(() => {});
   listen('device-activity', (e) => deviceActivity(e.payload));
 
   // controles chegam pelo núcleo (gilrs)
@@ -201,6 +205,7 @@
     setJoinIp: (ip) => invoke('set_join_ip', { ip }),
     installVirtual: () => invoke('virtual_pads_install'),
     retryVirtual: () => invoke('virtual_pads_retry'),
+    desktopShortcut: (create) => invoke('desktop_shortcut', { create }),
     checkUpdate: () => invoke('hub_check_update').then((u) => {
       if (!u) toast('Você já está na versão mais nova.', null, 'ok');
     }),
