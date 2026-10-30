@@ -63,6 +63,10 @@ pub enum PhoneEvent {
     LayoutChosen { seat: u8, id: String },
     /// O jogador trocou o nome pelo celular.
     Renamed { seat: u8, name: String },
+    /// Ligou ou desligou a tela do jogo no celular.
+    Screen { seat: u8, on: bool },
+    /// O celular mostrou o quadro `id` da tela do jogo (`at_ms` no relógio do servidor).
+    ViewAck { seat: u8, id: u16, at_ms: f64 },
 }
 
 type Outbox = mpsc::UnboundedSender<Message>;
@@ -145,6 +149,11 @@ impl PhoneServer {
     pub fn identify(&self, seat: u8) {
         self.send_text(seat, &ServerText::Identify);
         self.rumble(seat, 300, 200);
+    }
+
+    /// Um quadro da tela do jogo (já codificado com [`protocol::encode_view`]).
+    pub fn send_view(&self, seat: u8, frame: Vec<u8>) {
+        self.send(seat, Message::Binary(frame.into()));
     }
 
     pub fn rumble(&self, seat: u8, ms: u16, strength: u8) {
@@ -291,6 +300,11 @@ async fn connection(socket: WebSocket, shared: Arc<Shared>, peer: SocketAddr) {
                         }
                     }
                 }
+                Ok(ClientMsg::ViewAck { id }) => {
+                    if has_seat {
+                        let _ = shared.events.send(PhoneEvent::ViewAck { seat, id, at_ms });
+                    }
+                }
                 // tipo novo de uma página mais nova: ignorar é compatível
                 Err(DecodeError::UnknownType(_)) => {}
                 Err(_) => break,
@@ -301,6 +315,9 @@ async fn connection(socket: WebSocket, shared: Arc<Shared>, peer: SocketAddr) {
                 }
                 Ok(ClientText::Rename { name }) => {
                     let _ = shared.events.send(PhoneEvent::Renamed { seat, name: name.chars().take(40).collect() });
+                }
+                Ok(ClientText::Screen { on }) => {
+                    let _ = shared.events.send(PhoneEvent::Screen { seat, on });
                 }
                 _ => {}
             },

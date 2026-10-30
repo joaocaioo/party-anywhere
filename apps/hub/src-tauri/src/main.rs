@@ -11,6 +11,7 @@ mod keyboards;
 mod nav;
 mod sdk;
 mod settings;
+mod view;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -97,6 +98,7 @@ fn main() {
             keyboards::start(hub.clone());
             sdk::start(hub.clone());
             nav::start(hub.clone());
+            view::start(hub.clone());
             app.manage(hub);
 
             let path = roaming.join("library.json");

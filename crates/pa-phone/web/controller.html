@@ -14,6 +14,8 @@
   mais modos (ex.: A pé e Veículo) e cada modo, peças posicionadas numa tela de referência deitada de
   proporção CANVAS (ver apps/hub/src-tauri/src/settings.rs). Esta página encaixa essa tela na do celular:
   a altura encolhe junto e a largura só estica, então o que não se sobrepõe no editor não se sobrepõe aqui.
+  Tela do jogo no celular (padrão): nos jogos do SDK, a parte deste jogador chega como quadros JPEG
+  (0x86) e aparece atrás dos controles; cada quadro é confirmado (0x08), e o Hub só manda outro depois.
   Com mais de um modo, os nomes aparecem no topo e um toque troca. A pílula do topo (jogador, conexão, Menu)
   fica no meio, por cima da tela; os cantos ficam para os controles. Analógicos livres: o esquerdo nasce onde
   o dedo tocar na metade da tela dele, fora das outras peças (o direito, na outra metade).
@@ -47,6 +49,12 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 ::-webkit-scrollbar-thumb { min-height: 44px; border-radius: 999px; border: 3px solid transparent; background: rgba(255, 255, 255, .13) padding-box; }
 ::-webkit-scrollbar-button { display: none; height: 0; width: 0; }
 
+/* a tela do jogo deste jogador, atrás dos controles (só aparece quando o jogo manda) */
+#view { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; display: none; }
+body.viewing #view { display: block; }
+body.viewing .pad { background: transparent; }
+body.viewing .area > * { opacity: .62; }
+body.viewing .area > .stick .hint { display: none; }
 .pad {
   position: fixed; inset: 0;
   background: radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, var(--seat) 14%, transparent), transparent 70%), var(--bg);
@@ -164,6 +172,7 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 </style>
 </head>
 <body>
+<canvas id="view"></canvas>
 <div class="pad" id="pad">
   <div class="area" id="area"></div>
   <div class="pill">
@@ -184,6 +193,7 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
     <h3>Preferências</h3>
     <button class="opt" id="optVibe"><span><b>Vibrar ao tocar</b><small>Um toque leve a cada botão</small></span><span class="sw"></span></button>
     <button class="opt" id="optFs"><span><b>Tela cheia</b><small>Esconde as barras do navegador</small></span><span class="sw"></span></button>
+    <button class="opt" id="optScreen"><span><b>Tela do jogo no celular</b><small>Nos jogos que mostram, a sua parte aparece aqui e sai da TV</small></span><span class="sw"></span></button>
     <h3>Diagnóstico</h3>
     <button class="opt" id="optDiag"><span><b>Medir a conexão</b><small>Atraso do toque até o PC</small></span><span class="sw"></span></button>
     <div id="diag" hidden>
@@ -193,6 +203,7 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
         <span>Rede</span><b id="r50">--</b><b id="r95">--</b><b id="r99">--</b><b id="rn">0</b>
         <span>Ida e volta</span><b id="i50">--</b><b id="i95">--</b><b id="i99">--</b><b id="in">0</b>
       </div>
+      <div class="rows" style="grid-template-columns:auto 1fr;margin-top:8px"><span>Tela do jogo</span><b id="screenTxt">sem imagem</b></div>
       <button class="go" id="burstBtn">Medir a rede (30 s)</button><span id="burstTxt"></span>
     </div>
   </div>
@@ -234,7 +245,7 @@ let stopped = false;
 let layouts = FALLBACK;
 let currentLayout = 'advanced';
 let modeIdx = 0;
-const prefs = { vibe: true };
+const prefs = { vibe: true, screen: true };
 try { Object.assign(prefs, JSON.parse(localStorage.getItem('pa.prefs') || '{}')); } catch (_) {}
 try { const l = JSON.parse(localStorage.getItem('pa.layout') || 'null'); if (l && l.modes && l.modes.length) { layouts = [l]; currentLayout = l.id; } } catch (_) {}
 
@@ -360,6 +371,7 @@ function onText(m) {
     $('seatName').textContent = `P${m.seat} · ${m.name}`;
     $('nameInput').value = /^Jogador \d+$/.test(m.name) ? '' : m.name;
     vibrate(60);
+    sendText({ t: 'screen', on: !!prefs.screen });
   } else if (m.t === 'layouts') {
     // mudou o layout ou o próprio layout foi editado no Hub: redesenha
     const before = JSON.stringify(currentLayoutObj());
@@ -376,6 +388,8 @@ function onText(m) {
     $('rejText').textContent = texts[m.reason] || m.reason;
     $('rejected').classList.add('on');
     if (m.reason === 'version') { stopped = true; setTimeout(() => location.reload(), 1500); }
+  } else if (m.t === 'screen') {
+    $('screenTxt').textContent = `${m.fps} quadros/s · ${m.ms} ms do jogo até aqui`;
   } else if (m.t === 'stats') {
     showStats(m.data);
   } else if (m.t === 'toast') {
@@ -415,7 +429,31 @@ function onBinary(dv) {
     showNet();
   } else if (type === 0x84) { // RUMBLE
     vibrate(dv.getUint16(1, true));
+  } else if (type === 0x86) { // VIEW: um quadro da tela do jogo
+    showFrame(dv);
   }
+}
+
+// Tela do jogo: decodifica (fora da thread da página), desenha e confirma. Sem quadro por 1,5 s, some.
+const viewCanvas = $('view');
+const viewCtx = viewCanvas.getContext('2d');
+let viewTimer = 0;
+function showFrame(dv) {
+  const id = dv.getUint16(1, true);
+  const w = dv.getUint16(5, true), h = dv.getUint16(7, true);
+  const blob = new Blob([new Uint8Array(dv.buffer, dv.byteOffset + 9, dv.byteLength - 9)], { type: 'image/jpeg' });
+  createImageBitmap(blob).then((bmp) => {
+    if (!prefs.screen) { bmp.close(); return; }
+    if (viewCanvas.width !== w || viewCanvas.height !== h) { viewCanvas.width = w; viewCanvas.height = h; }
+    viewCtx.drawImage(bmp, 0, 0);
+    bmp.close();
+    document.body.classList.add('viewing');
+    clearTimeout(viewTimer);
+    viewTimer = setTimeout(() => document.body.classList.remove('viewing'), 1500);
+    const ack = new DataView(new ArrayBuffer(3));
+    ack.setUint8(0, 0x08); ack.setUint16(1, id, true);
+    sendRaw(ack.buffer);
+  }).catch(() => {});
 }
 
 function sendRaw(buf) {
@@ -580,6 +618,7 @@ function openMenu() {
   renderLayoutList();
   $('optVibe').classList.toggle('on', prefs.vibe);
   $('optFs').classList.toggle('on', !!document.fullscreenElement);
+  $('optScreen').classList.toggle('on', !!prefs.screen);
   $('sheet').classList.add('on');
 }
 $('closeMenu').addEventListener('click', () => $('sheet').classList.remove('on'));
@@ -615,6 +654,13 @@ $('nameForm').addEventListener('submit', (e) => {
   $('seatName').textContent = $('seatName').textContent.replace(/·.*$/, `· ${name}`);
   $('nameInput').blur();
   showToast('Nome trocado');
+});
+$('optScreen').addEventListener('click', () => {
+  prefs.screen = !prefs.screen;
+  $('optScreen').classList.toggle('on', prefs.screen);
+  try { localStorage.setItem('pa.prefs', JSON.stringify(prefs)); } catch (_) {}
+  sendText({ t: 'screen', on: prefs.screen });
+  if (!prefs.screen) document.body.classList.remove('viewing');
 });
 $('optVibe').addEventListener('click', () => {
   prefs.vibe = !prefs.vibe;

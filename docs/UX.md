@@ -216,6 +216,8 @@ O Hub lê nome e ícone do próprio executável, procura a capa pelo nome e, se 
   tela dele (esquerda), fora dos botões; não fica parado num lugar.
 - **Layouts**: Simples (analógico, A, B, X, Y grandes e Start), Avançado (tudo) e os criados na aba
   Controles. Nada se sobrepõe, em nenhum celular. O Hub lembra o layout de cada celular.
+- **Tela do jogo no celular** (ligada por padrão, no menu): nos jogos que mostram, a sua parte do jogo
+  aparece no celular, atrás dos controles, e sai da TV. O Diagnóstico mostra quadros por segundo e o atraso.
 - **Modos**: um layout pode ter vários (ex.: A pé e Veículo). Os nomes ficam no topo; um toque troca na hora.
 - **Padrão do jogo**: cada jogo pode ter o seu controle (o que veio com o jogo, ou o que a pessoa escolheu em
   Organizar → editar o jogo). Quando o jogo abre, os celulares trocam sozinhos; ao voltar, cada um volta para o
@@ -228,8 +230,7 @@ O Hub lê nome e ícone do próprio executável, procura a capa pelo nome e, se 
   tela cheia e, em Diagnóstico, medir a conexão. Abrir o menu solta todos os botões.
 - Identificar: a tela pisca na cor do jogador (e vibra no Android).
 - Perdeu a conexão: tela "Reconectando..." que tenta sozinha e volta para a mesma vaga.
-- Planejado: o jogo do SDK escolhe o layout e dá nome aos botões ("Correr", "Atirar"); e a **tela do jogo
-  no celular** (fase 7, ver ARCHITECTURE.md).
+- Planejado: o jogo do SDK escolhe o layout e dá nome aos botões pelo SDK ("Correr", "Atirar").
 
 ## Navegação por controle no Hub
 

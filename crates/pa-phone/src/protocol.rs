@@ -33,9 +33,13 @@ pub const T_PING: u8 = 0x03;
 pub const T_STATE_T: u8 = 0x05;
 pub const T_SYNC: u8 = 0x06;
 pub const T_SYNC_DONE: u8 = 0x07;
+/// O celular mostrou um quadro da tela do jogo: o Hub manda o próximo (controle de fluxo) e mede o atraso.
+pub const T_VIEW_ACK: u8 = 0x08;
 pub const T_PONG: u8 = 0x83;
 pub const T_RUMBLE: u8 = 0x84;
 pub const T_SYNC_REPLY: u8 = 0x85;
+/// Um quadro da tela do jogo deste jogador: `[0x86][id u16][idade ms u16][largura u16][altura u16]` + JPEG.
+pub const T_VIEW: u8 = 0x86;
 
 /// De onde veio uma amostra STATE_T. Cada tipo mede uma coisa diferente.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -79,6 +83,7 @@ pub enum ClientMsg {
     Ping { t: u16 },
     Sync { id: u16, t0: f64 },
     SyncDone { id: u16, t1: f64 },
+    ViewAck { id: u16 },
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -126,8 +131,23 @@ pub fn decode_client(data: &[u8]) -> Result<ClientMsg, DecodeError> {
             }
             Ok(if kind == T_SYNC { ClientMsg::Sync { id, t0: t } } else { ClientMsg::SyncDone { id, t1: t } })
         }
+        T_VIEW_ACK => {
+            need(2)?;
+            Ok(ClientMsg::ViewAck { id: u16_at(rest, 0) })
+        }
         other => Err(DecodeError::UnknownType(other)),
     }
+}
+
+/// Um quadro da tela do jogo para o celular. `age_ms`: do jogo terminar o quadro até o Hub mandar.
+pub fn encode_view(id: u16, age_ms: u16, width: u16, height: u16, jpeg: &[u8]) -> Vec<u8> {
+    let mut v = Vec::with_capacity(9 + jpeg.len());
+    v.push(T_VIEW);
+    for n in [id, age_ms, width, height] {
+        v.extend_from_slice(&n.to_le_bytes());
+    }
+    v.extend_from_slice(jpeg);
+    v
 }
 
 /// Codifica STATE / STATE_T como a página faz (usado nos testes e em ferramentas).
@@ -182,6 +202,8 @@ pub enum ClientText {
     Layout { id: String },
     /// Trocou o nome no menu do celular.
     Rename { name: String },
+    /// "Tela do jogo no celular", ligada ou desligada no menu (ligada por padrão).
+    Screen { on: bool },
 }
 
 /// Mensagens de texto para o celular.
@@ -199,6 +221,8 @@ pub enum ServerText<'a> {
     Layouts { items: &'a serde_json::Value, current: &'a str },
     /// Resultado da medição, para a página mostrar ao vivo. Formato livre (JSON do spike).
     Stats { data: serde_json::Value },
+    /// A tela do jogo no celular: quadros por segundo e o atraso do jogo até a tela do celular (ms).
+    Screen { fps: u32, ms: u32 },
 }
 
 fn decode_state_body(b: &[u8]) -> (u16, Pad) {

@@ -143,6 +143,11 @@ Transporte: `ws://<ip>:<porta>/ws`. A página é servida em `http://<ip>:<porta>
 | C→S | `0x03 PING` | `[03][t u16]` | A cada 1 s; mede latência. |
 | S→C | `0x83 PONG` | `[83][t u16]` | |
 | S→C | `0x84 RUMBLE` | `[84][ms u16][força u8]` | `navigator.vibrate` onde existir. |
+| S→C | `0x86 VIEW` | `[86][id u16][idade ms u16][largura u16][altura u16]` + JPEG | Um quadro da tela do jogo deste jogador. No máximo 1 a caminho por celular. |
+| C→S | `0x08 VIEW_ACK` | `[08][id u16]` | O celular mostrou o quadro: o Hub manda o próximo e mede o atraso. |
+
+Texto, além dos de layout: `screen` (C→S, `{on}`: liga ou desliga a tela do jogo) e `screen` (S→C, `{fps, ms}`
+a cada segundo: quadros mostrados e o atraso do jogo até a tela do celular, para o Diagnóstico).
 
 **Medição** (a página do Hub usa sempre; uma página mínima pode usar só STATE):
 
@@ -383,11 +388,21 @@ O visual é fixo; o desempenho vem de não fazer trabalho à toa (medido com 200
 - `game_play(id, players)`: as vagas de fora ficam no banco (`Hub::set_players`): sem controle virtual e, no
   SDK, como vaga vazia. `game_stopped` (ao voltar para a biblioteca) devolve todo mundo.
 
-## Tela do jogo no celular (desenho; fase 7)
+## Tela do jogo no celular
 
-Ideia: o jogador vê a própria parte da tela (ou o jogo inteiro) no celular, com os controles por cima, como
-um jogo de celular. Serve para jogos em que um não pode ver a tela do outro (prop hunt, esconde-esconde) ou
-para quem prefere olhar para o celular em vez da TV.
+O jogador vê a própria parte do jogo no celular, com os controles por cima, como um jogo de celular, e ela
+sai da TV. Serve para jogos em que um não pode ver a tela do outro (prop hunt, esconde-esconde) ou para quem
+prefere olhar para o celular. **Padrão em todo jogo e mod do SDK** (docs/SDK.md, "Tela do jogo no celular").
+
+**Implementado (v1, quadros JPEG):** o jogo entrega a visão do jogador (`pa_submit_view`) numa memória por
+vaga → o Hub (`view.rs`) lê o quadro mais novo, comprime em JPEG (qualidade 70) e manda pela conexão do
+controle (`0x86`) → o celular decodifica (`createImageBitmap`), desenha atrás dos controles (que ficam
+translúcidos) e confirma (`0x08`). Controle de fluxo: 1 quadro a caminho por celular, até 30 por segundo:
+rede lenta dá menos quadros, nunca atraso acumulando. Medido no PC (Hub release, quadro 320x176): **28
+quadros por segundo, 21 a 26 ms do jogo até a tela**. Falta medir num celular de verdade pelo Wi-Fi.
+
+**Próximo, se o teste pedir:** H.264 de hardware (Media Foundation) com WebCodecs no celular, ou WebRTC, para
+quadros grandes com menos banda. O SDK não muda (só o Hub e a página). Abaixo, o desenho original.
 
 **Latência realista**: não existe "zero". Capturar, codificar em vídeo (H.264 na placa de vídeo), mandar
 pela rede local e decodificar no celular soma **50 a 100 ms** num Wi-Fi 5 GHz bom (Steam Link e Moonlight

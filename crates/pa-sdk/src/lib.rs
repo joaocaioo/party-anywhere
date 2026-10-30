@@ -5,6 +5,8 @@
 //! O layout espelha `pa_shm` do cabeçalho. Os testes compilam o cabeçalho de verdade (build.rs) e conversam
 //! com ele pela mesma memória: mudar um lado sem o outro quebra o teste.
 
+pub mod view;
+
 use std::ptr::{addr_of, addr_of_mut, NonNull};
 use std::sync::atomic::{fence, AtomicI32, AtomicU32, Ordering};
 

@@ -5,6 +5,9 @@
  *   cl /O2 arena_console.c          (ou: gcc -O2 arena_console.c -o arena_console.exe)
  *
  * Abra o Party Anywhere, rode o exemplo e entre com o celular pelo QR (o endereço aparece aqui também).
+ *
+ * Tela do jogo no celular (o padrão de todo jogo do Party Anywhere): quem joga pelo celular vê a arena
+ * centrada nele, no próprio celular, e sai da tela principal (send_views e draw).
  */
 #define PARTY_ANYWHERE_IMPLEMENTATION
 #include "../party_anywhere.h"
@@ -52,6 +55,44 @@ void arena_step(pa_client* pa) {
 }
 
 #ifndef PA_EXAMPLE_NO_MAIN
+/* A visão de quem está vendo no celular: a arena em volta dele, 8 px por casa, BGRA. */
+#define VW 320
+#define VH 176
+#define CELL 8
+static uint32_t view_px[VW * VH];
+
+static void fill_cell(int cx, int cy, uint32_t color, int inset) {
+    int x, y;
+    for (y = cy * CELL + inset; y < (cy + 1) * CELL - inset; ++y)
+        for (x = cx * CELL + inset; x < (cx + 1) * CELL - inset; ++x)
+            if (x >= 0 && y >= 0 && x < VW && y < VH) view_px[y * VW + x] = color;
+}
+
+static void send_views(pa_client* pa) {
+    int s, o, i, j;
+    for (s = 0; s < PA_MAX_SEATS; ++s) {
+        int cols = VW / CELL, rows = VH / CELL, left, top;
+        if (!players[s].alive || !pa_view_wanted(pa, s)) continue;
+        left = (int)players[s].x - cols / 2;
+        top = (int)players[s].y - rows / 2;
+        for (i = 0; i < VW * VH; ++i) view_px[i] = 0xFF14161Au; /* fundo escuro */
+        for (i = 0; i < rows; ++i) {
+            for (j = 0; j < cols; ++j) {
+                int x = left + j, y = top + i;
+                int inside = x >= 0 && y >= 0 && x < W && y < H;
+                if (inside && (x == 0 || y == 0 || x == W - 1 || y == H - 1)) fill_cell(j, i, 0xFF5D5E66u, 1); /* parede */
+            }
+        }
+        for (o = 0; o < PA_MAX_SEATS; ++o) {
+            pa_seat_info info;
+            if (!players[o].alive || !pa_get_seat(pa, o, &info)) continue;
+            fill_cell((int)players[o].x - left, (int)players[o].y - top,
+                      0xFF000000u | ((uint32_t)info.r << 16) | ((uint32_t)info.g << 8) | info.b, o == s ? 0 : 1);
+        }
+        pa_submit_view(pa, s, view_px, VW, VH, VW * 4);
+    }
+}
+
 static void draw(pa_client* pa) {
     char grid[H][W + 1];
     int x, y, s;
@@ -60,10 +101,15 @@ static void draw(pa_client* pa) {
         grid[y][W] = 0;
     }
     for (s = 0; s < PA_MAX_SEATS; ++s) {
-        if (players[s].alive) grid[(int)players[s].y][(int)players[s].x] = (char)('1' + (s == 9 ? -1 : s));
+        /* quem está vendo no celular sai da tela principal */
+        if (players[s].alive && !pa_view_wanted(pa, s)) grid[(int)players[s].y][(int)players[s].x] = (char)('1' + (s == 9 ? -1 : s));
     }
     printf("\x1b[H");
     for (y = 0; y < H; ++y) puts(grid[y]);
+    for (s = 0; s < PA_MAX_SEATS; ++s) {
+        if (players[s].alive && pa_view_wanted(pa, s)) printf("P%d joga pela tela do celular   ", s + 1);
+    }
+    printf("                                        \n");
     printf("Jogadores: %d   Entre pelo celular: %s        \n", pa_active_seat_count(pa), pa_join_url(pa));
 }
 
@@ -79,6 +125,7 @@ int main(void) {
     printf("\x1b[2J");
     for (;;) {
         arena_step(pa);
+        send_views(pa);
         draw(pa);
         if (!pa_is_connected(pa)) { printf("O Hub fechou.\n"); break; }
         Sleep(16);

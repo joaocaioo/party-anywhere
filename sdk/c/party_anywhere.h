@@ -113,6 +113,20 @@ void pa_toast(pa_client* pa, int seat, const char* text);                      /
 void pa_rumble(pa_client* pa, int seat, float low, float high, int duration_ms);
 void pa_set_light(pa_client* pa, int seat, uint8_t r, uint8_t g, uint8_t b);
 
+/* A tela do jogo no celular (padrão para todo jogo e mod): quem joga pelo celular vê a própria parte do
+ * jogo nele, e ela sai da TV.
+ *
+ *   if (pa_view_wanted(pa, s)) {           // este jogador está vendo no celular:
+ *       // não desenhe a parte dele na TV (a tela dividida fica para os outros)
+ *       // desenhe a visão dele num alvo à parte, leia os pixels (BGRA, até 1280x720) e entregue:
+ *       pa_submit_view(pa, s, pixels, 640, 360, 640 * 4);
+ *   }
+ *
+ * Sem o Hub, ou com o jogador sem celular, pa_view_wanted é false e o jogo segue como sempre. Entregue a
+ * cada frame (ou a cada 2): o Hub manda para o celular no ritmo que a rede aguenta. */
+bool pa_view_wanted(pa_client* pa, int seat);
+bool pa_submit_view(pa_client* pa, int seat, const void* bgra, int width, int height, int stride_bytes);
+
 /* ------------------------------------------------------------------------------------------------
  * Memória compartilhada (ABI 1). O Hub cria "Local\PartyAnywhere.v1"; o jogo abre e lê.
  * Mudar este layout é mudança de ABI (crates/pa-sdk tem o espelho em Rust e testa os dois juntos).
@@ -162,6 +176,29 @@ typedef char pa__shm_size_check[(sizeof(pa_shm) == PA_SHM_SIZE) ? 1 : -1];
 typedef char pa__seat_size_check[(sizeof(pa_shm_seat) == 72) ? 1 : -1];
 typedef char pa__cmd_size_check[(sizeof(pa_shm_cmd) == 64) ? 1 : -1];
 
+/* A tela de cada jogador: uma memória por vaga, que o Hub cria quando o celular liga a tela
+ * ("Local\PartyAnywhere.v1.view.<vaga>"). Cabeçalho de 64 bytes e os pixels BGRA logo depois. */
+#ifndef PA_VIEW_NAME_PREFIX
+#define PA_VIEW_NAME_PREFIX L"Local\\PartyAnywhere.v1.view."
+#endif
+#define PA_VIEW_MAGIC 0x57454956u /* "VIEW" */
+#define PA_VIEW_MAX_W 1280
+#define PA_VIEW_MAX_H 720
+#define PA_VIEW_HEADER 64
+#define PA_VIEW_SIZE (PA_VIEW_HEADER + PA_VIEW_MAX_W * PA_VIEW_MAX_H * 4)
+
+typedef struct pa_view_header {
+    uint32_t magic;
+    uint32_t version;         /* 1 */
+    volatile uint32_t wanted; /* o Hub escreve: 1 = o celular mostra a tela deste jogador */
+    uint32_t width, height, stride;
+    volatile uint32_t seq;    /* seqlock: ímpar = o jogo está escrevendo */
+    uint32_t reserved_;
+    uint64_t timestamp_us;    /* QueryPerformanceCounter em microssegundos, ao terminar o quadro */
+    uint8_t pad_[24];
+} pa_view_header;
+typedef char pa__view_header_check[(sizeof(pa_view_header) == PA_VIEW_HEADER) ? 1 : -1];
+
 /* Uso interno e testes: liga o cliente a uma memória já mapeada. */
 pa_result pa__attach(pa_shm* shm, int32_t pid, pa_client** out);
 
@@ -199,6 +236,10 @@ struct pa_client {
     pa_event events[PA__EVENTS];
     uint32_t ev_head, ev_tail;
     uint8_t sent_accepting; /* 0 = nunca mandado, 1 = não, 2 = sim (chamadas repetidas não geram tráfego) */
+    /* a tela de cada jogador no celular: aberta quando o Hub cria; procura de novo a cada ~1 s */
+    HANDLE view_map[PA_MAX_SEATS];
+    pa_view_header* view[PA_MAX_SEATS];
+    ULONGLONG view_next_try[PA_MAX_SEATS];
 };
 
 static void pa__push_event(pa_client* pa, pa_event_type type, int seat) {
@@ -258,7 +299,12 @@ pa_result pa_connect(const pa_game_info* info, pa_client** out) {
 }
 
 void pa_disconnect(pa_client* pa) {
+    int s;
     if (!pa) return;
+    for (s = 0; s < PA_MAX_SEATS; s++) {
+        if (pa->view[s]) UnmapViewOfFile(pa->view[s]);
+        if (pa->view_map[s]) CloseHandle(pa->view_map[s]);
+    }
     InterlockedCompareExchange((volatile LONG*)&pa->shm->game_pid, 0, (LONG)pa->pid);
     if (pa->mapping) { UnmapViewOfFile(pa->shm); CloseHandle(pa->mapping); }
     free(pa);
@@ -419,6 +465,63 @@ void pa_set_light(pa_client* pa, int seat, uint8_t r, uint8_t g, uint8_t b) {
     if (!c) return;
     c->value = ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
     pa__commit(pa);
+}
+
+static pa_view_header* pa__view(pa_client* pa, int seat) {
+    ULONGLONG now;
+    wchar_t name[64];
+    HANDLE h;
+    void* v;
+    if (!pa || seat < 0 || seat >= PA_MAX_SEATS) return NULL;
+    if (pa->view[seat]) return pa->view[seat];
+    now = GetTickCount64();
+    if (now < pa->view_next_try[seat]) return NULL;
+    pa->view_next_try[seat] = now + 1000;
+    lstrcpyW(name, PA_VIEW_NAME_PREFIX); /* + a vaga (0 a 9) */
+    {
+        int n = lstrlenW(name);
+        name[n] = (wchar_t)(L'0' + seat);
+        name[n + 1] = 0;
+    }
+    h = OpenFileMappingW(FILE_MAP_ALL_ACCESS, FALSE, name);
+    if (!h) return NULL;
+    v = MapViewOfFile(h, FILE_MAP_ALL_ACCESS, 0, 0, PA_VIEW_SIZE);
+    if (!v) { CloseHandle(h); return NULL; }
+    if (((pa_view_header*)v)->magic != PA_VIEW_MAGIC) { UnmapViewOfFile(v); CloseHandle(h); return NULL; }
+    pa->view_map[seat] = h;
+    pa->view[seat] = (pa_view_header*)v;
+    return pa->view[seat];
+}
+
+bool pa_view_wanted(pa_client* pa, int seat) {
+    pa_view_header* v = pa__view(pa, seat);
+    if (!v || !v->wanted) return false;
+    /* só quem está ativo (reconectando, a vaga fica na TV como sempre) */
+    return pa->seen[seat].state == PA_SEAT_ACTIVE;
+}
+
+bool pa_submit_view(pa_client* pa, int seat, const void* bgra, int width, int height, int stride_bytes) {
+    pa_view_header* v;
+    LARGE_INTEGER t, f;
+    uint8_t* dst;
+    const uint8_t* src = (const uint8_t*)bgra;
+    int y, w, h, row;
+    if (!bgra || width <= 0 || height <= 0 || !pa_view_wanted(pa, seat)) return false;
+    v = pa->view[seat];
+    w = width > PA_VIEW_MAX_W ? PA_VIEW_MAX_W : width;
+    h = height > PA_VIEW_MAX_H ? PA_VIEW_MAX_H : height;
+    row = w * 4;
+    dst = (uint8_t*)v + PA_VIEW_HEADER;
+    InterlockedIncrement((volatile LONG*)&v->seq); /* ímpar: escrevendo */
+    for (y = 0; y < h; y++) memcpy(dst + (size_t)y * row, src + (size_t)y * stride_bytes, (size_t)row);
+    v->width = (uint32_t)w;
+    v->height = (uint32_t)h;
+    v->stride = (uint32_t)row;
+    QueryPerformanceCounter(&t);
+    QueryPerformanceFrequency(&f);
+    v->timestamp_us = (uint64_t)(t.QuadPart / f.QuadPart) * 1000000u + (uint64_t)(t.QuadPart % f.QuadPart) * 1000000u / (uint64_t)f.QuadPart;
+    InterlockedIncrement((volatile LONG*)&v->seq); /* par: pronto */
+    return true;
 }
 
 #endif /* PARTY_ANYWHERE_IMPLEMENTED */

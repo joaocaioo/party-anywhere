@@ -26,6 +26,12 @@ chegam sozinhas.
 | Conferir o jogo publicado (como o Hub lê) | `inspect_published_game` | `pa inspect <dono/repo>` |
 | Levar um mod publicado para a Biblioteca (para jogar) | `add_to_library` | `pa add <dono/repo>` |
 
+## Padrão: a tela do jogo no celular
+
+Todo jogo e mod: para cada vaga com `pa_view_wanted(pa, s)`, não desenhe a parte daquele jogador na TV e
+entregue a visão dele com `pa_submit_view` (BGRA, 640x360 é um bom tamanho). Sem o Hub ou sem celular, nada
+muda. O exemplo `sdk/examples/arena_console.c` mostra o jeito.
+
 ## Fluxo
 
 1. `hub_status`. Sem o Hub, ou com versão velha: explique e ofereça `install_hub` (só com o "sim" da pessoa).

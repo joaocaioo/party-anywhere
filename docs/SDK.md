@@ -144,7 +144,40 @@ tráfego.
 | `pa_toast` | Mostra o aviso no topo do celular. |
 | `pa_set_accepting_players`, `pa_set_label`, `pa_set_layout`, `pa_set_light` | Chegam ao Hub (já são ABI 1); o celular passa a mostrar layouts e rótulos na próxima versão do protocolo. |
 
+### Tela do jogo no celular (padrão)
+
+Todo jogo e mod do Party Anywhere deve ter: **quem joga pelo celular vê a própria parte do jogo nele, e ela
+sai da TV.** O jogador liga ou desliga no menu do celular ("Tela do jogo no celular", ligada por padrão).
+
+```c
+bool pa_view_wanted(pa_client* pa, int seat);
+bool pa_submit_view(pa_client* pa, int seat, const void* bgra, int width, int height, int stride_bytes);
+```
+
+A cada frame, para cada vaga:
+
+```c
+if (pa_view_wanted(pa, s)) {
+    // 1. não desenhe a parte deste jogador na TV (a tela dividida fica para os outros)
+    // 2. desenhe a visão dele num alvo à parte (sugestão: 640x360), leia os pixels (BGRA) e entregue
+    pa_submit_view(pa, s, pixels, 640, 360, 640 * 4);
+}
+```
+
+- `pa_view_wanted` é `false` sem o Hub, sem celular ou com a tela desligada: o jogo segue como sempre.
+- Até 1280x720. Tamanhos menores chegam mais rápido (o exemplo usa 320x176; 640x360 é um bom padrão).
+- Entregue a cada frame ou a cada 2: o Hub manda para o celular no ritmo que a rede aguenta (até 30 por
+  segundo) e sempre o quadro mais novo, sem fila.
+- Ler os pixels da placa de vídeo tem custo: use um alvo pequeno e, se der, leitura assíncrona (PBO no OpenGL,
+  staging texture no Direct3D).
+- O exemplo [`arena_console.c`](../sdk/c/examples/arena_console.c) faz tudo isso: desenha a arena em volta
+  de quem está no celular e tira essa pessoa da tela principal.
+
 ## Como funciona por dentro
+
+A tela do jogo no celular usa uma memória por vaga, `Local\PartyAnywhere.v1.view.<vaga>` (cabeçalho
+`pa_view_header` de 64 bytes + os pixels), que o Hub cria quando o celular liga a tela e marca `wanted`. O
+jogo escreve com seqlock e o instante do quadro (QueryPerformanceCounter); é aditivo, a ABI continua 1.
 
 Memória compartilhada `Local\PartyAnywhere.v1`, criada pelo Hub (layout `pa_shm` no cabeçalho). Cada vaga
 tem um seqlock: o jogo nunca lê um estado pela metade e nunca trava. Os eventos saem da comparação de um

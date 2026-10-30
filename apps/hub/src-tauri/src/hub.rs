@@ -63,6 +63,8 @@ pub struct Hub {
     /// Jogo aberto com "Padrão do jogo": o layout que os celulares usam enquanto ele roda, e quem trocou no
     /// menu durante a partida (esses ficam com a escolha deles).
     pub session_layout: Mutex<Option<(String, std::collections::HashSet<String>)>>,
+    /// A tela do jogo nos celulares que ligaram (ver view.rs).
+    pub views: Mutex<crate::view::Views>,
 }
 
 #[derive(Clone, Serialize)]
@@ -124,6 +126,7 @@ impl Hub {
             last_activity: Mutex::new(HashMap::new()),
             benched: Mutex::new([false; MAX_SEATS]),
             session_layout: Mutex::new(None),
+            views: Mutex::new(Default::default()),
         })
     }
 
@@ -179,7 +182,10 @@ impl Hub {
                         hub.lobby.lock().unwrap().rename(seat as usize, &name);
                         hub.emit_lobby();
                     }
+                    PhoneEvent::Screen { seat, on } => hub.views.lock().unwrap().set(seat, on),
+                    PhoneEvent::ViewAck { seat, id, at_ms } => hub.views.lock().unwrap().ack(seat, id, at_ms),
                     PhoneEvent::Disconnected { seat } => {
+                        hub.views.lock().unwrap().set(seat, false);
                         hub.set_pad(seat as usize, Pad::NEUTRAL);
                         hub.unplug(seat as usize);
                         hub.emit_lobby();
