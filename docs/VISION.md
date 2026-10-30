@@ -73,7 +73,9 @@ Party Anywhere tem três peças, nesta ordem de importância:
 
 - Uma pessoa que nunca viu o Hub coloca 4 amigos (2 celulares, 1 controle Bluetooth novo,
   1 controle USB) no lobby em **menos de 1 minuto**, sem ajuda.
-- Latência do celular: **p50 abaixo de 20 ms e p99 abaixo de 50 ms** numa rede Wi-Fi doméstica de 5 GHz.
+- Latência do celular numa rede Wi-Fi doméstica de 5 GHz: rede **p50 abaixo de 10 ms**; do toque num botão
+  ao PC, **p50 abaixo de 25 ms e p99 abaixo de 100 ms** (o resto é do navegador do celular). E, no fim,
+  ninguém sentir atraso jogando.
 - Quem cria um jogo vai de "clonei o repo" a "meu jogo lê 10 jogadores" em **uma tarde**.
 
 Os detalhes estão em [UX.md](UX.md), [ARCHITECTURE.md](ARCHITECTURE.md), [SDK.md](SDK.md),

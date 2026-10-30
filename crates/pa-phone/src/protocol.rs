@@ -46,6 +46,9 @@ pub enum SampleKind {
     Touch,
     /// Rajada automática do teste: instante = envio. Mede só rede + servidor.
     Burst,
+    /// Movimento do analógico: instante = criação do `pointermove`. Separado do toque porque o navegador
+    /// agrupa movimentos contínuos, e isso não é o atraso de apertar um botão.
+    Stick,
 }
 
 impl SampleKind {
@@ -54,6 +57,7 @@ impl SampleKind {
             0 => Some(Self::Heartbeat),
             1 => Some(Self::Touch),
             2 => Some(Self::Burst),
+            3 => Some(Self::Stick),
             _ => None,
         }
     }
@@ -63,6 +67,7 @@ impl SampleKind {
             Self::Heartbeat => 0,
             Self::Touch => 1,
             Self::Burst => 2,
+            Self::Stick => 3,
         }
     }
 }
@@ -285,6 +290,9 @@ mod tests {
         let mut nan = vec![T_SYNC, 0, 0];
         nan.extend_from_slice(&f64::NAN.to_le_bytes());
         assert_eq!(decode_client(&nan), Err(DecodeError::BadField));
+        let stick = encode_state(1, &Pad::NEUTRAL, Some((SampleKind::Stick, 1.0)));
+        assert!(matches!(decode_client(&stick), Ok(ClientMsg::StateTimed { kind: SampleKind::Stick, .. })));
+
         let mut bad_kind = encode_state(0, &Pad::NEUTRAL, Some((SampleKind::Burst, 0.0)));
         bad_kind[11] = 9;
         assert_eq!(decode_client(&bad_kind), Err(DecodeError::BadField));

@@ -1,8 +1,10 @@
 //! Modelo comum do Party Anywhere (ver docs/ARCHITECTURE.md, "Modelo de dados").
 //! Nada aqui faz I/O: tudo é testável sem hardware.
 
+pub mod lobby;
 pub mod pad;
 
+pub use lobby::{Device, DeviceKey, DeviceKind, JoinOutcome, JoinPolicy, Lobby, Seat, SeatState};
 pub use pad::{buttons, Pad};
 
 /// Quantidade máxima de vagas no lobby (P1..P10).

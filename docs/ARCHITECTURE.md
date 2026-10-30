@@ -31,7 +31,7 @@ errado: corrija um deles no mesmo PR. A experiência manda ([UX.md](UX.md)); a a
 | D1 | **Hub em Rust** (workspace com crates por módulo) | Desempenho previsível no caminho da entrada, sem coletor de lixo; boa interoperabilidade com Win32 e WinRT (crate `windows`); um binário só. | C++ (mais risco de memória na parte de rede); C#/.NET (runtime, GC no caminho quente) |
 | D2 | **UI em Tauri 2 + React + TypeScript (Vite)** | Visual rico e animado com tecnologia web, janela leve (WebView2), updater assinado pronto, maior ecossistema para quem contribuir. | Electron (pesado); UI nativa (lenta de iterar no visual que queremos) |
 | D3 | **Controles físicos via SDL3** | Cobre XInput, DirectInput, HID, DualSense/DualShock 4, Switch Pro, 8BitDo; hotplug por evento; luz e vibração; mais de 4 controles; número de série/caminho para reconhecer o mesmo aparelho. | XInput puro (4 controles, só Xbox); Raw Input à mão |
-| D4 | **Celular via página web servida pelo Hub** (HTTP + WebSocket) | Sem app para instalar: o QR abre o navegador. WebSocket na rede local dá ~5 a 20 ms. | App nativo (fricção de instalação); nuvem (latência, privacidade) |
+| D4 | **Celular via página web servida pelo Hub** (HTTP + WebSocket) | Sem app para instalar: o QR abre o navegador. Medido no iPhone: rede ~5 ms; do toque ao PC ~24 ms (p50), quase todo dentro do Safari. | App nativo (fricção de instalação); nuvem (latência, privacidade) |
 | D5 | **Protocolo do celular: binário para estado, JSON para controle** | O estado vai 60 vezes por segundo e precisa ser mínimo; o resto (layout, avisos) muda pouco e precisa ser fácil de evoluir. | Tudo JSON (desperdício no caminho quente); tudo binário (difícil evoluir layouts) |
 | D6 | **Sempre o estado completo do controle, nunca eventos** | Perder ou repetir uma mensagem não deixa botão preso. Base para migrar para WebRTC sem ordenação. | Eventos "apertou/soltou" |
 | D7 | **Bluetooth via WinRT (`Windows.Devices.Enumeration`)** dentro do Hub | Pareamento personalizado sem a janela do Windows, com filtro de controles e PIN automático. | Mandar para as Configurações do Windows (a experiência que queremos superar) |
@@ -94,15 +94,27 @@ struct Pad {                   // formato comum de estado, em termos de controle
 O número de sequência não faz parte do `Pad`: ele é do transporte (protocolo do celular, memória
 compartilhada do SDK), que o usa para descartar amostras velhas.
 
-Regras do lobby (`pa-core`, testadas sem hardware):
+Regras do lobby (`pa-core::lobby`, testadas sem hardware):
 
-- No máximo **10 vagas**. Dispositivo novo ocupa a menor vaga vazia.
-- Dispositivo conhecido que volta retoma **a vaga dele** se ela estiver em `Reconnecting`.
-- Vaga em `Reconnecting` não é dada a outro dispositivo até a pessoa remover (UX: guardar a vaga).
-- Reordenar troca as vagas e **mantém as cores ligadas ao índice** (P1 é sempre azul).
-- Opção "Entrar só ao apertar um botão": dispositivo conectado fica em espera até apertar algo.
-- Teclado vira jogador só por ação explícita: apertar **Enter nele** na tela Adicionar jogador → Teclado (senão todo
-  notebook teria um "P1 fantasma"). Ver [Teclados como jogadores](#teclados-como-jogadores).
+- No máximo **10 vagas**. Dispositivo novo ocupa a menor vaga vazia. Com as 10 ocupadas, ele fica na
+  espera e entra (ao apertar um botão) quando uma vaga abrir.
+- Dispositivo conhecido que volta retoma **a vaga dele**, mesmo se o Hub ainda não percebeu a queda (o
+  celular reabriu a página, por exemplo): a conexão antiga é fechada. A chave do celular é o token.
+- Vaga em `Reconnecting` não é dada a outro dispositivo até a pessoa remover (UX: guardar a vaga), e conta
+  como ocupada para "lobby cheio".
+- Reordenar troca as vagas (inclusive com uma vazia); o nome vai junto e **a cor fica com o número** (P1 é
+  sempre azul).
+- Celular sempre entra ao conectar (a pessoa escaneou o QR de propósito). Controle entra sozinho, ou, com
+  "Entrar só ao apertar um botão", fica em espera até apertar algo.
+- Teclado vira jogador só por ação explícita: apertar **Enter nele** na tela Adicionar jogador → Teclado
+  ou "Conectar" (senão todo notebook teria um "P1 fantasma"). Tecla qualquer não basta. Ver
+  [Teclados como jogadores](#teclados-como-jogadores).
+- **Remover** um jogador cujo aparelho continua ligado não o devolve ao lobby sozinho: ele vai para a
+  espera e volta só apertando um botão. Remover uma vaga em `Reconnecting` esquece o aparelho.
+- **Desfazer** a remoção devolve a mesma vaga, com o nome, se ela continua livre; se o aparelho saiu
+  nesse meio-tempo, volta como `Reconnecting`.
+- Nome: o lembrado do aparelho, senão "Jogador N". Renomear corta espaços e passa de 20 caracteres;
+  vazio volta para "Jogador N".
 
 ## Threads e tempo
 
@@ -133,7 +145,7 @@ Transporte: `ws://<ip>:<porta>/ws`. A página é servida em `http://<ip>:<porta>
 
 | Dir | Tipo | Formato | Notas |
 |---|---|---|---|
-| C→S | `0x05 STATE_T` | STATE + `[tipo u8][t f64]` (20 bytes) | `t` = instante no relógio do celular (`performance.now()`): do toque (tipo 1), do envio do heartbeat (0) ou da rajada de teste (2). |
+| C→S | `0x05 STATE_T` | STATE + `[tipo u8][t f64]` (20 bytes) | `t` = instante no relógio do celular (`performance.now()`): do toque num botão ou de soltar o analógico (tipo 1), do movimento do analógico (3), do envio do heartbeat (0) ou da rajada de teste (2). |
 | C→S | `0x06 SYNC` | `[06][id u16][t0 f64]` | Ao conectar, 12 seguidas; depois, uma a cada 2 s. |
 | S→C | `0x85 SYNC_REPLY` | `[85][id u16]` | Respondida na hora. |
 | C→S | `0x07 SYNC_DONE` | `[07][id u16][t1 f64]` | O Hub estima `offset = chegada do SYNC − (t0 + t1) / 2` e usa a troca de menor ida e volta (erro ≤ rtt / 2). |

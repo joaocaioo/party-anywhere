@@ -153,7 +153,7 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 <script>
 'use strict';
 const BIT = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, BACK: 6, START: 7, LS: 8, RS: 9, UP: 10, DOWN: 11, LEFT: 12, RIGHT: 13 };
-const KIND = { heartbeat: 0, touch: 1, burst: 2 };
+const KIND = { heartbeat: 0, touch: 1, burst: 2, stick: 3 };
 const HEARTBEAT_MS = 100;
 const STICK_RADIUS = 60;
 const DEADZONE = 0.12;
@@ -343,7 +343,7 @@ zone.addEventListener('pointermove', (e) => {
   const lx = (dx / STICK_RADIUS) * k, ly = (-dy / STICK_RADIUS) * k;
   if (Math.abs(lx - pad.lx) < 0.01 && Math.abs(ly - pad.ly) < 0.01) return;
   pad.lx = lx; pad.ly = ly;
-  sendState(KIND.touch, touchTime(e));
+  sendState(KIND.stick, touchTime(e));
 });
 const stickUp = (e) => {
   if (e.pointerId !== stickId) return;

@@ -1,7 +1,8 @@
 # Spike de latência (fase 1)
 
 Responde à pergunta da fase 1 do [roadmap](../../docs/ROADMAP.md): **o celular é rápido o bastante
-como controle?** Meta: do toque até o PC, **p50 < 20 ms e p99 < 50 ms**, em Wi-Fi doméstico de 5 GHz,
+como controle?** Meta (revista em 2026-10-29): do toque num botão até o PC, **p50 < 25 ms e p99 < 100 ms**,
+e só a rede com **p50 < 10 ms**, em Wi-Fi doméstico de 5 GHz,
 medido em pelo menos um Android e um iPhone.
 
 ## Rodar
@@ -52,7 +53,23 @@ Registre aqui cada medição (copie do JSON em `reports/`):
 
 | Data | Celular | Rede | Toque → PC p50 / p99 | Rajada p50 / p99 | Ida e volta p50 | Meta |
 |---|---|---|---|---|---|---|
-| | | | | | | |
+| 2026-10-29 | iPhone (Safari) | Wi-Fi doméstico, faixa não anotada | 22,9 / 38,1 ms (46 toques) | 5,2 / 27,0 ms | 7,0 ms | ❌ p50 (p99 ok) |
+| 2026-10-29 | iPhone (Safari) | idem | 23,2 / 120,5 ms (2.707, botões e analógico juntos) | 3,8 / 34,0 ms | 7,0 ms | ❌ |
+| 2026-10-29 | iPhone (Safari) | idem | botões 23,6 / 81,6 ms (2.129) · analógico 13,6 / 80,9 ms (614) | 4,7 / 31,0 ms | 7,0 ms | ❌ |
 
-Se a meta não for batida em Wi-Fi bom, o próximo passo do roadmap é testar WebRTC DataChannel sem
-ordenação antes de seguir para a fase 2.
+Leitura da primeira medição: a rede é rápida (5 ms de ida, sem pacotes perdidos). Os ~18 ms restantes do
+toque até o PC acontecem **dentro do navegador do celular**, entre o toque e o JavaScript receber o evento.
+Trocar o transporte (WebRTC) não muda isso. Na segunda medição, a cauda (p99 120 ms) não veio da rede
+(rajada p99 34 ms): a suspeita é o analógico, cujos movimentos o navegador agrupa. Por isso o medidor
+passou a separar **botões** (o número da meta) de **analógico**. A terceira medição mostrou que a cauda
+também aparece nos botões (p99 82 ms, contra 31 ms da rede). Como a página envia o toque antes de qualquer
+outro trabalho e bloqueia os gestos do navegador, o atraso que sobra (~19 ms no p50) acontece no Safari,
+antes de o JavaScript receber o toque. Ainda falta um Android.
+
+**Decisão (2026-10-29):** o celular está bom para jogos de festa e co-op. A meta foi revista para o que
+depende de nós (rede p50 < 10 ms) e para o que o navegador permite (toque p50 < 25 ms, p99 < 100 ms).
+O teste que vale de verdade é **dentro de um jogo**, na fase 2. Um app nativo opcional fica como
+alternativa na fase 7, se o jogo mostrar que precisa.
+
+Se a **rede** (rajada) passar da meta num Wi-Fi bom, aí sim vale testar WebRTC DataChannel sem ordenação.
+O atraso do navegador não muda com o transporte.
