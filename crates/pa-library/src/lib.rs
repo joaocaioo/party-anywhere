@@ -2,6 +2,7 @@
 //! instalar com o hash conferido, guardar tudo em `library.json` e avisar quando sai versão nova
 //! (dos jogos e do próprio Hub). A rede fica atrás de [`http::Http`]: tudo aqui é testável sem internet.
 
+pub mod basegame;
 pub mod github;
 pub mod http;
 pub mod hubapp;

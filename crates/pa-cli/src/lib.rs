@@ -32,6 +32,7 @@ pub struct NewOptions {
 pub struct BaseGameSpec {
     pub name: String,
     pub steam_app_id: Option<u32>,
+    pub epic_app_name: Option<String>,
     /// Executável, relativo à pasta do jogo.
     pub exe: String,
 }
@@ -60,7 +61,7 @@ pub fn resolve_base_game(query: &str) -> Result<BaseGameSpec, String> {
         ));
     }
     let exe = pcgames::exe_candidates(&dir).into_iter().next().ok_or_else(|| format!("não achei o executável de {} em {}.", game.name, dir.display()))?;
-    Ok(BaseGameSpec { name: game.name, steam_app_id: game.steam_app_id, exe })
+    Ok(BaseGameSpec { name: game.name, steam_app_id: game.steam_app_id, epic_app_name: game.epic_app_name, exe })
 }
 
 /// Cria um projeto de jogo já válido: manifesto, capa provisória, workflow de release, MCP e skill.
@@ -346,7 +347,7 @@ mod tests {
     #[test]
     fn coop_mod_of_an_installed_game_points_at_it() {
         let dir = tempfile::tempdir().unwrap();
-        let base = BaseGameSpec { name: "Grand Theft Auto: San Andreas".into(), steam_app_id: Some(12120), exe: "gta_sa.exe".into() };
+        let base = BaseGameSpec { name: "Grand Theft Auto: San Andreas".into(), steam_app_id: Some(12120), epic_app_name: None, exe: "gta_sa.exe".into() };
         let opts = NewOptions { name: "San Andreas Party".into(), base_game: Some(base), ..Default::default() };
         new_project(dir.path(), &opts).unwrap();
         let v = validate_dir(dir.path());

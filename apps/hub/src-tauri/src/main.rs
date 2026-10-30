@@ -153,6 +153,8 @@ fn main() {
             commands::library_add_pc,
             commands::library_sync,
             commands::pick_game_file,
+            commands::base_game_check,
+            commands::base_game_pick,
             commands::open_bluetooth_settings,
             commands::library_remove,
             commands::library_restore,

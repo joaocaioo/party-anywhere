@@ -78,6 +78,12 @@ pub struct BaseGame {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub steam_app_id: Option<u32>,
+    /// Nome do jogo na Epic (o `AppName` dela): o Hub acha a instalação e sabe pedir para a Epic instalar.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub epic_app_name: Option<String>,
+    /// Onde comprar, quando não é Steam (GOG, site do jogo). Sem isto, a página da Steam.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub store_url: Option<String>,
     pub exe: String,
     /// Versões aceitas do executável. Vazio = qualquer uma.
     #[serde(default)]
@@ -356,6 +362,8 @@ mod tests {
             base_game: Some(BaseGame {
                 name: "GTA SA".into(),
                 steam_app_id: Some(12120),
+                epic_app_name: None,
+                store_url: None,
                 exe: "gta_sa.exe".into(),
                 accepted_sha256: vec!["zz".into()],
                 help: None,

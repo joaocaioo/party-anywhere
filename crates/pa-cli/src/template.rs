@@ -28,6 +28,8 @@ pub fn manifest(id: &str, name: &str, tagline: &str, slug: &str, base: Option<&B
             base_game: Some(BaseGame {
                 name: b.name.clone(),
                 steam_app_id: b.steam_app_id,
+                epic_app_name: b.epic_app_name.clone(),
+                store_url: None,
                 exe: b.exe.clone(),
                 accepted_sha256: vec![],
                 help: None,

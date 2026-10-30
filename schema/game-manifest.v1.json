@@ -151,6 +151,15 @@
             },
             "help": {
               "type": "string"
+            },
+            "epicAppName": {
+              "type": "string",
+              "description": "O AppName do jogo na Epic: o Hub acha a instalação e sabe pedir para a Epic instalar."
+            },
+            "storeUrl": {
+              "type": "string",
+              "pattern": "^https://",
+              "description": "Onde comprar fora da Steam (GOG, site do jogo)."
             }
           }
         }

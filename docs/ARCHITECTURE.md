@@ -323,6 +323,21 @@ Regras:
 - O menu abre **segurando** o botão do topo por 0,5 s (um anel enche): sem abrir sem querer no meio do jogo.
   Abrir o menu ou trocar de layout solta todos os botões (nada fica preso no jogo).
 
+## Jogo original de um mod (`requires.baseGame`)
+
+O Hub nunca baixa o jogo original: o mod roda sobre a cópia da pessoa. Ao instalar um mod pelo link
+(`pa_library::basegame`):
+
+1. Procura: Steam (`steamAppId` → `appmanifest`), Epic (`epicAppName` → manifestos do launcher) e qualquer
+   jogo do PC cuja pasta tenha o `exe`.
+2. Não achou: a tela oferece `steam://install/<appid>`, `com.epicgames.launcher://apps/<AppName>?action=install`,
+   a loja (`storeUrl` ou a página da Steam) e "já tenho": escolher o `.exe` ou a pasta (vale a pasta do jogo, o
+   próprio `.exe` ou uma pasta até dois níveis acima). Mandou instalar: a tela consulta de novo a cada 3 s e
+   segue sozinha quando o jogo aparece.
+3. Com `acceptedSha256`, confere o executável; versão diferente mostra o `help` do autor.
+4. Instala o mod na pasta achada, com backup dos originais. Ao jogar, se o jogo sumiu da pasta, a mensagem
+   diz para instalar de novo pelo link.
+
 ## Fliperama da Biblioteca: desempenho
 
 O visual é fixo; o desempenho vem de não fazer trabalho à toa (medido com 200 jogos numa Radeon integrada):

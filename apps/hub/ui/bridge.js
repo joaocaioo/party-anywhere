@@ -315,14 +315,87 @@
         <div class="facts">
           <div>${icon('users')}${escapeHtml(g.players)}</div>
           <div>${icon('download')}Download de ${mb} MB, conferido pelo hash</div>
-          ${base ? `<div>${icon('check')}Precisa de ${escapeHtml(base.name)} (a gente procura na sua Steam)</div>` : `<div>${icon('check')}Não precisa de outro jogo</div>`}
+          ${base ? `<div>${icon('gamebox')}Um mod do ${escapeHtml(base.name)}: usa a sua cópia do jogo</div>` : `<div>${icon('check')}Não precisa de outro jogo</div>`}
         </div>
         <div class="warnbox">${icon('warn')}<div>Jogo da comunidade, ainda não verificado pela equipe Party Anywhere. Instale só se confiar no autor.</div></div>
-        <div style="margin-top:16px;display:flex;gap:10px"><button class="btn-neon" id="installBtn">${icon('download')}Instalar</button><button class="btn-ghost" data-close>Cancelar</button></div>
+        ${base ? '<div class="basebox" id="baseBox"></div>' : ''}
+        <div style="margin-top:16px;display:flex;gap:10px"><button class="btn-neon" id="installBtn"${base ? ' disabled' : ''}>${icon('download')}${base ? 'Instalar o mod' : 'Instalar'}</button><button class="btn-ghost" data-close>Cancelar</button></div>
         <div id="installProg"></div>
       </div></div>`;
     document.getElementById('installBtn').addEventListener('click', () => install(g));
+    if (base) baseGameFlow(base);
   };
+
+  // O jogo original de um mod: o Hub procura (Steam, Epic, jogos do PC); se não acha, mostra cada caminho
+  // (instalar pela Steam ou Epic, a loja, ou "já tenho": escolher o .exe ou a pasta, cópia de qualquer lugar).
+  // Mandou instalar: fica olhando até o jogo aparecer e segue sozinho.
+  let baseDir = null;
+  function baseGameFlow(base) {
+    baseDir = null;
+    let waiting = null, poll = 0;
+    const box = () => document.getElementById('baseBox');
+    const render = (c) => {
+      const el = box();
+      if (!el) { clearInterval(poll); return; }
+      const btn = document.getElementById('installBtn');
+      if (c.found) {
+        clearInterval(poll);
+        waiting = null;
+        baseDir = c.found.dir;
+        if (btn) btn.disabled = false;
+        el.className = 'basebox ok';
+        el.onclick = null; // o "Usar outra cópia" deste estado é tratado abaixo
+        el.innerHTML = `<div class="row1">${icon('check')}<b>${escapeHtml(c.name)} encontrado</b><span style="color:var(--muted)">· ${escapeHtml(c.found.source)}</span></div>
+          <small>${escapeHtml(c.found.dir)}</small>
+          <div class="acts"><button class="linkish" data-base="exe">Usar outra cópia</button></div>`;
+        return;
+      }
+      baseDir = null;
+      if (btn) btn.disabled = true;
+      el.className = 'basebox';
+      const opt = (k, label, cls) => `<button class="${cls} sm" data-base-open="${k}">${label}</button>`;
+      el.innerHTML = `<div class="row1">${icon('gamebox')}<b>Este mod precisa do ${escapeHtml(c.name)}</b></div>
+        <p>${escapeHtml(c.problem || 'Ele não está neste PC. O mod usa a sua cópia do jogo (da Steam, da Epic ou de onde for): o Hub nunca baixa o jogo original.')}</p>
+        ${c.problem && c.help ? `<p>${escapeHtml(c.help)}</p>` : ''}
+        ${waiting ? `<div class="wait"><span class="spin" style="display:grid">${icon('spinner')}</span>Esperando a ${waiting} instalar. Pode levar um tempo; quando terminar, o Hub segue sozinho.</div>` : ''}
+        <div class="acts">
+          ${c.steamInstall ? opt('steam', 'Instalar pela Steam', 'btn-soft') : ''}
+          ${c.epicInstall ? opt('epic', 'Instalar pela Epic', 'btn-soft') : ''}
+          ${c.storeUrl ? opt('store', 'Ver na loja', 'btn-ghost') : ''}
+          <button class="btn-ghost sm" data-base="exe">Já tenho: escolher o ${escapeHtml(c.exe)}</button>
+          <button class="linkish" data-base="folder">ou a pasta do jogo</button>
+        </div>`;
+      el.onclick = async (e) => {
+        const open = e.target.closest('[data-base-open]')?.dataset.baseOpen;
+        if (open) {
+          const url = open === 'steam' ? c.steamInstall : open === 'epic' ? c.epicInstall : c.storeUrl;
+          try { await invoke('open_url', { url }); } catch (err) { warn(err); return; }
+          if (open !== 'store') {
+            waiting = open === 'steam' ? 'Steam' : 'Epic';
+            render(c);
+            clearInterval(poll);
+            poll = setInterval(() => invoke('base_game_check', { base, dir: null }).then((n) => { if (n.found) { render(n); toast(`${n.name} instalado. Pode instalar o mod.`, null, 'ok'); } }).catch(() => {}), 3000);
+          }
+          return;
+        }
+        const pick = e.target.closest('[data-base]')?.dataset.base;
+        if (pick) {
+          const n = await invoke('base_game_pick', { base, folder: pick === 'folder' }).catch(warn);
+          if (n) render(n);
+        }
+      };
+    };
+    const el = box();
+    if (el) el.innerHTML = `<div class="wait"><span class="spin" style="display:grid">${icon('spinner')}</span>Procurando o ${escapeHtml(base.name)} no seu PC...</div>`;
+    invoke('base_game_check', { base, dir: null }).then(render).catch(warn);
+    // "Usar outra cópia" no estado encontrado também escolhe
+    document.getElementById('baseBox')?.addEventListener('click', async (e) => {
+      const pick = e.target.closest('.basebox.ok [data-base]')?.dataset.base;
+      if (!pick) return;
+      const n = await invoke('base_game_pick', { base, folder: false }).catch(warn);
+      if (n) render(n);
+    });
+  }
 
   window.install = async (g) => {
     const box = document.getElementById('installProg');
@@ -330,7 +403,7 @@
     if (btn) btn.disabled = true;
     if (box) box.innerHTML = `<div class="progress"><i id="pbar" style="width:35%"></i></div><div class="progress-lbl" id="plbl">Baixando e conferindo o pacote...</div>`;
     try {
-      const list = await invoke('library_install', { url: g.repo || (lastReport && lastReport.repo) });
+      const list = await invoke('library_install', { url: g.repo || (lastReport && lastReport.repo), baseDir });
       closeModal();
       if (currentView !== 'library') await switchView('library');
       setGames(list, g.id);

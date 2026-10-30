@@ -203,7 +203,15 @@ mod tests {
         let mut g = game();
         g.install.target = InstallTarget::BaseGame;
         g.requires = Some(Requires {
-            base_game: Some(BaseGame { name: "GTA SA".into(), steam_app_id: None, exe: "gta_sa.exe".into(), accepted_sha256: vec![], help: None }),
+            base_game: Some(BaseGame {
+                name: "GTA SA".into(),
+                steam_app_id: None,
+                epic_app_name: None,
+                store_url: None,
+                exe: "gta_sa.exe".into(),
+                accepted_sha256: vec![],
+                help: None,
+            }),
         });
         g.install.files = vec![
             InstallFile { from: "SAParty.asi".into(), to: "SAParty.asi".into() },

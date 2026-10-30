@@ -568,6 +568,33 @@ pub fn library_sync(libs: Libs, games: Vec<SyncGame>) -> Vec<UiGame> {
     lib.games.iter().map(ui_game).collect()
 }
 
+// ---------------------------------------------------------------- jogo original de um mod
+
+/// Onde está o jogo que o mod precisa (Steam, Epic, qualquer jogo do PC, ou `dir` que a pessoa escolheu),
+/// e como conseguir se não estiver. A tela chama de novo a cada poucos segundos enquanto a Steam ou a Epic
+/// instalam: quando o jogo aparece, ela segue sozinha.
+#[tauri::command]
+pub async fn base_game_check(base: pa_manifest::BaseGame, dir: Option<String>) -> Result<pa_library::basegame::BaseCheck, String> {
+    tauri::async_runtime::spawn_blocking(move || pa_library::basegame::check(&base, dir.as_deref().map(std::path::Path::new)))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// "Já tenho o jogo": a pessoa aponta o .exe ou a pasta (vale cópia de qualquer lugar: GOG, CD, outra
+/// pasta). `None` se ela fechou a janela.
+#[tauri::command]
+pub async fn base_game_pick(app: tauri::AppHandle, base: pa_manifest::BaseGame, folder: bool) -> Option<pa_library::basegame::BaseCheck> {
+    use tauri_plugin_dialog::DialogExt;
+    let dialog = app.dialog().file().set_title(format!("Onde está o {}?", base.name));
+    let picked = if folder {
+        dialog.blocking_pick_folder()
+    } else {
+        dialog.add_filter(&base.exe, &["exe"]).blocking_pick_file()
+    }?;
+    let path = picked.into_path().ok()?;
+    tauri::async_runtime::spawn_blocking(move || pa_library::basegame::check(&base, Some(&path))).await.ok()
+}
+
 /// "Escolher pasta ou atalho": a janela de arquivo do Windows.
 #[tauri::command]
 pub async fn pick_game_file(app: tauri::AppHandle) -> Option<PcGame> {
@@ -592,6 +619,7 @@ pub async fn pick_game_file(app: tauri::AppHandle) -> Option<PcGame> {
         image: None,
         install_dir: path.parent().map(|p| p.to_path_buf()),
         steam_app_id: None,
+        epic_app_name: None,
     })
 }
 
@@ -760,6 +788,16 @@ pub fn game_play(app: tauri::AppHandle, hub: Hubs, libs: Libs, id: String, playe
         }
         (Source::Repo { .. }, Some(inst)) => {
             let exe = pa_library::install::exe_path(inst);
+            // mod: o jogo original saiu da pasta (desinstalado ou movido)
+            if !exe.is_file() {
+                return Err(match &inst.base_dir {
+                    Some(dir) => format!(
+                        "O jogo original não está mais em {}. Instale de novo pelo link do mod e mostre onde ele está agora.",
+                        dir.display()
+                    ),
+                    None => format!("{} não está mais instalado. Instale de novo pelo link.", entry.name),
+                });
+            }
             spawn(&exe, &inst.args, Some(inst.dir.join(&inst.working_dir)))
         }
         (Source::Repo { .. }, None) => Err(format!("{} ainda não está instalado.", entry.name)),
@@ -858,8 +896,10 @@ mod tests {
 
 #[tauri::command]
 pub fn open_url(app: tauri::AppHandle, url: String) -> Result<(), String> {
-    if !(url.starts_with("https://") || url.starts_with("http://")) {
-        return Err("só links da web".into());
+    // links da web e os pedidos de instalação para a Steam e a Epic (o jogo original de um mod)
+    let allowed = ["https://", "http://", "steam://install/", "steam://store/", "com.epicgames.launcher://apps/"];
+    if !allowed.iter().any(|p| url.starts_with(p)) {
+        return Err("só links da web, da Steam e da Epic".into());
     }
     app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
 }

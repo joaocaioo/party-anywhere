@@ -26,6 +26,9 @@ pub struct PcGame {
     pub install_dir: Option<PathBuf>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub steam_app_id: Option<u32>,
+    /// O `AppName` da Epic (com maiúsculas: a Epic diferencia).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub epic_app_name: Option<String>,
 }
 
 pub fn scan() -> Vec<PcGame> {
@@ -102,6 +105,7 @@ pub fn scan_steam(steam: &Path) -> Vec<PcGame> {
                 image: steam_art_path(steam, appid, Art::Cover).map(|_| format!("steam:{appid}")),
                 install_dir,
                 steam_app_id: appid.parse().ok(),
+                epic_app_name: None,
             });
         }
     }
@@ -230,6 +234,7 @@ pub fn scan_epic(manifests: &Path) -> Vec<PcGame> {
             image: None,
             install_dir: (!item.install_location.is_empty()).then(|| PathBuf::from(item.install_location)),
             steam_app_id: None,
+            epic_app_name: Some(item.app_name),
         });
     }
     out

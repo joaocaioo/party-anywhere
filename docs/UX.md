@@ -184,8 +184,12 @@ O Hub lê nome e ícone do próprio executável, procura a capa pelo nome e, se 
    uma **prévia**: capa, nome, autor, jogadores, tamanho do download, se exige um jogo-base.
 3. Se não for do catálogo: aviso claro, em uma frase, sem drama: "Este jogo não foi verificado pela
    equipe Party Anywhere. Instale só se confiar no autor."
-4. Exige jogo-base (ex.: GTA San Andreas)? O Hub **procura sozinho** nas bibliotecas da Steam; se não
-   achar, pede a pasta. Avisa quando a versão do jogo não é a esperada.
+4. É um mod (precisa do jogo original)? O Hub **procura sozinho** na Steam, na Epic e nos jogos do PC e
+   mostra onde achou ("GTA San Andreas encontrado · Steam", com "Usar outra cópia"). Não achou: "Este mod
+   precisa do GTA San Andreas" e cada caminho em um botão: **Instalar pela Steam**, **Instalar pela Epic**
+   (o Hub espera a instalação e segue sozinho), **Ver na loja** e **Já tenho: escolher o .exe** (ou a
+   pasta; cópia de qualquer lugar). Versão diferente da que o mod usa: diz o que fazer. O botão "Instalar o
+   mod" só acende com o jogo achado.
 5. **Instalar** → progresso → a capa aparece na Biblioteca com brilho de "novo".
 6. Erros com saída: "Este repositório não tem `party-anywhere.json`" e um link para o guia do criador.
 

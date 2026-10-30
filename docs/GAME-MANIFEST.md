@@ -41,6 +41,8 @@ está em [`templates/game/`](../templates/game/), e o esquema JSON em
     "baseGame": {
       "name": "Grand Theft Auto: San Andreas",
       "steamAppId": 12120,
+      "epicAppName": "...",              // opcional: o AppName na Epic (o Hub acha e sabe pedir para instalar)
+      "storeUrl": "https://...",          // opcional: onde comprar fora da Steam (GOG, site do jogo)
       "exe": "gta_sa.exe",
       "acceptedSha256": ["…"],            // versões aceitas do executável
       "help": "docs/versao-do-jogo.md"    // o que fazer se a versão não bater
@@ -76,7 +78,7 @@ está em [`templates/game/`](../templates/game/), e o esquema JSON em
 | `art.cover` | sim | PNG/JPG/WebP, **3:4**, mínimo 600×800, máximo 2 MB. Sem texto pequeno (vista de longe na TV). |
 | `players` | sim | `1 ≤ min ≤ max ≤ 10`. |
 | `sdk.abi` | sim | Versão maior do SDK. |
-| `requires.baseGame` | não | Use quando o mod precisa do jogo original. O Hub procura na Steam e confere o hash. |
+| `requires.baseGame` | não | Use quando o mod precisa do jogo original. O Hub procura na Steam (`steamAppId`), na Epic (`epicAppName`) e nos jogos do PC pelo `exe`; se não achar, oferece instalar pela Steam ou Epic, a loja (`storeUrl`) ou escolher o `.exe`/a pasta (cópia de qualquer lugar). Com `acceptedSha256`, confere a versão e mostra o `help` se não bater. |
 | `install` | sim | v1 aceita só `github-release` e cópia de arquivos. **Sem scripts de instalação.** `asset` é um `.zip`; `target: "baseGame"` exige `requires.baseGame` e `files`. Caminhos sempre relativos, sem `..`. |
 | `minHubVersion` | não | Hub mínimo, se o jogo usa algo recente do SDK. |
 | `launch` | sim | Como abrir o jogo depois de instalado. |

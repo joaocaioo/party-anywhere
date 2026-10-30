@@ -387,7 +387,7 @@ mod tests {
             if q == "anticheat" {
                 return Err("usa anti-cheat (EasyAntiCheat)".into());
             }
-            Ok(BaseGameSpec { name: "GTA San Andreas".into(), steam_app_id: Some(12120), exe: "gta_sa.exe".into() })
+            Ok(BaseGameSpec { name: "GTA San Andreas".into(), steam_app_id: Some(12120), epic_app_name: None, exe: "gta_sa.exe".into() })
         }
     }
 
