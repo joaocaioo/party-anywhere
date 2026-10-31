@@ -57,6 +57,9 @@ fn tick(hub: &Hub) {
             }
         } else {
             hub.replug_all();
+            // o que o jogo pediu para os celulares acaba com ele
+            *hub.sdk_phone.lock().unwrap() = Default::default();
+            hub.broadcast_layouts();
         }
         let _ = hub.app.emit("sdk-game", connected);
     }
@@ -84,9 +87,37 @@ fn tick(hub: &Hub) {
                     }
                 }
             }),
-            // rótulos, layout e luz: o protocolo do celular ainda não tem; ficam para a próxima versão
-            Command::Accepting(_) | Command::Label { .. } | Command::Layout { .. } | Command::Light { .. } => {}
+            // layout, modo e nomes nos botões: guardados por vaga (valem também para quem reconectar depois)
+            // e aplicados ao controle do celular
+            Command::Label { seat, button, text } => phone_request(hub, seat, |s, i| s.set_label(i, button, &text)),
+            Command::Layout { seat, layout } => phone_request(hub, seat, |s, i| {
+                s.set_layout(i, layout);
+            }),
+            Command::Mode { seat, mode } => phone_request(hub, seat, |s, i| s.set_mode(i, mode)),
+            // lobby fechado e luz do controle: ainda não aplicados (docs/SDK.md)
+            Command::Accepting(_) | Command::Light { .. } => {}
         }
+    }
+}
+
+fn phone_request(hub: &Hub, seat: Option<usize>, mut f: impl FnMut(&mut crate::sdk_phone::SdkPhone, usize)) {
+    let seats: Vec<usize> = match seat {
+        Some(i) if i < MAX_SEATS => vec![i],
+        Some(_) => return,
+        None => (0..MAX_SEATS).collect(),
+    };
+    {
+        let mut s = hub.sdk_phone.lock().unwrap();
+        for &i in &seats {
+            f(&mut s, i);
+        }
+    }
+    let phones: Vec<usize> = {
+        let lobby = hub.lobby.lock().unwrap();
+        lobby.seats().filter(|s| s.kind == DeviceKind::Phone && seats.contains(&s.index)).map(|s| s.index).collect()
+    };
+    for i in phones {
+        hub.send_layouts(i as u8);
     }
 }
 

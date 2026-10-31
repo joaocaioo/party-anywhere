@@ -21,6 +21,21 @@ Cada fase termina com um critério verificável. Fase só começa quando a anter
 - Contornar a proteção da loja (DRM, conta, propriedade) para abrir várias cópias: cada jogador usa a própria
   cópia/conta quando o jogo exige.
 
+## Para testar o primeiro mod (fase 6)
+
+- **`pa sim`: jogadores de mentira.** Celulares falsos que entram no Hub pelo mesmo caminho dos de verdade e
+  apertam botões (parados, em sequência ou aleatórios). Assim quem cria testa um mod de 4 jogadores sozinho, e
+  o agente de IA também.
+- **Template de mod por tipo de jogo** (DLL por proxy ou ASI loader, BepInEx, UE4SS): tirado do primeiro mod
+  de verdade, não inventado antes.
+
+## Antes de abrir ao público
+
+- Assinatura digital do instalador (Authenticode) para o SmartScreen não assustar; até lá o README explica
+  o aviso.
+- Guardar por alguns minutos o resultado de "Descobrir" (a busca do GitHub sem login aceita poucas consultas
+  por minuto).
+
 ## Várias cópias do jogo (caminho B do guia), quando o primeiro mod pedir
 
 O suporte do Hub a "uma cópia do jogo por jogador": abrir N cópias com a pasta de salvamento e de

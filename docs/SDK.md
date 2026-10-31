@@ -33,7 +33,8 @@ void game_start(void) {
         .max_players = 10,
     };
     if (pa_connect(&info, &pa) != PA_OK) {
-        // Hub fechado ou versão incompatível: avise o jogador ou use controles próprios.
+        // Hub fechado ou versão incompatível: avise o jogador ou use controles próprios. As outras funções
+        // aceitam pa nulo e não fazem nada. Hub fechado: tente pa_connect de novo a cada segundo ou dois.
     }
     pa_set_accepting_players(pa, true);        // lobby aberto: celulares novos podem entrar
 }
@@ -129,7 +130,8 @@ Regras:
 ```c
 void pa_set_accepting_players(pa_client* pa, bool accepting);
 void pa_set_layout(pa_client* pa, int seat, pa_layout layout);                 // GAMEPAD | SIMPLE | DRIVING | MENU
-void pa_set_label(pa_client* pa, int seat, uint32_t button, const char* label); // "Correr", "Atirar"
+void pa_set_label(pa_client* pa, int seat, uint32_t button, const char* label); // "Correr", "Atirar"; "" tira
+void pa_set_mode(pa_client* pa, int seat, int mode);                           // modo do controle: 0 = "A pé"
 void pa_toast(pa_client* pa, int seat, const char* text);                      // aviso curto no celular
 void pa_rumble(pa_client* pa, int seat, float low, float high, int duration_ms);
 void pa_set_light(pa_client* pa, int seat, uint8_t r, uint8_t g, uint8_t b);   // luz do controle, se houver
@@ -142,7 +144,14 @@ tráfego.
 |---|---|
 | `pa_rumble` | Vibra o celular e o controle da vaga. |
 | `pa_toast` | Mostra o aviso no topo do celular. |
-| `pa_set_accepting_players`, `pa_set_label`, `pa_set_layout`, `pa_set_light` | Chegam ao Hub (já são ABI 1); o celular passa a mostrar layouts e rótulos na próxima versão do protocolo. |
+| `pa_set_mode` | Troca o modo do controle do celular (os modos do controle do mod, na ordem da ficha: 0 = "A pé", 1 = "Veículo"). Use quando o jogo muda: entrou no carro, saiu do carro. O jogador ainda pode trocar pelo topo do celular. |
+| `pa_set_label` | Põe o nome da ação no botão do celular ("Drift"); `""` tira. `button` é um `PA_BTN_*` (os direcionais dividem um nome só) ou, para gatilhos e analógicos, `PA_LABEL_LT`, `PA_LABEL_RT`, `PA_LABEL_STICK_L`, `PA_LABEL_STICK_R`. Até 12 letras. |
+| `pa_set_layout` | `PA_LAYOUT_GAMEPAD` (completo) ou `PA_LAYOUT_SIMPLE` no celular da vaga, no lugar do "Padrão do jogo". `DRIVING` e `MENU` estão reservados: para "dirigindo", use os modos do controle do mod e `pa_set_mode`. Se o jogador escolhe outro layout no menu do celular, vale o dele. |
+| `pa_set_accepting_players`, `pa_set_light` | Chegam ao Hub, mas ainda não fazem nada. |
+
+O que o jogo pede para o celular vale enquanto ele está conectado, inclusive para quem cai e volta; quando o
+jogo desconecta, cada celular volta ao layout de antes. `pa_set_mode` e `PA_LABEL_*` entraram depois na ABI
+1, sem mudar nada do que existia: um Hub mais velho só ignora.
 
 ### Tela do jogo no celular (padrão)
 

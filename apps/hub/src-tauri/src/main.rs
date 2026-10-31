@@ -10,6 +10,7 @@ mod hub;
 mod keyboards;
 mod nav;
 mod sdk;
+mod sdk_phone;
 mod settings;
 mod view;
 

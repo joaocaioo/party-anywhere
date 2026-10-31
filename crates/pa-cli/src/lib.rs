@@ -1,6 +1,7 @@
 //! Operações de quem cria jogos: criar o projeto, validar e empacotar um release. A CLI `pa` e o servidor
 //! MCP (`pa mcp`) chamam as mesmas funções, então humano e agente veem as mesmas regras e mensagens.
 
+pub mod docs;
 pub mod host;
 pub mod mcp;
 mod template;
@@ -64,7 +65,7 @@ pub fn resolve_base_game(query: &str) -> Result<BaseGameSpec, String> {
     Ok(BaseGameSpec { name: game.name, steam_app_id: game.steam_app_id, epic_app_name: game.epic_app_name, exe })
 }
 
-/// Cria um projeto de jogo já válido: manifesto, capa provisória, workflow de release, MCP e skill.
+/// Cria um projeto de jogo já válido: manifesto, capa provisória, workflow de release, AGENTS.md e skill.
 pub fn new_project(dir: &Path, opts: &NewOptions) -> Result<Vec<PathBuf>, String> {
     if dir.join(MANIFEST_FILE).exists() {
         return Err(format!("{} já tem um {MANIFEST_FILE}. Use `pa validate` para conferir.", dir.display()));
@@ -90,7 +91,6 @@ pub fn new_project(dir: &Path, opts: &NewOptions) -> Result<Vec<PathBuf>, String
         ("assets/cover.png", template::placeholder_cover()?),
         ("assets/cover.svg", template::COVER_SVG.as_bytes().to_vec()),
         (".gitignore", template::GITIGNORE.as_bytes().to_vec()),
-        (".mcp.json", template::MCP_JSON.as_bytes().to_vec()),
         ("AGENTS.md", template::AGENTS.as_bytes().to_vec()),
         ("CLAUDE.md", template::CLAUDE.as_bytes().to_vec()),
         (".github/workflows/release.yml", template::RELEASE_WORKFLOW.as_bytes().to_vec()),

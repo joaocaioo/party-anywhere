@@ -90,6 +90,9 @@ typedef struct pa_game_info {
 
 typedef enum pa_layout { PA_LAYOUT_GAMEPAD = 0, PA_LAYOUT_SIMPLE = 1, PA_LAYOUT_DRIVING = 2, PA_LAYOUT_MENU = 3 } pa_layout;
 
+/* Só para pa_set_label: gatilhos e analógicos não são botões em pa_pad.buttons, mas têm nome no celular. */
+enum { PA_LABEL_LT = 1u << 16, PA_LABEL_RT = 1u << 17, PA_LABEL_STICK_L = 1u << 18, PA_LABEL_STICK_R = 1u << 19 };
+
 typedef struct pa_client pa_client;
 
 /* conexão */
@@ -108,7 +111,8 @@ bool pa_get_pad(const pa_client* pa, int seat, pa_pad* out); /* false (e zerado)
 /* do jogo para o jogador */
 void pa_set_accepting_players(pa_client* pa, bool accepting);
 void pa_set_layout(pa_client* pa, int seat, pa_layout layout);
-void pa_set_label(pa_client* pa, int seat, uint32_t button, const char* label); /* "Correr", "Atirar" */
+void pa_set_label(pa_client* pa, int seat, uint32_t button, const char* label); /* "Correr", "Atirar"; "" tira */
+void pa_set_mode(pa_client* pa, int seat, int mode); /* modo do controle do celular: 0 = o primeiro ("A pé") */
 void pa_toast(pa_client* pa, int seat, const char* text);                      /* aviso curto no celular */
 void pa_rumble(pa_client* pa, int seat, float low, float high, int duration_ms);
 void pa_set_light(pa_client* pa, int seat, uint8_t r, uint8_t g, uint8_t b);
@@ -146,7 +150,7 @@ typedef struct pa_shm_seat {
     float lx, ly, rx, ry, lt, rt;
 } pa_shm_seat;
 
-enum { PA_CMD_RUMBLE = 1, PA_CMD_TOAST = 2, PA_CMD_ACCEPTING = 3, PA_CMD_LABEL = 4, PA_CMD_LAYOUT = 5, PA_CMD_LIGHT = 6 };
+enum { PA_CMD_RUMBLE = 1, PA_CMD_TOAST = 2, PA_CMD_ACCEPTING = 3, PA_CMD_LABEL = 4, PA_CMD_LAYOUT = 5, PA_CMD_LIGHT = 6, PA_CMD_MODE = 7 };
 
 typedef struct pa_shm_cmd {
     uint8_t type;
@@ -249,16 +253,21 @@ static void pa__push_event(pa_client* pa, pa_event_type type, int seat) {
     pa->ev_tail++;
 }
 
-/* Lê uma vaga sem pegar o Hub no meio da escrita. */
-static void pa__read_seat(const pa_shm_seat* src, pa_shm_seat* dst) {
-    for (;;) {
+/* Lê uma vaga sem pegar o Hub no meio da escrita. Com limite de tentativas: um Hub encerrado à força no meio
+ * de uma escrita deixa a vaga "escrevendo" para sempre, e o jogo não pode travar esperando. Sem leitura
+ * inteira, fica a anterior (e o Hub sumido zera os controles logo depois, pelo heartbeat). */
+#define PA__READ_TRIES 1000
+static bool pa__read_seat(const pa_shm_seat* src, pa_shm_seat* dst) {
+    int tries;
+    for (tries = 0; tries < PA__READ_TRIES; ++tries) {
         uint32_t a = src->seq;
         MemoryBarrier();
         if (a & 1u) { YieldProcessor(); continue; }
         memcpy(dst, (const void*)src, sizeof *dst);
         MemoryBarrier();
-        if (src->seq == a) return;
+        if (src->seq == a) return true;
     }
+    return false;
 }
 
 pa_result pa__attach(pa_shm* shm, int32_t pid, pa_client** out) {
@@ -326,7 +335,7 @@ void pa_poll(pa_client* pa) {
     for (s = 0; s < PA_MAX_SEATS; ++s) {
         pa_shm_seat cur;
         pa_shm_seat* old = &pa->seen[s];
-        pa__read_seat(&pa->shm->seats[s], &cur);
+        if (!pa__read_seat(&pa->shm->seats[s], &cur)) cur = *old;
         if (pa->lost) cur.state = old->state; /* sem Hub: a foto congela, os pads ficam neutros */
         if (cur.state != old->state) {
             if (old->state == PA_SEAT_EMPTY && cur.state != PA_SEAT_EMPTY) pa__push_event(pa, PA_EVENT_SEAT_JOINED, s);
@@ -441,6 +450,13 @@ void pa_set_label(pa_client* pa, int seat, uint32_t button, const char* label) {
     if (!c) return;
     c->value = button;
     pa__copy_text(c->text, sizeof c->text, label);
+    pa__commit(pa);
+}
+
+void pa_set_mode(pa_client* pa, int seat, int mode) {
+    pa_shm_cmd* c = pa__cmd(pa, PA_CMD_MODE, seat);
+    if (!c || mode < 0) return;
+    c->value = (uint32_t)mode;
     pa__commit(pa);
 }
 

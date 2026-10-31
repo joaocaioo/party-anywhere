@@ -217,8 +217,14 @@ pub enum ServerText<'a> {
     /// Identificar: a tela pisca na cor do jogador (e vibra, onde o navegador deixa).
     Identify,
     /// Layouts que o celular pode usar e o escolhido. `items`: `[{ id, name, controls: [..] }]`
-    /// (controles: stickL, stickR, dpad, A, B, X, Y, LB, RB, LT, RT, BACK, START, LS, RS).
-    Layouts { items: &'a serde_json::Value, current: &'a str },
+    /// (controles: stickL, stickR, dpad, A, B, X, Y, LB, RB, LT, RT, BACK, START, LS, RS). `mode`: o modo
+    /// que o jogo pediu (`pa_set_mode`), quando pediu.
+    Layouts {
+        items: &'a serde_json::Value,
+        current: &'a str,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        mode: Option<u8>,
+    },
     /// Resultado da medição, para a página mostrar ao vivo. Formato livre (JSON do spike).
     Stats { data: serde_json::Value },
     /// A tela do jogo no celular: quadros por segundo e o atraso do jogo até a tela do celular (ms).

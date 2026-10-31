@@ -53,7 +53,9 @@ pub fn install(
         base_dir: None,
     };
     if let (InstallTarget::BaseGame, Some(base)) = (game.install.target, base_dir) {
-        copy_into_base(game, &dest, base)?;
+        copy_into_base(game, &dest, base).inspect_err(|_| {
+            let _ = fs::remove_dir_all(&dest); // nada ficou registrado: a versão some junto
+        })?;
         installed.base_dir = Some(base.to_path_buf());
         installed.dir = base.to_path_buf(); // abre o jogo-base, com o mod dentro
     }
@@ -86,8 +88,27 @@ pub fn extract(zip_bytes: &[u8], dest: &Path) -> Result<usize, String> {
     Ok(count)
 }
 
+/// Copia os arquivos do mod para a pasta do jogo. Tudo ou nada: se um arquivo falha (por exemplo, o jogo
+/// aberto segurando a DLL), os que já foram copiados voltam ao original e a pasta do jogo fica como estava.
 fn copy_into_base(game: &GameManifest, package_dir: &Path, base: &Path) -> Result<(), String> {
     let backup = package_dir.join("backup");
+    let mut done: Vec<&str> = Vec::new();
+    let r = copy_files(game, package_dir, base, &backup, &mut done);
+    if r.is_err() {
+        for to in done.iter().rev() {
+            let saved = backup.join(to);
+            let target = base.join(to);
+            if saved.exists() {
+                let _ = fs::copy(&saved, &target);
+            } else {
+                let _ = fs::remove_file(&target); // não existia antes do mod
+            }
+        }
+    }
+    r
+}
+
+fn copy_files<'a>(game: &'a GameManifest, package_dir: &Path, base: &Path, backup: &Path, done: &mut Vec<&'a str>) -> Result<(), String> {
     for f in &game.install.files {
         let from = package_dir.join(&f.from);
         let to = base.join(&f.to);
@@ -106,7 +127,10 @@ fn copy_into_base(game: &GameManifest, package_dir: &Path, base: &Path) -> Resul
         if let Some(p) = to.parent() {
             fs::create_dir_all(p).map_err(|e| e.to_string())?;
         }
-        fs::copy(&from, &to).map_err(|e| format!("não consegui copiar {} para a pasta do jogo: {e}", f.to))?;
+        done.push(&f.to);
+        fs::copy(&from, &to).map_err(|e| {
+            format!("não consegui copiar {} para a pasta do jogo ({e}). Se o jogo estiver aberto, feche e tente de novo; a pasta do jogo ficou como estava.", f.to)
+        })?;
     }
     Ok(())
 }
@@ -235,5 +259,31 @@ mod tests {
         uninstall_from_base(&g, &inst, &pkg_dir).unwrap();
         assert_eq!(fs::read(base.path().join("data/gta.dat")).unwrap(), b"original");
         assert!(!base.path().join("SAParty.asi").exists());
+    }
+
+    #[test]
+    fn a_copy_that_fails_halfway_leaves_the_game_folder_as_it_was() {
+        let pkg = zip_of(&[("SAParty.asi", b"mod"), ("data/gta.dat", b"novo"), ("travado.dll", b"x")]);
+        let mut g = game();
+        g.install.target = InstallTarget::BaseGame;
+        g.install.files = vec![
+            InstallFile { from: "SAParty.asi".into(), to: "SAParty.asi".into() },
+            InstallFile { from: "data/gta.dat".into(), to: "data/gta.dat".into() },
+            InstallFile { from: "travado.dll".into(), to: "travado.dll".into() },
+        ];
+        let mut http = FakeHttp::default();
+        published(&mut http, "joao/meu-jogo", "0.1.0", &pkg);
+        let latest = fetch_latest(&http, &RepoRef::parse("joao/meu-jogo").unwrap(), &game()).unwrap().unwrap();
+
+        let root = tempfile::tempdir().unwrap();
+        let base = tempfile::tempdir().unwrap();
+        fs::create_dir_all(base.path().join("data")).unwrap();
+        fs::write(base.path().join("data/gta.dat"), b"original").unwrap();
+        fs::create_dir_all(base.path().join("travado.dll")).unwrap(); // o terceiro arquivo não dá para copiar
+
+        assert!(install(&http, &g, &latest, root.path(), Some(base.path())).is_err());
+        assert_eq!(fs::read(base.path().join("data/gta.dat")).unwrap(), b"original");
+        assert!(!base.path().join("SAParty.asi").exists());
+        assert!(!root.path().join(&g.id).join("0.1.0").exists(), "sem versão pela metade registrada");
     }
 }

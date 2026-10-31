@@ -87,6 +87,8 @@ pub enum Command {
     Label { seat: Option<usize>, button: u32, text: String },
     Layout { seat: Option<usize>, layout: u32 },
     Light { seat: Option<usize>, rgb: u32 },
+    /// Modo do controle do celular (índice nos modos do layout: "A pé", "Veículo").
+    Mode { seat: Option<usize>, mode: u32 },
 }
 
 enum Owner {
@@ -106,29 +108,61 @@ pub struct HubShm {
 unsafe impl Send for HubShm {}
 
 impl HubShm {
-    /// Cria `Local\PartyAnywhere.v1`. Se outro Hub já criou, falha (só um Hub por vez).
+    /// Cria `Local\PartyAnywhere.v1`. Se a memória já existe e o Hub dela está vivo, falha (só um Hub por
+    /// vez). Se ela sobrou de um Hub que fechou com um jogo ainda aberto (o jogo segura a memória), o Hub novo
+    /// assume: o jogo volta a ver os jogadores sem precisar reiniciar.
     #[cfg(windows)]
     pub fn create() -> Result<Self, String> {
+        Self::create_named(NAME)
+    }
+
+    #[cfg(windows)]
+    fn create_named(name: &str) -> Result<Self, String> {
         use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, ERROR_ALREADY_EXISTS, INVALID_HANDLE_VALUE};
         use windows_sys::Win32::System::Memory::{CreateFileMappingW, MapViewOfFile, FILE_MAP_ALL_ACCESS, PAGE_READWRITE};
-        let name: Vec<u16> = NAME.encode_utf16().chain(Some(0)).collect();
+        let name: Vec<u16> = name.encode_utf16().chain(Some(0)).collect();
         unsafe {
             let h = CreateFileMappingW(INVALID_HANDLE_VALUE, std::ptr::null(), PAGE_READWRITE, 0, SHM_SIZE as u32, name.as_ptr());
             if h.is_null() {
                 return Err("não consegui criar a memória do SDK".into());
             }
-            if GetLastError() == ERROR_ALREADY_EXISTS {
-                CloseHandle(h);
-                return Err("outro Hub já está aberto".into());
-            }
+            let existed = GetLastError() == ERROR_ALREADY_EXISTS;
             let view = MapViewOfFile(h, FILE_MAP_ALL_ACCESS, 0, 0, SHM_SIZE);
             let Some(ptr) = NonNull::new(view.Value as *mut Shm) else {
                 CloseHandle(h);
                 return Err("não consegui mapear a memória do SDK".into());
             };
             let shm = Self { ptr, owner: Owner::Mapping(h) };
+            if existed {
+                if shm.hub_alive() {
+                    return Err("outro Hub já está aberto".into()); // o Drop solta a memória
+                }
+                shm.repair();
+            }
             shm.init();
             Ok(shm)
+        }
+    }
+
+    /// O heartbeat de outro Hub ainda anda? (o Hub bate a cada 100 ms)
+    #[cfg(windows)]
+    fn hub_alive(&self) -> bool {
+        let beat = self.atomic_u32(|p| unsafe { addr_of_mut!((*p).hub_heartbeat) });
+        let before = beat.load(Ordering::Acquire);
+        std::thread::sleep(std::time::Duration::from_millis(350));
+        beat.load(Ordering::Acquire) != before
+    }
+
+    /// Memória de um Hub que morreu: uma vaga pode ter ficado "escrevendo" (seq ímpar). Fecha a escrita para o
+    /// jogo voltar a ler; o Hub novo regrava as vagas logo em seguida.
+    #[cfg(windows)]
+    fn repair(&self) {
+        for i in 0..MAX_SEATS {
+            let seq = unsafe { AtomicU32::from_ptr(addr_of_mut!((*self.as_ptr()).seats[i].seq)) };
+            let s = seq.load(Ordering::Acquire);
+            if s % 2 == 1 {
+                seq.store(s.wrapping_add(1), Ordering::Release);
+            }
         }
     }
 
@@ -248,6 +282,7 @@ impl HubShm {
                 4 => out.push(Command::Label { seat, button: c.value, text }),
                 5 => out.push(Command::Layout { seat, layout: c.value }),
                 6 => out.push(Command::Light { seat, rgb: c.value }),
+                7 => out.push(Command::Mode { seat, mode: c.value }),
                 _ => {}
             }
             read = read.wrapping_add(1);
@@ -348,6 +383,9 @@ mod tests {
         fn pa_rumble(pa: *mut c_void, seat: c_int, low: f32, high: f32, ms: c_int);
         fn pa_toast(pa: *mut c_void, seat: c_int, text: *const c_char);
         fn pa_set_accepting_players(pa: *mut c_void, accepting: bool);
+        fn pa_set_label(pa: *mut c_void, seat: c_int, button: u32, label: *const c_char);
+        fn pa_set_layout(pa: *mut c_void, seat: c_int, layout: c_int);
+        fn pa_set_mode(pa: *mut c_void, seat: c_int, mode: c_int);
     }
 
     struct Game(*mut c_void);
@@ -453,6 +491,11 @@ mod tests {
             pa_toast(game.0, -1, text.as_ptr());
             pa_set_accepting_players(game.0, true);
             pa_set_accepting_players(game.0, true); // repetido: sem tráfego
+            let drift = std::ffi::CString::new("Drift").unwrap();
+            pa_set_label(game.0, 0, 1 << 17, drift.as_ptr()); // PA_LABEL_RT
+            pa_set_layout(game.0, -1, 1);
+            pa_set_mode(game.0, 2, 1);
+            pa_set_mode(game.0, 2, -1); // inválido: nada
         }
         assert_eq!(
             hub.drain_commands(),
@@ -460,6 +503,9 @@ mod tests {
                 Command::Rumble { seat: Some(3), low: 0.4, high: 1.0, ms: 250 },
                 Command::Toast { seat: None, text: "Sua vez!".into() },
                 Command::Accepting(true),
+                Command::Label { seat: Some(0), button: 1 << 17, text: "Drift".into() },
+                Command::Layout { seat: None, layout: 1 },
+                Command::Mode { seat: Some(2), mode: 1 },
             ]
         );
         assert!(hub.drain_commands().is_empty());
@@ -486,6 +532,50 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(1700)); // heartbeat parado
         assert_eq!(game.events(), vec![(6, -1)]);
         assert!(game.pad(0).is_none());
+    }
+
+    #[test]
+    fn a_hub_killed_mid_write_never_freezes_the_game() {
+        let hub = HubShm::heap();
+        let game = Game::attach(&hub, 1).unwrap();
+        hub.write_seat(0, SeatState::Active, Device::Gamepad, [0x3b, 0x82, 0xf6], "Ana");
+        hub.write_pad(0, Pad { buttons: buttons::A, ..Pad::NEUTRAL });
+        hub.heartbeat();
+        game.events();
+        // o Hub "morre" no meio de uma escrita: a vaga fica com seq ímpar para sempre
+        let seq = unsafe { AtomicU32::from_ptr(addr_of_mut!((*hub.as_ptr()).seats[0].seq)) };
+        seq.fetch_add(1, Ordering::Release);
+        let t = std::time::Instant::now();
+        assert!(game.pad(0).is_some(), "fica a leitura anterior");
+        assert!(t.elapsed() < std::time::Duration::from_millis(500), "pa_poll não pode travar");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_new_hub_takes_over_memory_left_by_a_closed_hub_but_not_a_live_one() {
+        let name = r"Local\PartyAnywhereTest.takeover";
+        let old = HubShm::create_named(name).unwrap(); // faz o papel do jogo segurando a memória
+        old.write_seat(0, SeatState::Active, Device::Gamepad, [1, 2, 3], "Ana");
+        let seq = unsafe { AtomicU32::from_ptr(addr_of_mut!((*old.as_ptr()).seats[0].seq)) };
+        seq.fetch_add(1, Ordering::Release); // morreu escrevendo
+        let new = HubShm::create_named(name).expect("memória sem Hub vivo é assumida");
+        assert_eq!(seq.load(Ordering::Acquire) % 2, 0, "a vaga volta a ser legível");
+
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let beat = {
+            let stop = stop.clone();
+            std::thread::spawn(move || {
+                while !stop.load(Ordering::Relaxed) {
+                    new.heartbeat();
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
+                drop(new);
+            })
+        };
+        let beating = HubShm::create_named(name).is_err();
+        stop.store(true, Ordering::Relaxed);
+        beat.join().unwrap();
+        assert!(beating, "com o Hub vivo, o segundo não abre");
     }
 
     #[test]

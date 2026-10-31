@@ -7,7 +7,6 @@ use crate::BaseGameSpec;
 const MANIFEST: &str = include_str!("../../../templates/game/party-anywhere.json");
 pub const COVER_SVG: &str = include_str!("../../../templates/game/assets/cover.svg");
 pub const GITIGNORE: &str = include_str!("../../../templates/game/.gitignore");
-pub const MCP_JSON: &str = include_str!("../../../templates/game/.mcp.json");
 pub const RELEASE_WORKFLOW: &str = include_str!("../../../templates/game/.github/workflows/release.yml");
 pub const AGENTS: &str = include_str!("../../../templates/game/AGENTS.md");
 pub const CLAUDE: &str = include_str!("../../../templates/game/CLAUDE.md");

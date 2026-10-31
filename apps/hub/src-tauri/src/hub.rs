@@ -63,6 +63,8 @@ pub struct Hub {
     /// Jogo aberto com "Padrão do jogo": o layout que os celulares usam enquanto ele roda, e quem trocou no
     /// menu durante a partida (esses ficam com a escolha deles).
     pub session_layout: Mutex<Option<(String, std::collections::HashSet<String>)>>,
+    /// O que o jogo do SDK pediu para o controle do celular de cada vaga (layout, modo, nomes nos botões).
+    pub sdk_phone: Mutex<crate::sdk_phone::SdkPhone>,
     /// A tela do jogo nos celulares que ligaram (ver view.rs).
     pub views: Mutex<crate::view::Views>,
 }
@@ -126,6 +128,7 @@ impl Hub {
             last_activity: Mutex::new(HashMap::new()),
             benched: Mutex::new([false; MAX_SEATS]),
             session_layout: Mutex::new(None),
+            sdk_phone: Mutex::new(Default::default()),
             views: Mutex::new(Default::default()),
         })
     }
@@ -174,6 +177,7 @@ impl Hub {
                                 }
                                 st.phone_layout.insert(key.0, id);
                                 let _ = st.save(&hub.settings_path);
+                                hub.sdk_phone.lock().unwrap().player_chose(seat as usize);
                             }
                         }
                         hub.send_layouts(seat);
@@ -218,18 +222,25 @@ impl Hub {
     /// Manda ao celular da vaga os layouts e o que ele usa.
     pub fn send_layouts(&self, seat: u8) {
         let Some(key) = self.device_at(seat as usize) else { return };
-        let (items, current) = {
+        let (items, current, mode) = {
             let st = self.settings.lock().unwrap();
+            let sdk = self.sdk_phone.lock().unwrap();
             let mine = st.layout_for(&key.0);
-            // jogo aberto com "Padrão do jogo": vale o dele, menos para quem trocou no menu durante a partida
-            let current = match self.session_layout.lock().unwrap().as_ref() {
-                Some((layout, chose)) if !chose.contains(&key.0) && st.all_layouts().iter().any(|l| &l.id == layout) => layout.clone(),
+            // o jogo do SDK pediu um layout: vale ele. Senão, jogo aberto com "Padrão do jogo": vale o dele,
+            // menos para quem trocou no menu durante a partida
+            let current = match (sdk.layout(seat as usize), self.session_layout.lock().unwrap().as_ref()) {
+                (Some(id), _) => id.to_string(),
+                (None, Some((layout, chose))) if !chose.contains(&key.0) && st.all_layouts().iter().any(|l| &l.id == layout) => {
+                    layout.clone()
+                }
                 _ => mine,
             };
-            (serde_json::to_value(st.all_layouts()).unwrap_or_default(), current)
+            let mut items = serde_json::to_value(st.all_layouts()).unwrap_or_default();
+            sdk.apply_labels(seat as usize, &mut items, &current);
+            (items, current, sdk.mode(seat as usize))
         };
         if let Some(p) = self.phone.lock().unwrap().as_ref() {
-            p.send_text(seat, &ServerText::Layouts { items: &items, current: &current });
+            p.send_text(seat, &ServerText::Layouts { items: &items, current: &current, mode });
         }
     }
 

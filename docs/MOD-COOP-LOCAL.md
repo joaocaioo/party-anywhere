@@ -34,6 +34,11 @@ proteção da loja** (DRM, conta, propriedade do jogo). Cada pessoa usa a sua c�
 | A sincronia entre jogadores (no A: as entidades de rede do jogo; no B: a rede de verdade, em `localhost`) | **Imagem**: uma visão por jogador (tela dividida na TV) e, para quem está no celular, a visão dele vai para o celular (`pa_view_wanted` / `pa_submit_view`) e sai da TV |
 | Salvamento de cada jogador, quando o jogo já separa por jogador | **Quem é quem**: nome e cor da vaga (`pa_get_seat`) no lugar do nome da conta online |
 | | **Entrar e sair**: os eventos do SDK (`PA_EVENT_SEAT_JOINED`, `RECONNECTING`, `LEFT`) no lugar do "entrar na sala" online |
+| | **O controle do celular acompanha o jogo**: `pa_set_mode` ao entrar e sair do carro, `pa_set_label` com o nome de cada ação |
+
+**Desligue a leitura de controle e teclado do próprio jogo** para os jogadores do mod. O Windows continua
+entregando o teclado (e o controle 1) ao jogo: sem isso, um teclado que é o P3 no Party Anywhere mexe no P1
+do jogo, e o P1 recebe a mesma entrada duas vezes.
 
 **Checklist "não perdi nada":** antes de publicar, jogue a mesma partida no online original e no local e
 confira: todos os modos de jogo, entrar e sair no meio, morrer e voltar, salvar e carregar, trocar de mapa,
@@ -79,7 +84,15 @@ Sem multiplayer nenhum para reaproveitar, só o caminho A, criando os personagen
 passo que prova a ideia: um segundo personagem que anda com o controle da vaga 2, mesmo sem câmera própria.
 Depois a câmera, depois o HUD, depois o resto.
 
-## 5. Ordem de trabalho sugerida (para o mod e para a IA)
+## 5. Ferramentas para a parte do jogo
+
+Achar no jogo onde ficam os jogadores, a câmera e o HUD é engenharia reversa: um depurador e um
+desmontador (x64dbg, Ghidra, Cheat Engine para achar valores na memória) ou as ferramentas da engine
+(Unity: BepInEx, dnSpy; Unreal: UE4SS), e as comunidades de mod do jogo, que costumam já ter mapeado
+muito. Alguns desses programas têm servidor MCP, o que deixa o agente olhar o jogo junto com você. Só em
+jogos sem anti-cheat, e sem distribuir nada do jogo original.
+
+## 6. Ordem de trabalho sugerida (para o mod e para a IA)
 
 1. Entrar no jogo: o mod carrega e manda um aviso para o celular (`pa_toast`).
 2. Entrada: o jogador 1 do jogo passa a ler a vaga 1 do SDK.

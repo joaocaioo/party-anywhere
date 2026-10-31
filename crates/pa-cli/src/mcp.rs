@@ -1,7 +1,10 @@
 //! Servidor MCP (Model Context Protocol) por stdio: `pa mcp`. Roda no computador de quem cria, iniciado
 //! pelo próprio agente (sem servidor na internet). Dá ao agente as mesmas ferramentas da CLI: conferir e
 //! instalar o Hub, achar os jogos instalados, criar o projeto (inclusive o mod co-op de um jogo do PC),
-//! validar, empacotar e inspecionar um jogo publicado; e a documentação do SDK e do manifesto.
+//! validar, empacotar e inspecionar um jogo publicado; e a documentação (a mesma do `pa docs`).
+//!
+//! É opcional: agentes com terminal usam a `pa` direto (com `--json`) e o `AGENTS.md` do projeto. O MCP serve a
+//! quem não tem terminal.
 //!
 //! JSON-RPC 2.0, uma mensagem por linha. Só o necessário: initialize, ping, tools/*, resources/*.
 
@@ -10,12 +13,9 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{json, Value};
 
+use crate::docs::{self, DOCS};
 use crate::{new_project, pack_dir, validate_dir, BaseGameSpec, NewOptions};
 
-const SDK_DOCS: &str = include_str!("../../../docs/SDK.md");
-const COOP_GUIDE: &str = include_str!("../../../docs/MOD-COOP-LOCAL.md");
-const MANIFEST_DOCS: &str = include_str!("../../../docs/GAME-MANIFEST.md");
-const MANIFEST_SCHEMA: &str = include_str!("../../../schema/game-manifest.v1.json");
 const SUPPORTED_PROTOCOLS: [&str; 3] = ["2025-06-18", "2025-03-26", "2024-11-05"];
 
 /// O que depende do mundo real (GitHub, Steam, registro do Windows). Os testes usam um falso.
@@ -120,9 +120,9 @@ impl Server {
                 JOGAR um mod que a pessoa achou (um link de repositório): inspect_published_game e add_to_library. O Hub \
                 abre com a prévia, acha o jogo original da pessoa (Steam, Epic ou a pasta que ela escolher) e ela confirma \
                 em 'Instalar o mod'. Nunca baixe o jogo original. \
-                CRIAR um mod: find_installed_games e create_game com base_game; leia get_coop_guide (como transformar o \
+                CRIAR um mod: find_installed_games e create_game com base_game; leia get_docs coop (como transformar o \
                 multiplayer online em co-op local sem perder jogabilidade e como passar do limite de jogadores) e \
-                get_sdk_docs antes de escrever código \
+                get_docs sdk antes de escrever código \
                 de controle (o mod lê os jogadores só pelo SDK); validate_game; publicar é opcional (pack_release e um \
                 release no GitHub), mas ajuda outras pessoas a jogar. A capa (retrato 3:4) é obrigatória; peça a arte ao \
                 criador. Jogos com anti-cheat ficam de fora."
@@ -135,35 +135,40 @@ impl Server {
             json!({
                 "name": "hub_status",
                 "description": "O Party Anywhere (o Hub) está instalado neste PC? Em que versão, está aberto, e há versão nova? Chame primeiro.",
-                "inputSchema": { "type": "object", "properties": {} }
+                "inputSchema": { "type": "object", "properties": {} },
+                "annotations": { "readOnlyHint": true, "openWorldHint": true }
             }),
             json!({
                 "name": "install_hub",
                 "description": "Baixa o instalador mais novo do Hub (conferindo o hash) e abre o instalador na tela, onde a pessoa confirma. Instala ou atualiza. Peça permissão à pessoa antes de chamar.",
-                "inputSchema": { "type": "object", "properties": {} }
+                "inputSchema": { "type": "object", "properties": {} },
+                "annotations": { "readOnlyHint": false, "destructiveHint": false, "openWorldHint": true }
             }),
             json!({
                 "name": "find_installed_games",
                 "description": "Jogos instalados neste PC (Steam e Epic) com pasta, executável e aviso de anti-cheat. Use para escolher o jogo que vira co-op.",
                 "inputSchema": { "type": "object", "properties": {
                     "query": { "type": "string", "description": "Parte do nome ou appid da Steam. Vazio lista todos." }
-                }}
+                }},
+                "annotations": { "readOnlyHint": true, "openWorldHint": false }
             }),
             json!({
                 "name": "create_game",
-                "description": "Cria um projeto já válido (party-anywhere.json, capa provisória, SDK com exemplo, workflow de release, MCP e skill), do jeito que a Biblioteca do Hub instala pelo link do GitHub. Com base_game, cria o mod co-op de um jogo instalado (recusa jogos com anti-cheat). Não sobrescreve arquivos existentes.",
+                "description": "Cria um projeto já válido (party-anywhere.json, capa provisória, SDK com exemplo, workflow de release, AGENTS.md e skill), do jeito que a Biblioteca do Hub instala pelo link do GitHub. Com base_game, cria o mod co-op de um jogo instalado (recusa jogos com anti-cheat). Não sobrescreve arquivos existentes.",
                 "inputSchema": { "type": "object", "required": ["dir", "name"], "properties": {
                     "dir": dir,
                     "name": { "type": "string", "description": "Nome do jogo ou do mod (até 40 caracteres)." },
                     "id": { "type": "string", "description": "com.usuario.jogo. Nunca muda depois de publicado." },
                     "tagline": { "type": "string", "description": "Uma frase (até 90 caracteres)." },
                     "base_game": { "type": "string", "description": "Mod co-op de um jogo instalado: nome ou appid da Steam (veja find_installed_games)." }
-                }}
+                }},
+                "annotations": { "readOnlyHint": false, "destructiveHint": false, "openWorldHint": false }
             }),
             json!({
                 "name": "validate_game",
                 "description": "Confere party-anywhere.json e a capa. Devolve a lista de problemas com o que fazer em cada um.",
-                "inputSchema": { "type": "object", "properties": { "dir": dir } }
+                "inputSchema": { "type": "object", "properties": { "dir": dir } },
+                "annotations": { "readOnlyHint": true, "openWorldHint": false }
             }),
             json!({
                 "name": "pack_release",
@@ -172,36 +177,32 @@ impl Server {
                     "dir": dir,
                     "from": { "type": "string", "description": "Pasta do build, relativa ao projeto. Padrão: build" },
                     "tag": { "type": "string", "description": "Tag do release (ex.: v0.2.0); precisa bater com version." }
-                }}
+                }},
+                "annotations": { "readOnlyHint": false, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false }
             }),
             json!({
-                "name": "get_coop_guide",
-                "description": "Como transformar o multiplayer online de um jogo em co-op local sem perder jogabilidade (um jogo com vários jogadores ou várias cópias do jogo), e como passar do limite de jogadores do jogo (onde o limite fica e o método). Leia antes de propor o caminho técnico de um mod.",
-                "inputSchema": { "type": "object", "properties": {} }
-            }),
-            json!({
-                "name": "get_sdk_docs",
-                "description": "Contrato do SDK em C (party_anywhere.h): conexão, vagas P1..P10, estado do controle, eventos, vibração e rótulos no celular.",
-                "inputSchema": { "type": "object", "properties": {} }
-            }),
-            json!({
-                "name": "get_manifest_spec",
-                "description": "Especificação do party-anywhere.json e do party-anywhere.release.json, com o esquema JSON.",
-                "inputSchema": { "type": "object", "properties": {} }
+                "name": "get_docs",
+                "description": "A documentação para quem cria (a mesma do `pa docs`): sdk (party_anywhere.h: vagas, controles, eventos, celular), coop (multiplayer online → co-op local sem perder jogabilidade e passar do limite de jogadores; leia antes de propor o caminho de um mod), manifest (party-anywhere.json) ou schema (esquema JSON da ficha).",
+                "inputSchema": { "type": "object", "required": ["topic"], "properties": {
+                    "topic": { "type": "string", "enum": ["sdk", "coop", "manifest", "schema"] }
+                }},
+                "annotations": { "readOnlyHint": true, "openWorldHint": false }
             }),
             json!({
                 "name": "add_to_library",
                 "description": "Leva um mod (ou jogo) publicado para a Biblioteca do Party Anywhere: abre o Hub com a prévia do link; o Hub acha o jogo original da pessoa e ela confirma em 'Instalar o mod'. Antes: hub_status (e install_hub se faltar).",
                 "inputSchema": { "type": "object", "required": ["repo"], "properties": {
                     "repo": { "type": "string", "description": "Link do repositório ou dono/repo." }
-                }}
+                }},
+                "annotations": { "readOnlyHint": false, "destructiveHint": false, "openWorldHint": true }
             }),
             json!({
                 "name": "inspect_published_game",
                 "description": "Lê um jogo publicado no GitHub como o Hub lê: manifesto, último release e anexo, e diz se ele instala pelo link.",
                 "inputSchema": { "type": "object", "required": ["repo"], "properties": {
                     "repo": { "type": "string", "description": "Link do repositório ou dono/repo." }
-                }}
+                }},
+                "annotations": { "readOnlyHint": true, "openWorldHint": true }
             }),
         ]
     }
@@ -246,7 +247,7 @@ impl Server {
                         tool_ok(
                             format!(
                                 "Projeto criado em {} ({} arquivos). Próximos passos: trocar assets/cover.png pela capa de verdade, \
-                                 ler get_sdk_docs, ajustar o passo Build de .github/workflows/release.yml.",
+                                 ler get_docs sdk, ajustar o passo Build de .github/workflows/release.yml.",
                                 dir.display(),
                                 list.len()
                             ),
@@ -282,9 +283,13 @@ impl Server {
                     Err(issues) => tool_err(issues.iter().map(|i| format!("- {i}")).collect::<Vec<_>>().join("\n")),
                 })
             }
-            "get_sdk_docs" => Ok(text(SDK_DOCS)),
-            "get_coop_guide" => Ok(text(COOP_GUIDE)),
-            "get_manifest_spec" => Ok(text(&format!("{MANIFEST_DOCS}\n\n## Esquema JSON\n\n```json\n{MANIFEST_SCHEMA}```\n"))),
+            "get_docs" => {
+                let topic = s("topic").unwrap_or_default();
+                match docs::find(&topic) {
+                    Some(d) => Ok(text(d.body)),
+                    None => Err((-32602, format!("tema desconhecido: {topic} (sdk, coop, manifest ou schema)"))),
+                }
+            }
             "inspect_published_game" => {
                 let Some(repo) = s("repo") else { return Err((-32602, "falta \"repo\"".into())) };
                 Ok(match self.host.inspect(&repo) {
@@ -308,24 +313,13 @@ impl Server {
 }
 
 fn resources() -> Vec<Value> {
-    vec![
-        json!({ "uri": "party-anywhere://docs/sdk", "name": "SDK (party_anywhere.h)", "mimeType": "text/markdown" }),
-        json!({ "uri": "party-anywhere://docs/coop-local", "name": "Online → co-op local e mais jogadores", "mimeType": "text/markdown" }),
-        json!({ "uri": "party-anywhere://docs/game-manifest", "name": "Manifesto de jogo", "mimeType": "text/markdown" }),
-        json!({ "uri": "party-anywhere://schema/game-manifest.v1.json", "name": "Esquema do manifesto", "mimeType": "application/schema+json" }),
-    ]
+    DOCS.iter().map(|d| json!({ "uri": format!("party-anywhere://docs/{}", d.topic), "name": d.title, "mimeType": d.mime })).collect()
 }
 
 fn read_resource(params: &Value) -> Result<Value, (i64, String)> {
     let uri = params.get("uri").and_then(Value::as_str).unwrap_or_default();
-    let (mime, body) = match uri {
-        "party-anywhere://docs/sdk" => ("text/markdown", SDK_DOCS),
-        "party-anywhere://docs/coop-local" => ("text/markdown", COOP_GUIDE),
-        "party-anywhere://docs/game-manifest" => ("text/markdown", MANIFEST_DOCS),
-        "party-anywhere://schema/game-manifest.v1.json" => ("application/schema+json", MANIFEST_SCHEMA),
-        _ => return Err((-32602, format!("recurso desconhecido: {uri}"))),
-    };
-    Ok(json!({ "contents": [{ "uri": uri, "mimeType": mime, "text": body }] }))
+    let doc = uri.strip_prefix("party-anywhere://docs/").and_then(docs::find).ok_or((-32602, format!("recurso desconhecido: {uri}")))?;
+    Ok(json!({ "contents": [{ "uri": uri, "mimeType": doc.mime, "text": doc.body }] }))
 }
 
 fn text(t: &str) -> Value {
@@ -375,9 +369,7 @@ mod tests {
                 "create_game",
                 "validate_game",
                 "pack_release",
-                "get_coop_guide",
-                "get_sdk_docs",
-                "get_manifest_spec",
+                "get_docs",
                 "add_to_library",
                 "inspect_published_game"
             ]
@@ -466,9 +458,12 @@ mod tests {
     #[test]
     fn docs_are_served_as_tool_and_resource() {
         let s = Server::new(".");
-        let r = call(&s, 1, "tools/call", json!({ "name": "get_sdk_docs" }));
+        let r = call(&s, 1, "tools/call", json!({ "name": "get_docs", "arguments": { "topic": "sdk" } }));
         assert!(r["result"]["content"][0]["text"].as_str().unwrap().contains("pa_get_pad"));
-        let r = call(&s, 2, "resources/read", json!({ "uri": "party-anywhere://schema/game-manifest.v1.json" }));
+        let r = call(&s, 2, "tools/call", json!({ "name": "get_docs", "arguments": { "topic": "coop" } }));
+        assert!(r["result"]["content"][0]["text"].as_str().unwrap().contains("limite de jogadores"));
+        assert!(call(&s, 3, "tools/call", json!({ "name": "get_docs", "arguments": { "topic": "x" } }))["error"].is_object());
+        let r = call(&s, 4, "resources/read", json!({ "uri": "party-anywhere://docs/schema" }));
         assert!(r["result"]["contents"][0]["text"].as_str().unwrap().contains("manifestVersion"));
     }
 

@@ -23,13 +23,7 @@ Feito para seguir numa conversa nova do Claude Code, com o contexto limpo.
    cargo install --path crates/pa-cli
    ```
 
-3. **O MCP no Claude Code** (uma vez; vale para todas as conversas):
-
-   ```bash
-   claude mcp add --scope user party-anywhere -- pa mcp
-   ```
-
-4. **Celulares nos jogos comuns:** no Hub, Ajustes → Controle virtual → **Instalar** (o ViGEmBus). O mod
+3. **Celulares nos jogos comuns:** no Hub, Ajustes → Controle virtual → **Instalar** (o ViGEmBus). O mod
    do SDK não precisa dele, mas é bom ter para testar o celular em qualquer jogo.
 
 ## 2. Escolher o jogo
@@ -49,9 +43,9 @@ pa games
 2. Comece a conversa com algo assim (troque o que está entre `< >`):
 
    > Quero transformar o **<nome do jogo>** em co-op local para o Party Anywhere: **<quantos>** jogadores no
-   > mesmo PC, **<tela dividida / mesma tela>**, cada um com o próprio personagem. Use o MCP `party-anywhere`:
-   > confira o Hub (`hub_status`), crie o projeto nesta pasta com o jogo-base (`create_game`), leia o SDK
-   > (`get_sdk_docs`) e o guia de co-op local (`get_coop_guide`) e me proponha o caminho técnico antes de
+   > mesmo PC, **<tela dividida / mesma tela>**, cada um com o próprio personagem. Use a ferramenta `pa`:
+   > confira o Hub (`pa hub`), crie o projeto nesta pasta com o jogo-base (`pa new . --base-game`), leia o
+   > SDK (`pa docs sdk`) e o guia de co-op local (`pa docs coop`) e me proponha o caminho técnico antes de
    > escrever código: um jogo com vários jogadores dentro ou várias cópias do jogo. Quero tudo o que o online
    > tem, sem perder jogabilidade, e **<N>** jogadores (o jogo aceita **<M>**). Nada de anti-cheat e nada de
    > copiar arquivos do jogo original para o repositório.

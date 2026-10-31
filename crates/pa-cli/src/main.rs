@@ -19,7 +19,8 @@ Uso:
   pa pack [pasta] [--from build] [--tag v0.1.0] [--json]
   pa inspect <link do repositório | dono/repo> [--json]
   pa add <link do repositório | dono/repo | pasta do projeto>   leva o mod para a Biblioteca (abre o Party Anywhere)
-  pa mcp                      servidor MCP (stdio) para agentes de IA
+  pa docs [sdk | coop | manifest | schema]   a documentação para quem cria (a desta versão)
+  pa mcp                      servidor MCP (stdio), opcional: para agentes sem terminal
   pa --version
 
 Docs: https://github.com/joaocaioo/party-anywhere/blob/main/docs/GAME-MANIFEST.md";
@@ -132,6 +133,15 @@ Para criar o mod co-op: pa new <pasta> --name \"Meu Mod\" --base-game \"<nome ou
                 print_issues(&report.issues);
             }
             Ok(if report.installable { ExitCode::SUCCESS } else { ExitCode::FAILURE })
+        }
+        "docs" => {
+            let Some(topic) = opts.positional.first() else {
+                println!("Temas:\n{}", pa_cli::docs::topics());
+                return Ok(ExitCode::SUCCESS);
+            };
+            let doc = pa_cli::docs::find(topic).ok_or_else(|| format!("tema desconhecido: {topic}\n{}", pa_cli::docs::topics()))?;
+            println!("{}", doc.body);
+            Ok(ExitCode::SUCCESS)
         }
         "add" => {
             let link = opts.positional.first().ok_or("diga o mod: pa add dono/repo (ou o link do GitHub)")?;

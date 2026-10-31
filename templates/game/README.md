@@ -6,9 +6,9 @@ O jeito mais fácil de começar é pela ferramenta `pa`, que cria tudo isto já 
 pa new meu-jogo --id com.seu-usuario.meu-jogo --name "Meu Jogo"
 ```
 
-Com agentes de IA (Claude Code e outros com MCP), o projeto já vem com o servidor MCP configurado
-(`.mcp.json`) e uma skill (`.claude/skills/party-anywhere-game`): peça "crie um jogo co-op para o Party
-Anywhere" e o agente usa as ferramentas certas.
+Com agentes de IA (Claude Code, Cursor, Codex e outros): abra o agente nesta pasta. Ele lê o `AGENTS.md`
+(e a skill em `.claude/skills/party-anywhere-game`), usa a `pa` no terminal e lê a documentação com
+`pa docs`. Não precisa configurar nada.
 
 ## Passo a passo
 

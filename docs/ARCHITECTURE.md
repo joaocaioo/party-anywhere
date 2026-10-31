@@ -54,7 +54,7 @@ Um crate por módulo, cada um com testes que rodam sem hardware (dispositivos fa
 | `pa-sdk` | Lado do Hub do SDK: a memória compartilhada (espelho do `party_anywhere.h`), testada contra o cabeçalho C compilado. | `pa-core` |
 | `pa-manifest` | `party-anywhere.json` e `party-anywhere.release.json`: tipos, validação com mensagens que dizem o que fazer, capa, links. | — |
 | `pa-library` | GitHub: prévia por link, Descobrir (tópico), instalação com hash e backup de jogo-base, `library.json`, atualizações (jogos e Hub). | `pa-manifest` |
-| `pa-cli` | `pa` para criadores (`new`, `validate`, `pack`, `inspect`) e o servidor MCP (`pa mcp`). | `pa-manifest`, `pa-library` |
+| `pa-cli` | `pa` para criadores (`new`, `validate`, `pack`, `inspect`, `add`, `docs`), com `--json` para agentes, e o servidor MCP opcional (`pa mcp`). | `pa-manifest`, `pa-library` |
 | `apps/hub/src-tauri` | O app: lobby compartilhado, controles (gilrs), teclados (Raw Input), celulares, Modo Universal, SDK, Biblioteca, jogos do PC (Steam/Epic), atualizações. | todos |
 | `apps/hub/ui` | A UI (HTML/JS). | — |
 | `sdk/c` | `party_anywhere.h` e o exemplo `arena_console.c`. | — |
@@ -189,7 +189,10 @@ Implementação: `crates/pa-phone/src/protocol.rs` (codificação, com testes) e
 
 - **WebRTC DataChannel** sem ordenação e sem reenvio, sinalizado pelo próprio WebSocket: elimina o
   bloqueio de fila do TCP em Wi-Fi ruim. Só entra se as medições mostrarem p99 ruim com WebSocket.
-- **HTTPS local** (exigido pelo iOS para giroscópio): em aberto, ver Riscos.
+- **HTTPS local**: em aberto, ver Riscos. O controle abre por `http://` na rede local, e o navegador
+  esconde as APIs de "contexto seguro" fora do HTTPS: giroscópio no iOS, Wake Lock (manter a tela acesa) e
+  WebCodecs. Tela acesa: um vídeo mudo de 2 s em repetição no lugar do Wake Lock. Vídeo do jogo no celular
+  em hardware: pelo WebRTC (funciona sem HTTPS), não pelo WebCodecs.
 
 ## Bluetooth
 
@@ -267,8 +270,10 @@ Contrato completo em [SDK.md](SDK.md). O mecanismo é **só memória compartilha
 - cabeçalho: `magic` ("PAH1"), `abi` (1), tamanho, `hub_heartbeat` (+1 a cada 100 ms), `game_pid` (o jogo
   conectado), endereço do QR;
 - 10 vagas, cada uma com `seqlock` (ímpar = o Hub escrevendo), estado, aparelho, cor, nome e o `Pad`.
-  O Hub escreve (atrás de uma trava, um escritor por vez); o jogo lê sem trava e repete se pegou o meio;
-- anel de 64 comandos do jogo para o Hub (`rumble`, `toast`, `accepting`, `label`, `layout`, `light`): o jogo
+  O Hub escreve (atrás de uma trava, um escritor por vez); o jogo lê sem trava e repete se pegou o meio,
+  com limite de tentativas: um Hub encerrado à força no meio de uma escrita não pode travar o jogo (fica a
+  leitura anterior, e o heartbeat parado zera os controles);
+- anel de 64 comandos do jogo para o Hub (`rumble`, `toast`, `accepting`, `label`, `layout`, `light`, `mode`): o jogo
   escreve e avança `cmd_write`, o Hub lê a cada 100 ms e avança `cmd_read`.
 
 Regras:
@@ -277,8 +282,14 @@ Regras:
 - Os eventos (`SEAT_JOINED`, `RECONNECTING`, `RESUMED`, `LEFT`, `RENAMED`) o SDK gera comparando cada
   `pa_poll` com o anterior; `HUB_LOST` quando o heartbeat para por 1,5 s (os pads ficam neutros).
 - O SDK funciona **sem o Hub aberto**: `pa_connect` falha com um código claro, e o jogo decide.
-- Aplicados hoje pelo Hub: `rumble` (controle Xbox pelo XInput; celular Android) e `toast` (celular). `label`, `layout` e `light`
-  já fazem parte da ABI e chegam ao Hub; o protocolo do celular ganha os layouts na próxima versão.
+- **Hub reaberto com o jogo rodando:** o jogo segura a memória, então ela continua existindo. O Hub novo vê
+  que o heartbeat dela parou (nenhum Hub vivo; o app só abre uma vez) e **assume a memória**: fecha uma
+  escrita que ficou pela metade e regrava as vagas. O jogo volta a ver os jogadores sem reiniciar.
+- Aplicados hoje pelo Hub: `rumble` (controle Xbox pelo XInput; celular Android), `toast` (celular) e, no
+  controle do celular, `layout`, `mode` e `label` (`sdk_phone.rs`): guardados por vaga enquanto o jogo está
+  conectado (valem para quem reconecta) e aplicados no `layouts` que vai ao celular. O layout pedido pelo
+  jogo vale mais que o "Padrão do jogo"; o jogador que troca no menu do celular vale mais que o jogo.
+  `accepting` e `light` chegam ao Hub e ainda não fazem nada.
 
 ## Navegar o Hub com controle ou celular
 
@@ -522,10 +533,10 @@ party-anywhere/
     pa-virtualpad/    controles virtuais (ViGEmBus) atrás de uma interface
     pa-manifest/      party-anywhere.json e party-anywhere.release.json (puro, testado)
     pa-library/       GitHub: prévia por link, Descobrir, instalação com hash, library.json, atualizações
-    pa-cli/           `pa` para criadores (new, validate, pack, inspect) e servidor MCP (`pa mcp`)
+    pa-cli/           `pa` para criadores (new, validate, pack, inspect, add, docs) e servidor MCP opcional (`pa mcp`)
   sdk/c/              party_anywhere.h (SDK, stb-style) e exemplo
   schema/             game-manifest.v1.json (esquema publicado)
-  templates/game/     projeto modelo: manifesto, capa, workflow de release, .mcp.json, skill para agentes
+  templates/game/     projeto modelo: manifesto, capa, workflow de release, AGENTS.md e skill para agentes
   spikes/latency/     medidor de latência da fase 1
   docs/
 ```

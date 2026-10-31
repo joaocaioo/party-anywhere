@@ -38,6 +38,8 @@ Cada pessoa vira um jogador, de **P1 a P10**, com a sua cor. Depois é só escol
 ## Jogar
 
 1. Baixe e instale o **`PartyAnywhere-X.Y.Z-setup.exe`** (a versão mais nova) na página de [Releases](../../releases).
+   Se o Windows mostrar "O Windows protegeu o computador", é porque o instalador ainda não tem assinatura
+   digital: clique em **Mais informações** → **Executar assim mesmo**.
 2. Abra o app. Ligue os controles ou escaneie o QR com o celular (no mesmo Wi-Fi do PC).
 3. Vá em **Biblioteca**, escolha o jogo e aperte **Jogar**.
 
@@ -51,6 +53,11 @@ Pronto. O app se atualiza sozinho e avisa quando um jogo ganha versão nova.
 |---|---|
 | Jogar com celulares e teclados um jogo que já aceita vários controles | Abra o jogo pela Biblioteca (Steam, Epic ou qualquer `.exe`): celulares e teclados aparecem para ele como controles de Xbox. |
 | Jogar o **mod co-op** que alguém fez para um jogo seu | Biblioteca → **Adicionar** → cole o link do repositório. O app acha o seu jogo, instala o mod e deixa pronto para jogar. |
+
+> **Quantos jogadores, em cada caso.** A maioria dos jogos comuns enxerga **até 4** controles de Xbox: é um
+> limite do Windows, não do app. **De 5 a 10 jogadores**, só com um mod co-op (ou num jogo que aceita mais
+> controles). E num jogo comum o próprio jogo também lê o teclado do PC: teclado como jogador funciona
+> melhor nos mods.
 
 ### Instalar um mod: o que acontece
 
@@ -92,6 +99,11 @@ flowchart LR
 Você não escreve nada de controle, Bluetooth, celular ou lobby. O mod lê os jogadores por um arquivo pronto
 (o **SDK**), e o app instala, atualiza e abre.
 
+**O que é com você, e é a parte grande:** fazer o jogo ter os jogadores extras e dividir a tela. Isso muda
+de jogo para jogo: num jogo com ferramentas de mod é mais simples; num jogo fechado é engenharia reversa
+(achar no jogo onde ficam os jogadores e a câmera). O [guia de co-op local](docs/MOD-COOP-LOCAL.md) mostra
+os caminhos, inclusive como aproveitar o multiplayer que o jogo já tem.
+
 ### Em 5 passos
 
 #### 1. Pegue a ferramenta `pa`
@@ -116,7 +128,7 @@ vem. Assim o app de quem baixar sabe procurar e, se precisar, ajudar a pessoa a 
 | `assets/cover.png` | A capa na Biblioteca. Vem uma provisória; troque pela sua (retrato 3:4, arte própria). |
 | `sdk/party_anywhere.h` | O SDK: o arquivo que o mod inclui para ler os jogadores. |
 | `.github/workflows/release.yml` | Publica cada versão sozinho quando você cria uma tag. |
-| `.mcp.json` e `.claude/` | Atalhos para agentes de IA (veja abaixo). |
+| `AGENTS.md`, `CLAUDE.md` e `.claude/` | Instruções para agentes de IA (veja abaixo). |
 
 #### 3. Escreva o mod
 
@@ -187,24 +199,31 @@ mod aparece em **Descobrir**. Versão nova? Suba a `version`, crie a tag nova e 
 
 ### Com um agente de IA
 
-Prefere pedir em vez de fazer? A `pa` traz um servidor **MCP**, que entrega ao seu agente (Claude Code,
-Cursor e outros) as ferramentas do Party Anywhere. Ele roda no seu computador: **sem servidor na internet
-e sem custo**.
+Abra o seu agente (Claude Code, Cursor, Codex e outros) na pasta do mod. **Não precisa configurar nada:** o
+projeto traz um `AGENTS.md` que ensina o agente a usar a `pa` e a ler a documentação dela (`pa docs`). Peça
+uma coisa de cada vez:
 
-Ligue uma vez. No Claude Code:
+- *"Quero o jogo X em co-op local para 4. Leia o guia de co-op e me proponha o caminho."*
+- *"Primeiro passo: o mod carrega no jogo e manda um aviso para o celular."*
+- *"Monte o controle do celular deste mod: a pé e no carro."*
+- *"Meu mod está pronto para publicar?"*
+
+O agente ajuda de verdade na parte do Party Anywhere (projeto, controles, celular, ficha, publicação) e é um
+bom parceiro na parte do jogo, mas essa é feita em idas e voltas com você, testando cada passo. Ele pede sua
+permissão antes de instalar qualquer coisa.
+
+<details>
+<summary>Agente sem terminal (Claude Desktop e outros): servidor MCP</summary>
+
+A `pa` também é um servidor MCP, com as mesmas ferramentas, rodando no seu PC (sem servidor na internet).
+No Claude Code, se preferir:
 
 ```bash
 claude mcp add --scope user party-anywhere -- pa mcp
 ```
 
-Em outros agentes, configure um servidor MCP com o comando `pa` e o argumento `mcp`. Depois é só pedir:
-
-- *"Transforme o jogo X em co-op local para o Party Anywhere, com tela dividida para 4."*
-- *"Monte o controle do celular deste mod: a pé e no carro."*
-- *"Meu mod está pronto para publicar?"*
-
-O agente confere o app, acha o jogo no seu PC, cria o projeto, lê a documentação do SDK, valida e prepara a
-publicação. Ele pede sua permissão antes de instalar qualquer coisa.
+Em outros agentes, configure um servidor MCP com o comando `pa` e o argumento `mcp`.
+</details>
 
 ### O que o app exige para achar e instalar o seu mod
 
