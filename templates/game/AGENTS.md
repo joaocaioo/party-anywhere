@@ -31,8 +31,12 @@ Use a skill `.claude/skills/party-anywhere-game`. A documentação vem na `pa`, 
 `pa docs sdk` antes de mexer em controles (o mod lê os jogadores só pelo SDK; `sdk/party_anywhere.h` é o
 contrato) e `pa validate` antes de publicar.
 
-**Jogo com multiplayer online?** Leia `pa docs coop` antes de propor o caminho: o mod reaproveita o
-multiplayer do jogo (nada de jogabilidade perdida) e, para passar do limite de jogadores, segue o método do guia.
+**Antes de propor o caminho técnico, leia `pa docs coop`.** O caminho é um só: **uma cópia do jogo, com
+todos os jogadores dentro dela e uma visão por jogador** (o motor desenha a cena uma vez para cada um, cada
+visão no seu pedaço da tela). **Não abra várias cópias do jogo** para fazer tela dividida: multiplica memória,
+processador e som, depende de LAN e de o jogo aceitar rodar várias vezes, e o Party Anywhere não dá suporte a
+isso. Jogo com multiplayer online: reaproveite o código de "vários jogadores" do jogo dentro da mesma cópia
+(nada de jogabilidade perdida). Para passar do limite de jogadores, siga o método do guia.
 
 **Seja honesto sobre o tamanho do trabalho.** Ler os controles pelo SDK é a parte pequena. Criar os jogadores
 extras e dividir a tela num jogo fechado é engenharia reversa, feita em passos pequenos e testados com a

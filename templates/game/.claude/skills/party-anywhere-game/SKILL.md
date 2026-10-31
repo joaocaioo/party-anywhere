@@ -29,12 +29,15 @@ O servidor MCP `party-anywhere` (`pa mcp`) é opcional e tem as mesmas ferrament
 | Conferir o jogo publicado (como o Hub lê) | `pa inspect <dono/repo>` | `inspect_published_game` |
 | Levar um mod para a Biblioteca (para jogar ou testar) | `pa add <dono/repo ou pasta>` | `add_to_library` |
 
-## Mod de um jogo com multiplayer online
+## O caminho de todo mod: uma cópia do jogo, N jogadores, N visões
 
-Leia `pa docs coop` antes de propor o caminho técnico. Regra de ouro: **não reescreva o multiplayer,
-reaproveite** (os jogadores, a sincronia e as regras são do jogo; o mod muda a entrada, a imagem e quem
-hospeda). Escolha entre um jogo com vários jogadores dentro dele e várias cópias do jogo pela regra de decisão
-do guia, e para passar do limite de jogadores ache todos os lugares do limite antes de mudar um.
+Leia `pa docs coop` antes de propor o caminho técnico. Os jogadores extras são jogadores de verdade do jogo,
+dentro da mesma cópia; o mod troca o contexto ("quem é o jogador" e "a câmera") e pede ao motor uma passada de
+desenho por jogador, cada uma no seu pedaço da tela. **Nunca proponha abrir várias cópias do jogo** (uma por
+jogador): custa N vezes a memória, o processador e o som, e o Party Anywhere não dá suporte. Jogo com
+multiplayer online: **não reescreva o multiplayer, reaproveite** as entidades e regras que o jogo usa para
+vários jogadores, na mesma cópia. Para passar do limite de jogadores, ache todos os lugares do limite antes de
+mudar um.
 
 ## Padrão: a tela do jogo no celular
 

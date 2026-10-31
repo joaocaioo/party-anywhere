@@ -3,9 +3,8 @@
 Passo a passo para transformar um jogo seu em co-op local com o Party Anywhere, testar e (se quiser) publicar.
 Feito para seguir numa conversa nova do Claude Code, com o contexto limpo.
 
-> **Hoje o repositório do Party Anywhere é privado** e ainda não tem versão publicada. Por isso o Hub e a `pa`
-> vêm deste código (passo 1), e a publicação do mod é feita pela linha de comando (passo 6), não pelo workflow
-> automático. Quando o projeto abrir, tudo isso vira "baixe na página de Releases".
+> Enquanto não houver uma versão na página de Releases, o Hub e a `pa` vêm do código (passo 1), e a
+> publicação do mod é feita pela linha de comando (passo 6). Com a versão publicada, é só baixar.
 
 ## 1. Preparar o PC (uma vez)
 
@@ -39,20 +38,21 @@ pa games
 ## 3. Criar a pasta do mod e abrir a conversa
 
 1. Crie uma pasta **fora** do repositório do party-anywhere (o mod é um repositório à parte), por exemplo
-   `C:\Users\voce\Github\meu-mod-coop`, e abra o Claude Code nela.
+   `C:\Projetos\meu-mod-coop`, e abra o Claude Code nela.
 2. Comece a conversa com algo assim (troque o que está entre `< >`):
 
    > Quero transformar o **<nome do jogo>** em co-op local para o Party Anywhere: **<quantos>** jogadores no
    > mesmo PC, **<tela dividida / mesma tela>**, cada um com o próprio personagem. Use a ferramenta `pa`:
    > confira o Hub (`pa hub`), crie o projeto nesta pasta com o jogo-base (`pa new . --base-game`), leia o
    > SDK (`pa docs sdk`) e o guia de co-op local (`pa docs coop`) e me proponha o caminho técnico antes de
-   > escrever código: um jogo com vários jogadores dentro ou várias cópias do jogo. Quero tudo o que o online
-   > tem, sem perder jogabilidade, e **<N>** jogadores (o jogo aceita **<M>**). Nada de anti-cheat e nada de
-   > copiar arquivos do jogo original para o repositório.
+   > escrever código: uma cópia do jogo, com todos os jogadores dentro dela e uma visão por jogador (nada de
+   > abrir várias cópias do jogo). Quero tudo o que o online tem, sem perder jogabilidade, e **<N>** jogadores
+   > (o jogo aceita **<M>**). Nada de anti-cheat e nada de copiar arquivos do jogo original para o repositório.
 
 3. O que esperar: o agente cria o projeto (ficha, capa provisória, SDK, `AGENTS.md`), e então vem a parte
    difícil, que é específica de cada jogo: como o mod entra no jogo (uma DLL carregada por proxy, ASI loader
-   ou a API de mods do jogo), como criar os personagens extras e dividir a tela. É um trabalho de idas e
+   ou a API de mods do jogo), como criar os jogadores extras, trocar o contexto entre eles e desenhar uma
+   visão para cada um. É um trabalho de idas e
    voltas: peça uma coisa de cada vez ("primeiro: o jogo carrega a DLL e mostra um aviso no celular").
 
 ## 4. Testar sem publicar

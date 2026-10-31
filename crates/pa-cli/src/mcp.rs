@@ -120,8 +120,8 @@ impl Server {
                 JOGAR um mod que a pessoa achou (um link de repositório): inspect_published_game e add_to_library. O Hub \
                 abre com a prévia, acha o jogo original da pessoa (Steam, Epic ou a pasta que ela escolher) e ela confirma \
                 em 'Instalar o mod'. Nunca baixe o jogo original. \
-                CRIAR um mod: find_installed_games e create_game com base_game; leia get_docs coop (como transformar o \
-                multiplayer online em co-op local sem perder jogabilidade e como passar do limite de jogadores) e \
+                CRIAR um mod: find_installed_games e create_game com base_game; leia get_docs coop (o caminho é um só: \
+                uma cópia do jogo, N jogadores e N visões dentro dela; nunca abrir várias cópias do jogo) e \
                 get_docs sdk antes de escrever código \
                 de controle (o mod lê os jogadores só pelo SDK); validate_game; publicar é opcional (pack_release e um \
                 release no GitHub), mas ajuda outras pessoas a jogar. A capa (retrato 3:4) é obrigatória; peça a arte ao \
@@ -182,7 +182,7 @@ impl Server {
             }),
             json!({
                 "name": "get_docs",
-                "description": "A documentação para quem cria (a mesma do `pa docs`): sdk (party_anywhere.h: vagas, controles, eventos, celular), coop (multiplayer online → co-op local sem perder jogabilidade e passar do limite de jogadores; leia antes de propor o caminho de um mod), manifest (party-anywhere.json) ou schema (esquema JSON da ficha).",
+                "description": "A documentação para quem cria (a mesma do `pa docs`): sdk (party_anywhere.h: vagas, controles, eventos, celular), coop (como fazer o co-op local: uma cópia do jogo com N jogadores e N visões, nunca várias cópias; reaproveitar o multiplayer do jogo e passar do limite de jogadores; leia antes de propor o caminho de um mod), manifest (party-anywhere.json) ou schema (esquema JSON da ficha).",
                 "inputSchema": { "type": "object", "required": ["topic"], "properties": {
                     "topic": { "type": "string", "enum": ["sdk", "coop", "manifest", "schema"] }
                 }},
