@@ -267,13 +267,19 @@ quem vai jogar.
 
 **Posso fazer mod de qualquer jogo?** De jogos sem anti-cheat, e sem distribuir arquivos do jogo original.
 
+**É seguro instalar um mod?** Um mod é um programa: ele roda no seu PC, dentro do jogo. Instale só de quem
+você confia, como faria com qualquer mod. O app confere que o pacote é exatamente o publicado (pelo hash),
+só grava na pasta do jogo e na do próprio app, guarda os arquivos originais e devolve tudo ao remover.
+Achou um mod malicioso? Abra uma issue com o link.
+
 ---
 
 ## Colaborar
 
 Toda ajuda é bem-vinda, de quem joga e de quem programa.
 
-- **Publicou um mod?** Abra uma issue com o link. Ele pode entrar no catálogo com o selo **Verificado**.
+- **Publicou um mod?** Com o tópico `party-anywhere-game` ele já aparece em **Descobrir**. Quer divulgar?
+  Abra uma issue com o link.
 - **Achou um problema?** Abra uma issue contando o que fez, o que esperava e o que aconteceu.
 - **Tem uma ideia?** Abra uma issue: as próximas prioridades saem do que as pessoas pedem.
 - **Quer mexer no código?** Faça um fork, crie um branch e abra um pull request.
