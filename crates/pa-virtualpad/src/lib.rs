@@ -1,4 +1,4 @@
-//! Controles virtuais (docs/ARCHITECTURE.md, D8 e "Modo Universal").
+//! Controles virtuais (Modo Universal).
 //!
 //! Todo acesso ao driver acontece numa thread própria, dona do cliente e dos controles: quem usa
 //! só manda comandos por um [`VirtualPads`] (barato de clonar, pode ir para qualquer thread).

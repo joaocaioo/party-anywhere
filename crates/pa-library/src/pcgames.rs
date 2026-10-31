@@ -1,5 +1,4 @@
-//! "Jogos deste PC": Steam e Epic, lendo os arquivos que as próprias lojas mantêm (docs/ARCHITECTURE.md,
-//! "Biblioteca: jogos do PC"). Nada é modificado. Serve o Hub (Biblioteca), a CLI (`pa games`, `pa new
+//! "Jogos deste PC": Steam e Epic, lendo os arquivos que as próprias lojas mantêm. Nada é modificado. Serve o Hub (Biblioteca), a CLI (`pa games`, `pa new
 //! --base-game`) e o servidor MCP (`find_installed_games`).
 
 use std::fs;

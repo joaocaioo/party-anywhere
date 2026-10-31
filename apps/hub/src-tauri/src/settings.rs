@@ -1,4 +1,4 @@
-//! `settings.json` (docs/ARCHITECTURE.md, "Dados salvos"): ajustes do Hub, layouts do controle do celular
+//! `settings.json`: ajustes do Hub, layouts do controle do celular
 //! (os prontos e os que a pessoa monta na aba Controles) e o layout que cada celular escolheu.
 //!
 //! Layout: um ou mais **modos** (ex.: "A pé" e "Veículo", para jogos que mudam os comandos), cada um com

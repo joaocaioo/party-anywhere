@@ -1,4 +1,4 @@
-//! A tela do jogo no celular (docs/ARCHITECTURE.md, "Tela do jogo no celular"): quem joga pelo celular vê a
+//! A tela do jogo no celular (docs/SDK.md, "Tela do jogo no celular"): quem joga pelo celular vê a
 //! própria parte do jogo nele. O jogo do SDK entrega a imagem daquele jogador (`pa_submit_view`) numa memória
 //! por vaga; aqui o Hub lê o quadro mais novo, comprime em JPEG e manda pela conexão do controle.
 //!

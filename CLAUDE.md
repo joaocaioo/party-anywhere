@@ -28,3 +28,6 @@ Comece por [docs/VISION.md](docs/VISION.md), [docs/UX.md](docs/UX.md) e [docs/AR
 - **Nunca torne este repositório público.** O histórico inteiro iria junto. Na primeira versão, o público
   recebe um histórico novo e limpo só com o produto: Hub, SDK, template e docs para usuários e criadores.
   Ficam de fora os spikes, as amostras de arte, VISION, ROADMAP, UX, ARCHITECTURE e este arquivo. Licença: MIT.
+- O público sai **só** de `python tools/public/export.py <pasta do público>`: copia o HEAD sem o que é interno,
+  tira os spikes do workspace e recusa se achar dado pessoal ou link para doc interno. Nunca copie à mão.
+  Código e docs do produto não citam os docs internos (o público não os tem).

@@ -1,4 +1,4 @@
-//! Celular como controle (docs/ARCHITECTURE.md, "Celular: protocolo v1").
+//! Celular como controle (protocolo v1: `protocol.rs`).
 //!
 //! - [`protocol`]: codificação das mensagens, pura e testada.
 //! - [`net`]: escolha do endereço da rede local que vai no QR.

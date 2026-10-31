@@ -1,5 +1,5 @@
 //! Regras do lobby: quem ocupa cada vaga (P1..P10), quem espera para entrar e o que acontece quando um
-//! aparelho cai, volta ou é removido (docs/ARCHITECTURE.md, "Regras do lobby"; docs/UX.md, "Fluxo 2").
+//! aparelho cai, volta ou é removido.
 //!
 //! Sem I/O e sem relógio próprio: quem chama informa os eventos dos aparelhos e o instante em ms.
 

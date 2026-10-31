@@ -60,7 +60,7 @@ fn migrate_steam_art(lib: &mut Library) -> bool {
     changed
 }
 
-/// Jogos e Hub: confere ao abrir e a cada 6 horas (docs/UX.md, "atualização").
+/// Jogos e Hub: confere ao abrir e a cada 6 horas.
 const UPDATE_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
 
 fn main() {

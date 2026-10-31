@@ -781,7 +781,7 @@ if (window.visualViewport) {
   });
 }
 
-// Em segundo plano o celular fecha a conexão; ao voltar, reconecta (docs/ARCHITECTURE.md).
+// Em segundo plano o celular fecha a conexão; ao voltar, reconecta (com o token, na mesma vaga).
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { if (ws) ws.close(); }
   else if (!ws || ws.readyState > 1) connect();

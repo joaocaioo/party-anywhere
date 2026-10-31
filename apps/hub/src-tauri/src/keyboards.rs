@@ -1,4 +1,4 @@
-//! Teclados como jogadores (docs/ARCHITECTURE.md, "Teclados como jogadores"). Raw Input separa cada
+//! Teclados como jogadores. Raw Input separa cada
 //! teclado; o caminho do aparelho diz se é do notebook, USB ou Bluetooth. Teclado nunca entra sozinho:
 //! só com Enter nele enquanto a tela "Adicionar jogador → Teclado" está aberta (ou "Conectar").
 
@@ -137,7 +137,7 @@ pub fn via(bus: Bus) -> &'static str {
     }
 }
 
-/// Teclas → controle de Xbox (docs/ARCHITECTURE.md): WASD analógico esquerdo, setas o direito,
+/// Teclas → controle de Xbox: WASD analógico esquerdo, setas o direito,
 /// Espaço A, Shift B, E X, Q Y, Enter Start, Tab Back, R/F bumpers, Z/C gatilhos.
 pub fn pad_from_keys(down: &[bool; 256]) -> Pad {
     let k = |vk: usize| down[vk];

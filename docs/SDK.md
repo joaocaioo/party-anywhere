@@ -190,7 +190,7 @@ jogo escreve com seqlock e o instante do quadro (QueryPerformanceCounter); é ad
 
 Memória compartilhada `Local\PartyAnywhere.v1`, criada pelo Hub (layout `pa_shm` no cabeçalho). Cada vaga
 tem um seqlock: o jogo nunca lê um estado pela metade e nunca trava. Os eventos saem da comparação de um
-`pa_poll` com o anterior. Detalhes em [ARCHITECTURE.md](ARCHITECTURE.md#modo-sdk-ipc).
+`pa_poll` com o anterior. O layout exato está no próprio `party_anywhere.h`.
 
 ## Garantias do Hub
 

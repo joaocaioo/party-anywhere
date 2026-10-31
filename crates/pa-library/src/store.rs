@@ -1,5 +1,5 @@
 //! `library.json`: a biblioteca da pessoa (o que adicionou, a ordem, o que editou, o que está instalado).
-//! Gravação atômica com `.bak` do último arquivo bom (docs/ARCHITECTURE.md, "Dados salvos").
+//! Gravação atômica com `.bak` do último arquivo bom.
 
 use std::fs;
 use std::path::{Path, PathBuf};

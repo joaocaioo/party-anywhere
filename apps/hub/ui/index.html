@@ -1197,7 +1197,7 @@ function pickName() {
   return NAMES.find((n) => !used.has(n)) || `Jogador ${Math.floor(Math.random() * 90 + 10)}`;
 }
 
-// Regras do lobby (as mesmas de docs/ARCHITECTURE.md): dispositivo conhecido volta para a vaga dele;
+// Regras do lobby (as mesmas de crates/pa-core/src/lobby.rs): dispositivo conhecido volta para a vaga dele;
 // novo ocupa a menor vaga vazia; vaga em "reconectando" fica guardada.
 function addPlayer(dev) {
   const back = seats.find((s) => s && s.deviceKey === dev.deviceKey);
@@ -1745,7 +1745,7 @@ const games = [
   { id: 'pong', name: 'Pong Royale', tagline: 'Pong com 10 raquetes ao mesmo tempo. Caos garantido.', players: '2 a 10 jogadores', badge: 'ok', tags: ['Festa', 'Rápido'], art: ['#1e1b4b', '#a855f7', '#22c55e'] },
 ];
 
-// No Hub real: %APPDATA%\PartyAnywhere\library.json (ver ARCHITECTURE.md). No protótipo: localStorage.
+// No Hub real: %APPDATA%\PartyAnywhere\library.json. No protótipo: localStorage.
 const LIBRARY_KEY = 'pa.library.v1';
 const DEFAULT_GAMES = JSON.parse(JSON.stringify(games));
 function saveLibrary() {
