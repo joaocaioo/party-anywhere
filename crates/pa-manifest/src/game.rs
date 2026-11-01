@@ -212,10 +212,30 @@ impl GameManifest {
             out.push(Issue::warning("authors", "diga quem fez o jogo: [\"seu-usuario\"]."));
         }
 
-        if let Some(c) = &self.controls {
-            if let Err(e) = crate::controls::check_modes(&c.modes) {
-                out.push(Issue::error("controls", format!("{e} Monte no editor do Hub (Controles → Criar layout) e copie de lá.")));
+        match &self.controls {
+            Some(c) => {
+                if let Err(e) = crate::controls::check_modes(&c.modes) {
+                    out.push(Issue::error("controls", format!("{e} Monte no editor do Hub (Controles → Criar layout) e copie de lá.")));
+                }
+                for (i, m) in c.modes.iter().enumerate() {
+                    let center = crate::controls::center_pieces(m);
+                    if !center.is_empty() {
+                        out.push(Issue::warning(
+                            &format!("controls.modes[{i}]"),
+                            format!(
+                                "{} {} o meio da tela no modo {}, onde aparece a imagem do jogo para quem joga olhando o celular. Encoste nas bordas, como nos jogos de celular.",
+                                center.join(", "),
+                                if center.len() > 1 { "tampam" } else { "tampa" },
+                                m.name
+                            ),
+                        ));
+                    }
+                }
             }
+            None => out.push(Issue::warning(
+                "controls",
+                "sem o controle do jogo, os celulares usam o Avançado (15 peças). Monte o do seu jogo no Hub (Controles → Criar layout → Copiar para a ficha do mod).",
+            )),
         }
         if self.art.cover == STEAM_COVER {
             if self.steam_cover().is_none() {
@@ -391,6 +411,18 @@ mod tests {
         let fields = errors(&m);
         assert!(fields.contains(&"install.files[0].to".to_string()));
         assert!(fields.contains(&"requires.baseGame.acceptedSha256[0]".to_string()));
+    }
+
+    #[test]
+    fn the_phone_controller_comes_with_the_game_and_keeps_the_middle_free() {
+        let warnings = |m: &GameManifest| m.validate().into_iter().filter(|i| !i.is_error()).map(|i| i.field).collect::<Vec<_>>();
+        let mut m = base();
+        assert!(m.controls.is_some(), "o template já traz um controle com o meio livre");
+        let center = crate::controls::Piece { kind: "BACK".into(), x: 0.5, y: 0.5, s: 1.0, label: None };
+        m.controls.as_mut().unwrap().modes[0].pieces.push(center);
+        assert_eq!(warnings(&m), ["controls.modes[0]"]);
+        m.controls = None;
+        assert_eq!(warnings(&m), ["controls"]);
     }
 
     #[test]

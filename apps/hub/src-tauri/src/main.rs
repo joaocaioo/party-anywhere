@@ -142,6 +142,7 @@ fn main() {
             commands::layouts_list,
             commands::layout_save,
             commands::layout_delete,
+            commands::layout_reset,
             commands::devices_list,
             commands::devices_watch,
             commands::game_stopped,

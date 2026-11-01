@@ -199,6 +199,7 @@
     saveLayout: (id, name, modes, game) => invoke('layout_save', { id, name, modes, game }),
     setGameLayout: (game, layout) => invoke('game_layout_set', { game, layout }),
     deleteLayout: (id) => invoke('layout_delete', { id }),
+    resetLayout: (id) => invoke('layout_reset', { id }),
     settings: () => invoke('settings_get'),
     setJoinPolicy: (on) => invoke('set_join_policy', { onButton: on }),
     addresses: () => invoke('network_addresses'),

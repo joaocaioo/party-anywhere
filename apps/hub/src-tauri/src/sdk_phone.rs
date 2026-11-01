@@ -82,10 +82,13 @@ impl SdkPhone {
             return;
         }
         let Some(layout) = items.as_array_mut().and_then(|a| a.iter_mut().find(|l| l["id"] == current)) else { return };
-        let Some(modes) = layout["modes"].as_array_mut() else { return };
-        for piece in modes.iter_mut().filter_map(|m| m["pieces"].as_array_mut()).flatten() {
-            if let Some((_, text)) = labels.iter().find(|(k, _)| piece["kind"] == *k) {
-                piece["label"] = serde_json::Value::String(text.clone());
+        // os modos e a versão para a tela do jogo no celular (`screen`, nos prontos)
+        for list in ["modes", "screen"] {
+            let Some(modes) = layout[list].as_array_mut() else { continue };
+            for piece in modes.iter_mut().filter_map(|m| m["pieces"].as_array_mut()).flatten() {
+                if let Some((_, text)) = labels.iter().find(|(k, _)| piece["kind"] == *k) {
+                    piece["label"] = serde_json::Value::String(text.clone());
+                }
             }
         }
     }
@@ -108,7 +111,8 @@ mod tests {
                 { "name": "A pé", "pieces": [{ "kind": "A", "label": "" }, { "kind": "B", "label": "Correr" }, { "kind": "X" }] },
                 { "name": "Veículo", "pieces": [{ "kind": "RT", "label": "" }] }
             ] },
-            { "id": "simple", "modes": [{ "name": "", "pieces": [{ "kind": "A", "label": "" }] }] }
+            { "id": "simple", "modes": [{ "name": "", "pieces": [{ "kind": "A", "label": "" }] }],
+              "screen": [{ "name": "", "pieces": [{ "kind": "A" }] }] }
         ]);
         s.apply_labels(0, &mut items, "game-sa");
         assert_eq!(items[0]["modes"][0]["pieces"][0]["label"], "Pular");
@@ -116,6 +120,9 @@ mod tests {
         assert_eq!(items[0]["modes"][0]["pieces"][2]["label"], "Um nome comp");
         assert_eq!(items[0]["modes"][1]["pieces"][0]["label"], "Acelerar");
         assert_eq!(items[1]["modes"][0]["pieces"][0]["label"], "", "outro layout não muda");
+        let mut simple = items.clone();
+        s.apply_labels(0, &mut simple, "simple");
+        assert_eq!(simple[1]["screen"][0]["pieces"][0]["label"], "Pular", "a versão da tela do jogo também");
         let mut other = items.clone();
         s.apply_labels(1, &mut other, "game-sa");
         assert_eq!(other, items, "cada vaga tem os seus nomes");

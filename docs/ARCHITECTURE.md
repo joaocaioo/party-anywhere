@@ -401,7 +401,11 @@ O visual é fixo; o desempenho vem de não fazer trabalho à toa (medido com 200
   3. Mais gente do que o jogo aceita? "Quem vai jogar?": cada um aperta **A** no seu controle ou celular e a
      bolinha acende; **B** apaga; clique também vale; **Start** começa.
 - **Padrão do jogo**: `settings.game_layout` liga um jogo a um layout (qualquer um, até os prontos); um jogo
-  que traz `controls` no manifesto ganha um layout "do jogo" ao instalar (não editável, duplicável). Ao abrir
+  que traz `controls` no manifesto ganha um layout "do jogo" ao instalar (`Settings::set_game_layout`). Ele é
+  editável no lugar e não se apaga: o original fica em `settings.shipped` para **Restaurar** (`layout_reset`), e
+  uma atualização do jogo troca o original sem apagar a edição da pessoa. O menu do celular lista os prontos, os
+  da pessoa e só o do jogo aberto (os de outros jogos não). Os prontos têm uma versão `screen` (o meio livre),
+  que o celular usa enquanto mostra a tela do jogo; os nomes do `pa_set_label` valem nas duas. Ao abrir
   o jogo, `Hub::set_session_layout` manda esse layout a todos os celulares, menos a quem trocou no menu
   durante a partida; `game_stopped` devolve cada um ao seu. As regras das peças ficam em
   `pa_manifest::controls` (Hub, `pa validate` e MCP usam as mesmas).

@@ -24,6 +24,8 @@
   ficam transparentes; cada quadro é confirmado (0x08), e o Hub só manda outro depois.
   Câmera por deslocamento: quando o jogo lê (o Hub avisa em `layouts.look`), a metade direita vira área de
   câmera (arrastar = girar, como num jogo de celular) e segurar um botão da direita e arrastar também gira.
+  Num layout sem analógico direito (o Simples), a área de câmera entra do mesmo jeito.
+  Com a tela do jogo, os prontos usam a versão `screen` deles (o meio livre).
   Com mais de um modo, os nomes aparecem no topo e um toque troca. A pílula do topo (jogador, conexão, Menu)
   fica no meio, por cima da tela; os cantos ficam para os controles. Analógicos livres: o esquerdo nasce onde
   o dedo tocar na metade da tela dele, fora das outras peças (o direito, na outra metade).
@@ -298,13 +300,24 @@ const $ = (id) => document.getElementById(id);
 
 // ---------------------------------------------------------------- layout: peças posicionadas
 const currentLayoutObj = () => layouts.find((l) => l.id === currentLayout) || layouts[0];
+// as peças do modo atual; com a tela do jogo, a versão do layout com o meio livre (`screen`, nos prontos)
+const viewingNow = () => document.body.classList.contains('viewing');
+function currentPieces() {
+  const l = currentLayoutObj();
+  const list = viewingNow() && l.screen && l.screen.length ? l.screen : l.modes;
+  const pieces = list[Math.min(modeIdx, list.length - 1)].pieces.filter((p) => SIZE[p.kind]);
+  // o jogo lê a câmera e o layout não tem analógico direito (o Simples, por exemplo): a parte livre da metade
+  // direita vira câmera do mesmo jeito (a dica fica no alto, entre o meio e os botões)
+  if (lookOn && !pieces.some((p) => p.kind === 'stickR')) return [...pieces, { kind: 'stickR', x: 0.576, y: 0.3, s: 0.6 }];
+  return pieces;
+}
 function render() {
   const layout = currentLayoutObj();
   if (modeIdx >= layout.modes.length) modeIdx = 0;
   releaseAll();
   const label = { BACK: 'VOLTAR', START: 'START', LS: 'L3', RS: 'R3' };
   const arrows = { UP: '▲', LEFT: '◀', RIGHT: '▶', DOWN: '▼' };
-  $('area').innerHTML = layout.modes[modeIdx].pieces.filter((p) => SIZE[p.kind]).map((p, i) => {
+  $('area').innerHTML = currentPieces().map((p, i) => {
     const k = p.kind, at = `data-i="${i}"`;
     if (k === 'stickR' && lookOn) return `<div class="stick look${prefs.lookSeen ? ' used' : ''}" ${at} data-look><div class="hint">Arraste<br>para olhar</div></div>`;
     if (k === 'stickL' || k === 'stickR') return `<div class="stick${prefs.stickSeen ? ' used' : ''}" ${at} data-stick="${k === 'stickL' ? 'l' : 'r'}"><div class="hint">Toque e<br>arraste</div></div>`;
@@ -329,7 +342,7 @@ function place() {
   const u = Math.min(H, W / CANVAS), top = (H - u) / 2;
   U = u;
   area.style.setProperty('--u', u + 'px');
-  const pieces = currentLayoutObj().modes[modeIdx].pieces.filter((p) => SIZE[p.kind]);
+  const pieces = currentPieces();
   // analógico livre: a metade da tela em que ele está (se o outro analógico não está na mesma metade)
   const half = (p) => (p.x < 0.5 ? 'l' : 'r');
   const sticks = pieces.filter((p) => p.kind === 'stickL' || p.kind === 'stickR');
@@ -510,8 +523,11 @@ function showFrame(dv) {
 }
 
 function setViewing(on) {
+  if (on === viewingNow()) return;
   document.body.classList.toggle('viewing', on);
   document.documentElement.classList.toggle('viewing', on);
+  const l = currentLayoutObj();
+  if (l.screen && l.screen.length) render(); // os prontos trocam para a versão com o meio livre
 }
 
 // Liga/desliga a tela do jogo e diz o formato desta tela deitada (o jogo desenha nele: a imagem enche, sem

@@ -82,13 +82,22 @@ está em [`templates/game/`](../templates/game/), e o esquema JSON em
 | `install` | sim | v1 aceita só `github-release` e cópia de arquivos. **Sem scripts de instalação.** `asset` é um `.zip`; `target: "baseGame"` exige `requires.baseGame` e `files`. Caminhos sempre relativos, sem `..`. |
 | `minHubVersion` | não | Hub mínimo, se o jogo usa algo recente do SDK. |
 | `launch` | sim | Como abrir o jogo depois de instalado. |
-| `controls` | não | O controle do celular feito para o jogo ("Padrão do jogo"). Ver "Controle no celular". |
+| `controls` | recomendado | O controle do celular feito para o jogo ("Padrão do jogo"). O `pa new` já cria um; sem ele, o `pa validate` avisa. Ver "Controle no celular". |
 
-## Controle no celular (`controls`, opcional)
+## Controle no celular (`controls`)
 
-O jogo pode trazer o controle do celular feito para ele. No Hub ele vira o **"Padrão do jogo"**: quando o
-jogo abre, os celulares trocam sozinhos para ele; quando a pessoa volta para a biblioteca, cada um volta para o
-seu. Quem preferir outro troca no menu do celular durante a partida.
+Todo jogo deveria trazer o controle do celular feito para ele: o `pa new` já cria um inicial (andar à
+esquerda, câmera e botões à direita, o meio livre), para trocar pelos nomes e peças do jogo. No Hub ele vira o
+**"Padrão do jogo"**: vem junto ao instalar, e quando o jogo abre os celulares trocam sozinhos para ele; quando a
+pessoa volta para a biblioteca, cada um volta para o seu. No menu do celular aparecem três tipos: **Simples**,
+**Avançado** e **o do jogo** (mais os que a pessoa montou). Quem preferir outro troca no menu durante a partida.
+
+Quem joga pode **editar** o controle do jogo na aba Controles do Hub; **Restaurar** volta ao que veio com o
+jogo, e uma versão nova do jogo não apaga a edição da pessoa.
+
+**O meio livre.** Quem liga a tela do jogo no celular vê a imagem atrás dos controles. Como nos jogos de
+celular, deixe o meio da tela sem botões (os analógicos não contam: são invisíveis e nascem onde o dedo
+toca). O `pa validate` avisa qual peça tampa o meio.
 
 O jeito fácil: monte no editor do Hub (**Controles → Criar layout**), com os modos e o nome de cada botão, e
 copie as peças. Cada peça tem o centro (`x`, `y`, de 0 a 1 numa tela de celular deitado), o tamanho `s`

@@ -302,6 +302,15 @@ pub fn game_layout_set(hub: Hubs, game: String, layout: Option<String>) -> Resul
     Ok(())
 }
 
+/// "Restaurar": o controle do jogo volta a ser o que veio com ele.
+#[tauri::command]
+pub fn layout_reset(hub: Hubs, id: String) -> Result<crate::settings::Layout, String> {
+    let saved = hub.settings.lock().unwrap().reset_game_layout(&id)?;
+    hub.save_settings();
+    hub.broadcast_layouts();
+    Ok(saved)
+}
+
 #[tauri::command]
 pub fn layout_delete(hub: Hubs, id: String) -> bool {
     let ok = hub.settings.lock().unwrap().delete_layout(&id);
@@ -595,13 +604,9 @@ pub fn take_pending_add() -> Option<String> {
 /// `create: false` só conta se já existe.
 #[tauri::command]
 pub fn desktop_shortcut(create: bool) -> Result<bool, String> {
+    const NO_SHORTCUT: &str = "Não deu para criar o atalho. Abra o Party Anywhere pelo menu Iniciar.";
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    let desktop = std::env::var_os("USERPROFILE").map(|h| PathBuf::from(h).join("Desktop")).ok_or("não achei a área de trabalho")?;
-    // OneDrive pode mover a área de trabalho: vale a que existir
-    let desktop = [desktop.clone(), std::env::var_os("OneDrive").map(|o| PathBuf::from(o).join("Desktop")).unwrap_or(desktop)]
-        .into_iter()
-        .find(|d| d.is_dir())
-        .ok_or("não achei a área de trabalho")?;
+    let desktop = desktop_dir().ok_or(NO_SHORTCUT)?;
     let lnk = desktop.join("Party Anywhere.lnk");
     if lnk.exists() || !create {
         return Ok(lnk.exists());
@@ -623,8 +628,34 @@ pub fn desktop_shortcut(create: bool) -> Result<bool, String> {
     if ok && lnk.exists() {
         Ok(true)
     } else {
-        Err("não consegui criar o atalho.".into())
+        Err(NO_SHORTCUT.into())
     }
+}
+
+/// A área de trabalho de verdade, como o Windows diz: com o OneDrive ela muda de lugar e de nome
+/// ("OneDrive\Área de Trabalho" num Windows em português), então `%USERPROFILE%\Desktop` não serve.
+#[cfg(windows)]
+fn desktop_dir() -> Option<PathBuf> {
+    use std::os::windows::ffi::OsStringExt;
+    use windows_sys::Win32::System::Com::CoTaskMemFree;
+    use windows_sys::Win32::UI::Shell::{FOLDERID_Desktop, SHGetKnownFolderPath};
+    let mut raw: windows_sys::core::PWSTR = std::ptr::null_mut();
+    // SAFETY: `raw` recebe um texto alocado pelo Windows, lido até o zero final e liberado com CoTaskMemFree.
+    let path = unsafe {
+        let ok = SHGetKnownFolderPath(&FOLDERID_Desktop, 0, std::ptr::null_mut(), &mut raw) >= 0 && !raw.is_null();
+        let path = ok.then(|| {
+            let len = (0..).take_while(|&i| *raw.add(i) != 0).count();
+            PathBuf::from(std::ffi::OsString::from_wide(std::slice::from_raw_parts(raw, len)))
+        });
+        CoTaskMemFree(raw as *const _);
+        path
+    };
+    path.filter(|d| d.is_dir())
+}
+
+#[cfg(not(windows))]
+fn desktop_dir() -> Option<PathBuf> {
+    std::env::var_os("HOME").map(|h| PathBuf::from(h).join("Desktop")).filter(|d| d.is_dir())
 }
 
 // ---------------------------------------------------------------- jogo original de um mod
@@ -944,6 +975,15 @@ pub fn installed_info(libs: Libs, id: String) -> Option<Installed> {
 #[cfg(test)]
 mod tests {
     use super::pretty_name;
+
+    /// A área de trabalho vem do Windows (com o OneDrive ela fica em "OneDrive\Área de Trabalho", não em
+    /// `%USERPROFILE%\Desktop`), e existe.
+    #[cfg(windows)]
+    #[test]
+    fn the_desktop_is_the_one_windows_says() {
+        let d = super::desktop_dir().expect("área de trabalho");
+        assert!(d.is_dir() && d.is_absolute(), "{}", d.display());
+    }
 
     #[test]
     fn names_from_files() {

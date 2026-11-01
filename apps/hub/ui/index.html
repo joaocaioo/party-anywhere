@@ -525,6 +525,8 @@ button.row:hover { background: rgba(255, 255, 255, .035); }
 .le-field { display: grid; flex: 0 1 280px; }
 .le-field input { height: 42px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line-strong); background: rgba(0, 0, 0, .3); font-size: 15px; font-weight: 500; outline: none; }
 .le-field input:focus { border-color: rgba(60, 240, 96, .6); box-shadow: 0 0 0 3px rgba(60, 240, 96, .12); }
+/* o controle do jogo: o nome e o jogo são os dele */
+.le-field input:disabled, .le-field select:disabled { opacity: .55; cursor: default; }
 .le-modes { flex: 1 1 360px; min-width: 0; }
 .lseg { display: inline-flex; align-items: center; gap: 4px; padding: 4px; border-radius: 999px; border: 1px solid var(--line-strong); background: rgba(0, 0, 0, .25); max-width: 100%; overflow-x: auto; }
 .lseg button { height: 32px; padding: 0 14px; border-radius: 999px; font-size: 12.5px; font-weight: 700; color: var(--muted); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
@@ -2920,11 +2922,22 @@ const demoLayouts = [
   { id: 'simple', name: 'Simples', modes: [{ name: 'Padrão', pieces: SIMPLE_PIECES }], builtin: true },
   { id: 'advanced', name: 'Avançado', modes: [{ name: 'Padrão', pieces: ADVANCED_PIECES }], builtin: true },
 ];
+// o controle que veio com um mod (controls na ficha): editável, com Restaurar
+{
+  const L = (kind, xu, y, s, label) => ({ ...P(kind, xu, y, s), label });
+  const modes = [
+    { name: 'A pé', pieces: [L('START', .16, .12, .9, 'Pausa'), L('LB', .4, .27, 1, 'Correr'), L('stickL', .4, .66, 1, 'Andar'), L('RT', 1.84, .12, 1, 'Atirar'), L('Y', 1.84, .4, 1, 'Carro'), L('X', 1.62, .6, 1, 'Soco'), L('B', 2.06, .6, 1, 'Agachar'), L('A', 1.84, .82, 1.1, 'Pular'), L('stickR', 1.45, .84, .7, 'Olhar')] },
+    { name: 'Veículo', pieces: [L('START', .16, .12, .9, 'Pausa'), L('stickL', .4, .62, 1, 'Direção'), L('LT', 1.84, .12, 1, 'Ré'), L('Y', 1.84, .4, 1, 'Sair'), L('B', 2.06, .6, 1, 'Freio'), L('RT', 1.84, .84, 1.2, 'Acelerar')] },
+  ];
+  demoLayouts.push({ id: 'game-sa', name: 'San Andreas Party', modes, shipped: JSON.parse(JSON.stringify(modes)), builtin: false, fromGame: true, edited: false, game: 'sa' });
+}
 const demoSettings = { joinOnButton: false, preferredIp: null, joinUrl: JOIN_URL, virtualPads: false, version: '0.1.0' };
 const hubData = {
   devices: async () => seats.filter(Boolean).map((x) => ({ key: x.deviceKey, kind: x.kind, deviceName: x.deviceName, via: x.via, battery: x.battery, ping: typeof x.ping === 'number' ? x.ping : null, seat: x.index, layout: x.kind === 'phone' ? 'advanced' : null })),
   layouts: async () => demoLayouts,
   saveLayout: async (id, name, modes, game) => {
+    const shipped = demoLayouts.find((x) => x.id === id && x.fromGame);
+    if (shipped) { shipped.modes = modes; shipped.edited = JSON.stringify(modes) !== JSON.stringify(shipped.shipped); return shipped; }
     demoLayouts.forEach((x) => { if (game && x.game === game) x.game = null; });
     const l = { id: id || 'custom-' + Date.now(), name, modes, builtin: false, game: game || null };
     const i = demoLayouts.findIndex((x) => x.id === l.id);
@@ -2936,7 +2949,8 @@ const hubData = {
     const l = demoLayouts.find((x) => x.id === layout);
     if (l) l.game = game;
   },
-  deleteLayout: async (id) => { const i = demoLayouts.findIndex((x) => x.id === id && !x.builtin); if (i >= 0) demoLayouts.splice(i, 1); return i >= 0; },
+  deleteLayout: async (id) => { const i = demoLayouts.findIndex((x) => x.id === id && !x.builtin && !x.fromGame); if (i >= 0) demoLayouts.splice(i, 1); return i >= 0; },
+  resetLayout: async (id) => { const l = demoLayouts.find((x) => x.id === id && x.fromGame); if (l) { l.modes = JSON.parse(JSON.stringify(l.shipped)); l.edited = false; } return l; },
   settings: async () => demoSettings,
   setJoinPolicy: async (on) => { demoSettings.joinOnButton = on; },
   addresses: async () => [{ url: JOIN_URL, interface: 'Wi-Fi', current: true }, { url: 'http://172.24.160.1:27027/', interface: 'vEthernet (WSL)', current: false }],
@@ -3016,10 +3030,13 @@ async function renderControls() {
   const usedBy = (id) => devs.filter((d) => d.layout === id && d.seat != null).map((d) => `P${d.seat + 1}`);
   document.getElementById('layoutRows').innerHTML = layouts.map((l) => {
     const users = usedBy(l.id);
-    const acts = l.builtin || l.fromGame
+    // o do jogo: editável no lugar (o original fica para Restaurar); os prontos: só duplicar
+    const acts = l.builtin
       ? `<button class="btn-ghost sm" data-dup-layout="${escapeHtml(l.id)}">Duplicar</button>`
+      : l.fromGame
+      ? `${l.edited ? `<button class="btn-ghost sm" data-reset-layout="${escapeHtml(l.id)}">Restaurar</button>` : ''}<button class="btn-ghost sm" data-edit-layout="${escapeHtml(l.id)}">Editar</button>`
       : `<button class="btn-ghost sm" data-edit-layout="${escapeHtml(l.id)}">Editar</button><button class="icon-btn sm" data-del-layout="${escapeHtml(l.id)}" title="Apagar" aria-label="Apagar ${escapeHtml(l.name)}">${icon('close')}</button>`;
-    return `<div class="lay-card">${miniPhone(l)}<div class="lay-meta"><span class="row-t"><b>${escapeHtml(l.name)}${l.builtin ? '<span class="tag-mini">PRONTO</span>' : l.fromGame ? '<span class="tag-mini">DO JOGO</span>' : ''}</b><small>${escapeHtml(describeLayout(l))}${l.game ? ` · entra sozinho em ${escapeHtml(gameName(l.game))}` : ''}${users.length ? ` · em uso: ${users.join(', ')}` : ''}</small></span><span class="row-act">${acts}</span></div></div>`;
+    return `<div class="lay-card">${miniPhone(l)}<div class="lay-meta"><span class="row-t"><b>${escapeHtml(l.name)}${l.builtin ? '<span class="tag-mini">PRONTO</span>' : l.fromGame ? '<span class="tag-mini">DO JOGO</span>' : ''}</b><small>${escapeHtml(describeLayout(l))}${l.game ? ` · entra sozinho em ${escapeHtml(gameName(l.game))}` : ''}${l.edited ? ' · editado por você' : ''}${users.length ? ` · em uso: ${users.join(', ')}` : ''}</small></span><span class="row-act">${acts}</span></div></div>`;
   }).join('') + `<button class="lay-card new" data-new-layout><span class="plus">${icon('plus')}</span><b>Criar layout</b><small>Monte o controle arrastando as peças para a tela do celular.</small></button>`;
 }
 document.getElementById('view-controls').addEventListener('click', async (e) => {
@@ -3031,6 +3048,15 @@ document.getElementById('view-controls').addEventListener('click', async (e) => 
     const id = ed.dataset.editLayout || ed.dataset.dupLayout;
     const l = (await hubData.layouts()).find((x) => x.id === id);
     if (l) openLayoutEditor(ed.dataset.editLayout ? l : null, l);
+    return;
+  }
+  const rst = e.target.closest('[data-reset-layout]');
+  if (rst) {
+    try {
+      const l = await hubData.resetLayout(rst.dataset.resetLayout);
+      if (l) toast(`Controle de ${l.name} restaurado: igual ao que veio com o jogo.`, null, 'ok');
+    } catch (err) { toast(String(err && err.message ? err.message : err), null, 'warn'); }
+    renderControls();
     return;
   }
   const del = e.target.closest('[data-del-layout]');
@@ -3072,12 +3098,15 @@ function openLayoutEditor(layout, base, forGame) {
   if (!layout && forGame && !st.name) st.name = gameName(forGame).slice(0, 24);
   if (!layout && !forGame && base && base.builtin && base.id !== 'simple') st.name = `Meu ${base.name}`.slice(0, 24);
   const cur = () => st.modes[st.m];
-  const title = layout ? 'Editar layout' : 'Criar layout';
+  // o controle que veio com o jogo: muda só o desenho; o nome e o jogo continuam os dele
+  const shipped = !!(layout && layout.fromGame);
+  if (shipped) st.game = layout.game || '';
+  const title = shipped ? 'Editar o controle do jogo' : layout ? 'Editar layout' : 'Criar layout';
   openModal(`${head(title, 'Arraste as peças para a tela do celular. Para tirar uma peça, arraste para fora da tela.')}
     <div class="le" id="le">
       <div class="le-top">
-        <label class="le-field"><span class="le-cap">Nome do layout</span><input id="leName" maxlength="24" placeholder="Ex.: GTA, Corrida, Luta" value="${escapeHtml(st.name)}"></label>
-        <label class="le-field"><span class="le-cap">Entra sozinho no jogo</span><select id="leGame"><option value="">Nenhum (cada um escolhe)</option>${games.filter((g) => !g.universal).map((g) => `<option value="${escapeHtml(g.id)}"${g.id === st.game ? ' selected' : ''}>${escapeHtml(g.name)}</option>`).join('')}</select></label>
+        <label class="le-field"><span class="le-cap">Nome do layout</span><input id="leName" maxlength="24" placeholder="Ex.: GTA, Corrida, Luta" value="${escapeHtml(st.name)}"${shipped ? ' disabled' : ''}></label>
+        <label class="le-field"><span class="le-cap">Entra sozinho no jogo</span><select id="leGame"${shipped ? ' disabled' : ''}><option value="">Nenhum (cada um escolhe)</option>${games.filter((g) => !g.universal).map((g) => `<option value="${escapeHtml(g.id)}"${g.id === st.game ? ' selected' : ''}>${escapeHtml(g.name)}</option>`).join('')}</select></label>
         <div class="le-modes"><span class="le-cap">Modos</span><div id="leModes"></div></div>
       </div>
       <div class="le-main">

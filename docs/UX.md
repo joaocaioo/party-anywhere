@@ -220,12 +220,16 @@ O Hub lê nome e ícone do próprio executável, procura a capa pelo nome e, se 
 - **Tela cheia:** no Android, o primeiro toque já deixa em tela cheia e deitado. No iPhone nenhum navegador
   faz tela cheia: na primeira vez, um aviso ensina "Compartilhar → Adicionar à Tela de Início"; aberto pelo
   ícone, roda sem a barra do navegador, com fundo preto.
-- **Layouts**: Simples (analógico, A, B, X, Y grandes e Start), Avançado (tudo) e os criados na aba
-  Controles. Nada se sobrepõe, em nenhum celular. O Hub lembra o layout de cada celular.
+- **Layouts**: Simples (analógico, A, B, X, Y grandes e Start), Avançado (tudo), **o do jogo** (veio com o
+  jogo aberto) e os criados na aba Controles. Os de outros jogos não aparecem. Nada se sobrepõe, em nenhum
+  celular. O Hub lembra o layout de cada celular.
 - **Tela do jogo no celular** (desligada; a pessoa liga no menu, e fica guardado naquele celular): nos jogos
   que mostram, a sua parte do jogo aparece no celular, no formato da tela dele (sem faixas, fundo preto), e
-  sai da TV. Os controles ficam de contorno, quase transparentes, com o meio livre; o nome de cada botão
-  continua legível. O Diagnóstico mostra quadros por segundo e o atraso.
+  sai da TV. Os controles ficam de contorno, quase transparentes, com o meio livre: o Simples e o Avançado
+  trocam sozinhos para a versão deles com as peças nas bordas, e o do jogo já nasce assim.
+- **Câmera na direita**: quando o jogo lê a câmera pelo celular, arrastar o dedo na parte livre da metade
+  direita gira a câmera em **todo** layout, inclusive no Simples (que não tem analógico direito) e no Avançado. O nome de cada
+  botão continua legível. O Diagnóstico mostra quadros por segundo e o atraso.
 - **Sair da partida** (menu, segurando): a vaga fica livre e o jogo reorganiza a tela na hora.
 - **Modos**: um layout pode ter vários (ex.: A pé e Veículo). Os nomes ficam no topo; um toque troca na hora.
 - **Padrão do jogo**: cada jogo pode ter o seu controle (o que veio com o jogo, ou o que a pessoa escolheu em
@@ -258,8 +262,8 @@ O Hub lê nome e ícone do próprio executável, procura a capa pelo nome e, se 
 - **Controles**: os aparelhos conectados agora (com a vaga ou "esperando"), com Identificar. **Apertou qualquer
   tecla ou botão, a linha daquele aparelho pisca**: fácil saber quem é quem (o núcleo só avisa com a aba aberta,
   no máximo a cada 150 ms por aparelho). E os layouts do
-  celular em cartões com a **tela do celular em miniatura** (prontos: Duplicar; seus: Editar e Apagar; quem
-  usava um layout apagado volta para o Avançado).
+  celular em cartões com a **tela do celular em miniatura** (prontos: Duplicar; do jogo: Editar e, depois de editado,
+  Restaurar; seus: Editar e Apagar; quem usava um layout apagado volta para o Avançado).
 - **Criar layout**: a tela de um celular deitado e a lista de peças ao lado. **Arrastar** da lista para a tela
   põe a peça (um toque põe no lugar livre mais perto); arrastar move (com grade); **arrastar para fora tira**.
   Peça escolhida: tamanho P, M ou G e "Tirar da tela"; setas do teclado movem. Modos (A pé, Veículo...): o

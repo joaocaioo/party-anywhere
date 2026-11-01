@@ -7,6 +7,11 @@
 //! sobrepõe no editor não se sobrepõe em nenhum celular. No meio do topo fica a pílula do jogador e do Menu
 //! (`TOP_PILL`): nenhuma peça vai ali. Os analógicos são "livres": no celular, o esquerdo nasce onde o dedo
 //! tocar na metade da tela em que ele está (o direito, na dele), fora das outras peças.
+//!
+//! Com a tela do jogo no celular, os prontos trocam para a versão `screen` deles: o meio fica livre para a
+//! imagem, como nos jogos de celular. O layout que veio com um jogo (`controls` no manifesto) também é
+//! editável; o original fica guardado (`shipped`) para "Restaurar" e para a atualização do jogo não apagar a
+//! edição da pessoa.
 
 use std::collections::HashMap;
 use std::fs;
@@ -36,9 +41,15 @@ pub struct Layout {
     /// (ou no próprio layout, quando ele veio com o jogo); `all_layouts` preenche para a UI.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub game: Option<String>,
-    /// Veio com o jogo (`controls` no manifesto): não dá para editar nem apagar; dá para duplicar.
+    /// Veio com o jogo (`controls` no manifesto): dá para editar e restaurar, não dá para apagar.
     #[serde(default)]
     pub from_game: bool,
+    /// Do jogo e editado pela pessoa (diferente do que veio com o jogo). Preenchido por `all_layouts`.
+    #[serde(default, skip_deserializing)]
+    pub edited: bool,
+    /// Os modos com a tela do jogo no celular (o meio livre). Vazio: os mesmos de `modes`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub screen: Vec<Mode>,
 }
 
 fn p(kind: &str, x_units: f32, y: f32, s: f32) -> Piece {
@@ -66,6 +77,39 @@ fn advanced_pieces() -> Vec<Piece> {
     ]
 }
 
+/// O Simples com a tela do jogo no celular: andar à esquerda, botões na borda direita, o meio livre.
+fn simple_screen_pieces() -> Vec<Piece> {
+    vec![
+        p("START", 0.16, 0.12, 0.9),
+        p("stickL", 0.42, 0.6, 1.0),
+        p("Y", 1.8, 0.38, 1.2),
+        p("X", 1.56, 0.62, 1.2),
+        p("B", 2.04, 0.62, 1.2),
+        p("A", 1.8, 0.86, 1.2),
+    ]
+}
+
+/// O Avançado com a tela do jogo no celular: as mesmas peças, encostadas nas bordas, o meio livre.
+fn advanced_screen_pieces() -> Vec<Piece> {
+    vec![
+        p("LT", 0.2, 0.1, 0.9),
+        p("LB", 0.58, 0.1, 0.9),
+        p("RB", 1.59, 0.1, 0.9),
+        p("RT", 1.97, 0.1, 0.9),
+        p("BACK", 0.16, 0.26, 0.9),
+        p("stickL", 0.3, 0.55, 0.8),
+        p("dpad", 0.64, 0.83, 0.7),
+        p("LS", 0.16, 0.9, 0.9),
+        p("START", 2.05, 0.26, 0.9),
+        p("Y", 1.84, 0.4, 1.0),
+        p("X", 1.64, 0.6, 1.0),
+        p("B", 2.04, 0.6, 1.0),
+        p("A", 1.84, 0.8, 1.0),
+        p("stickR", 1.42, 0.82, 0.6),
+        p("RS", 2.05, 0.95, 0.9),
+    ]
+}
+
 pub fn builtins() -> Vec<Layout> {
     let one_mode = |pieces| vec![Mode { name: "Padrão".into(), pieces }];
     vec![
@@ -84,6 +128,8 @@ pub fn builtins() -> Vec<Layout> {
             builtin: true,
             game: None,
             from_game: false,
+            edited: false,
+            screen: one_mode(simple_screen_pieces()),
         },
         Layout {
             id: "advanced".into(),
@@ -93,6 +139,8 @@ pub fn builtins() -> Vec<Layout> {
             builtin: true,
             game: None,
             from_game: false,
+            edited: false,
+            screen: one_mode(advanced_screen_pieces()),
         },
     ]
 }
@@ -122,6 +170,9 @@ pub struct Settings {
     /// Jogo da biblioteca → layout que entra sozinho quando ele abre (qualquer layout, até os prontos).
     #[serde(default)]
     pub game_layout: HashMap<String, String>,
+    /// Layout que veio com um jogo → os modos como o jogo trouxe (para "Restaurar" e para as atualizações).
+    #[serde(default)]
+    pub shipped: HashMap<String, Vec<Mode>>,
 }
 
 impl Default for Settings {
@@ -133,6 +184,7 @@ impl Default for Settings {
             layouts: vec![],
             phone_layout: HashMap::new(),
             game_layout: HashMap::new(),
+            shipped: HashMap::new(),
         }
     }
 }
@@ -145,6 +197,10 @@ impl Settings {
             if l.modes.is_empty() && !l.controls.is_empty() {
                 l.modes = from_controls(&l.controls);
             }
+        }
+        // do jogo, de antes de dar para editar: o que está guardado é o original
+        for l in s.layouts.iter().filter(|l| l.from_game) {
+            s.shipped.entry(l.id.clone()).or_insert_with(|| l.modes.clone());
         }
         s
     }
@@ -163,6 +219,9 @@ impl Settings {
 
     pub fn all_layouts(&self) -> Vec<Layout> {
         let mut all: Vec<Layout> = builtins().into_iter().chain(self.layouts.iter().cloned()).collect();
+        for l in all.iter_mut().filter(|l| l.from_game) {
+            l.edited = self.shipped.get(&l.id).is_some_and(|m| *m != l.modes);
+        }
         for l in all.iter_mut().filter(|l| !l.from_game) {
             let mut games: Vec<&String> = self.game_layout.iter().filter(|(_, id)| **id == l.id).map(|(g, _)| g).collect();
             games.sort();
@@ -203,6 +262,12 @@ impl Settings {
         }
         check_modes(&modes)?;
         let modes: Vec<Mode> = modes.into_iter().map(clean_mode).collect();
+        // o que veio com o jogo: só os modos mudam (o nome e o jogo continuam os dele)
+        if let Some(l) = id.and_then(|id| self.layouts.iter_mut().find(|l| l.id == id && l.from_game)) {
+            l.modes = modes;
+            let id = l.id.clone();
+            return self.all_layouts().into_iter().find(|l| l.id == id).ok_or_else(|| "esse controle não existe mais.".into());
+        }
         let game = game.filter(|g| !g.trim().is_empty());
         let saved = match id.and_then(|id| self.layouts.iter_mut().find(|l| l.id == id && !l.from_game)) {
             Some(l) => {
@@ -219,7 +284,17 @@ impl Settings {
                     id = format!("custom-{base}-{n}");
                     n += 1;
                 }
-                let l = Layout { id, name: name.into(), modes, controls: vec![], builtin: false, game: None, from_game: false };
+                let l = Layout {
+                    id,
+                    name: name.into(),
+                    modes,
+                    controls: vec![],
+                    builtin: false,
+                    game: None,
+                    from_game: false,
+                    edited: false,
+                    screen: vec![],
+                };
                 self.layouts.push(l.clone());
                 l
             }
@@ -232,22 +307,41 @@ impl Settings {
         Ok(Layout { game, ..saved })
     }
 
-    /// O controle que veio com o jogo (manifesto): entra como "do jogo", no lugar do anterior.
+    /// O controle que veio com o jogo (manifesto): entra como "do jogo", no lugar do anterior. Se a pessoa
+    /// editou o anterior, a edição dela fica (o novo original vai para "Restaurar").
     pub fn set_game_layout(&mut self, game: &str, name: &str, modes: Vec<Mode>) -> Result<Layout, String> {
         check_modes(&modes)?;
         let slug: String = game.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '-' }).collect();
+        let id = format!("game-{slug}");
+        let modes: Vec<Mode> = modes.into_iter().map(clean_mode).collect();
+        let before = self.layouts.iter().position(|x| x.id == id);
+        let edit = before.map(|i| &self.layouts[i]).filter(|l| self.shipped.get(&l.id).is_some_and(|m| *m != l.modes));
         let l = Layout {
-            id: format!("game-{slug}"),
+            id: id.clone(),
             name: name.chars().take(24).collect(),
-            modes: modes.into_iter().map(clean_mode).collect(),
+            modes: edit.map_or_else(|| modes.clone(), |l| l.modes.clone()),
             controls: vec![],
             builtin: false,
             game: Some(game.into()),
             from_game: true,
+            edited: edit.is_some(),
+            screen: vec![],
         };
-        self.layouts.retain(|x| x.id != l.id);
-        self.layouts.push(l.clone());
+        self.shipped.insert(id, modes);
+        match before {
+            Some(i) => self.layouts[i] = l.clone(),
+            None => self.layouts.push(l.clone()),
+        }
         Ok(l)
+    }
+
+    /// "Restaurar": o controle do jogo volta a ser o que veio com ele.
+    pub fn reset_game_layout(&mut self, id: &str) -> Result<Layout, String> {
+        let shipped = self.shipped.get(id).cloned().ok_or("esse controle não veio com um jogo.")?;
+        let l = self.layouts.iter_mut().find(|l| l.id == id && l.from_game).ok_or("esse controle não existe mais.")?;
+        l.modes = shipped;
+        l.edited = false;
+        Ok(l.clone())
     }
 
     /// O layout que entra sozinho quando o jogo abre: o que a pessoa escolheu para ele; senão, o que veio com ele.
@@ -292,10 +386,49 @@ mod tests {
     #[test]
     fn builtins_fit_the_screen_without_overlaps() {
         for l in builtins() {
-            for m in &l.modes {
+            for m in l.modes.iter().chain(&l.screen) {
                 check_mode(m).unwrap_or_else(|e| panic!("{}: {e}", l.name));
             }
         }
+    }
+
+    #[test]
+    fn builtins_leave_the_middle_free_for_the_game_screen() {
+        for l in builtins() {
+            assert!(!l.screen.is_empty(), "{} sem versão para a tela do jogo", l.name);
+            let kinds = |ms: &[Mode]| {
+                let mut k: Vec<String> = ms[0].pieces.iter().map(|p| p.kind.clone()).collect();
+                k.sort();
+                k
+            };
+            assert_eq!(kinds(&l.modes), kinds(&l.screen), "{}: a versão da tela tem as mesmas peças", l.name);
+            assert_eq!(pa_manifest::controls::center_pieces(&l.screen[0]), Vec::<String>::new(), "{}", l.name);
+        }
+    }
+
+    #[test]
+    fn the_game_layout_is_editable_restorable_and_survives_updates() {
+        let mut s = Settings::default();
+        let v1 = || vec![mode("Jogar", vec![p("stickL", 0.4, 0.5, 1.0), p("A", 1.8, 0.8, 1.0)])];
+        let v2 = || vec![mode("Jogar", vec![p("stickL", 0.4, 0.5, 1.0), p("A", 1.8, 0.8, 1.0), p("B", 2.0, 0.55, 1.0)])];
+        let shipped = s.set_game_layout("mw", "MicroWorks", v1()).unwrap();
+        assert!(!s.all_layouts().iter().find(|l| l.id == shipped.id).unwrap().edited);
+        // atualização sem edição: vem a nova
+        s.set_game_layout("mw", "MicroWorks", v2()).unwrap();
+        assert_eq!(s.layouts[0].modes, v2());
+        // a pessoa edita: o nome e o jogo ficam os do jogo
+        let mine = vec![mode("Jogar", vec![p("stickL", 0.4, 0.5, 1.0), p("A", 1.6, 0.8, 1.2)])];
+        let e = s.upsert_layout(Some(&shipped.id), "Outro nome", mine.clone(), None).unwrap();
+        assert!(e.edited && e.from_game);
+        assert_eq!((e.name.as_str(), e.game.as_deref()), ("MicroWorks", Some("mw")));
+        assert_eq!(s.layout_for_game("mw").as_deref(), Some(shipped.id.as_str()));
+        // o jogo atualiza: a edição fica, o novo original vai para o Restaurar
+        let v3 = vec![mode("Jogar", vec![p("stickL", 0.4, 0.5, 1.0), p("X", 1.8, 0.8, 1.0)])];
+        assert!(s.set_game_layout("mw", "MicroWorks", v3.clone()).unwrap().edited);
+        assert_eq!(s.layouts[0].modes, mine);
+        assert_eq!(s.reset_game_layout(&shipped.id).unwrap().modes, v3);
+        assert!(!s.all_layouts().iter().find(|l| l.id == shipped.id).unwrap().edited);
+        assert!(s.reset_game_layout("simple").is_err());
     }
 
     #[test]

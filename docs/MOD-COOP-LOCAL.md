@@ -132,7 +132,8 @@ HUD de cada jogador, o som (de quem é cada som) e a pausa (o local não pode tr
 
 - Todo mod declara `controls` na ficha, com os modos do jogo: o **meio livre**; andar na esquerda; câmera,
   tiro e ações principais na direita; ações raras num segundo modo. Monte no editor do Hub (Controles → Criar
-  layout) e copie com "Copiar para a ficha do mod".
+  layout) e copie com "Copiar para a ficha do mod". O `pa new` já traz um inicial nesse padrão, e o `pa validate`
+  avisa qual peça tampa o meio. Quem instala recebe esse controle junto e pode editá-lo no Hub.
 - Nomes nos botões curtos (até ~8 letras), iguais no `controls` e no `pa_set_label`.
 - Câmera: leia `pa_take_look` (arrastar o dedo) além do analógico direito.
 

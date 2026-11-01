@@ -131,3 +131,22 @@ pub fn check_modes(modes: &[Mode]) -> Result<(), String> {
     }
     modes.iter().try_for_each(check_mode)
 }
+
+/// Meia largura da faixa do meio que fica livre para a tela do jogo no celular (unidades da altura): ~28% da
+/// tela, como nos jogos de celular.
+pub const CENTER_FREE: f32 = 0.3;
+
+/// As peças que tampam o meio da tela (onde fica a imagem do jogo quando a pessoa joga olhando o celular).
+/// Os analógicos não contam: no celular eles são invisíveis e nascem onde o dedo tocar.
+pub fn center_pieces(m: &Mode) -> Vec<String> {
+    let mid = CANVAS / 2.0;
+    m.pieces
+        .iter()
+        .filter(|p| p.kind != "stickL" && p.kind != "stickR")
+        .filter(|p| {
+            // encostar na faixa não conta (a mesma folga das outras regras)
+            rect(p).is_some_and(|(x0, _, x1, y1)| x0 < mid + CENTER_FREE - 0.01 && x1 > mid - CENTER_FREE + 0.01 && y1 > TOP_PILL.1)
+        })
+        .map(|p| p.kind.clone())
+        .collect()
+}

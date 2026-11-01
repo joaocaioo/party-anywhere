@@ -124,7 +124,7 @@ vem. Assim o app de quem baixar sabe procurar e, se precisar, ajudar a pessoa a 
 
 | Arquivo | Para que serve |
 |---|---|
-| `party-anywhere.json` | A "ficha" do mod: nome, quantos jogadores, qual é o jogo original, o que copiar para a pasta dele. É o que o app lê. |
+| `party-anywhere.json` | A "ficha" do mod: nome, quantos jogadores, qual é o jogo original, o que copiar para a pasta dele e o controle do celular do jogo (já vem um, com o meio da tela livre). É o que o app lê. |
 | `assets/cover.png` | A capa na Biblioteca. Vem uma provisória; troque pela sua (retrato 3:4, arte própria). |
 | `sdk/party_anywhere.h` | O SDK: o arquivo que o mod inclui para ler os jogadores. |
 | `.github/workflows/release.yml` | Publica cada versão sozinho quando você cria uma tag. |

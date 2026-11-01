@@ -248,7 +248,14 @@ impl Hub {
                 }
                 _ => mine,
             };
-            let mut items = serde_json::to_value(st.all_layouts()).unwrap_or_default();
+            // no menu do celular: os prontos, os da pessoa e o do jogo aberto (os de outros jogos só atrapalham)
+            let session = self.session_layout.lock().unwrap().as_ref().map(|(l, _)| l.clone());
+            let shown: Vec<_> = st
+                .all_layouts()
+                .into_iter()
+                .filter(|l| !l.from_game || l.id == current || session.as_deref() == Some(l.id.as_str()))
+                .collect();
+            let mut items = serde_json::to_value(shown).unwrap_or_default();
             sdk.apply_labels(seat as usize, &mut items, &current);
             (items, current, sdk.mode(seat as usize))
         };
