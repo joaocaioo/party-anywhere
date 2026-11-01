@@ -1965,6 +1965,28 @@ function preGame(g) {
       } });
     });
 
+    // o mod tem versão nova: atualizar antes de jogar (ou jogar a de agora, se a pessoa preferir)
+    const askUpdate = () => new Promise((done) => {
+      show(`<p class="gr-kicker">Versão nova</p><h3>${escapeHtml(g.name)} ${escapeHtml(g.update)} saiu</h3>
+        <p class="gr-help">Atualizar leva alguns segundos e guarda os arquivos originais, como na instalação.</p>
+        <p class="gr-help" id="grUpState" hidden></p>
+        <div class="gr-actions" id="grUpActions"><button class="btn-neon" data-pre="install">${icon('download')}Atualizar e jogar</button><button class="btn-ghost" data-pre="skip">Jogar a versão de agora</button><button class="btn-ghost" data-pre="back">Voltar</button></div>`, { step: 'update', skip: done, install: async () => {
+        const state = document.getElementById('grUpState'), actions = document.getElementById('grUpActions');
+        state.hidden = false;
+        state.textContent = 'Baixando e conferindo a versão nova...';
+        actions.hidden = true;
+        try {
+          await hubData.updateGame(g);
+          g.update = null;
+          toast(`${g.name} atualizado`, null, 'ok');
+          done();
+        } catch (err) {
+          state.textContent = `Não deu para atualizar: ${String(err && err.message ? err.message : err)}`;
+          actions.hidden = false;
+        }
+      } });
+    });
+
     const pick = (max) => new Promise((done) => {
       const chosen = new Set();
       const draw = () => {
@@ -1987,6 +2009,7 @@ function preGame(g) {
     });
 
     (async () => {
+      if (g.update && g.repo) await askUpdate();
       const n = active().length;
       let max = maxPlayers(g);
       if (max == null && n > 1) { await askMax(); max = maxPlayers(g); }
@@ -2571,6 +2594,7 @@ async function switchView(v) {
   const dir = Math.sign(ORDER.indexOf(v) - ORDER.indexOf(from)) || 1;
   if (v === 'library' || from === 'library') await ensureArcade();
   currentView = v;
+  if (v === 'library' && hubData.libraryOpened) hubData.libraryOpened(); // no app: confere versões novas dos mods
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.view === v));
   document.querySelector('#addBtn .lbl-long').textContent = v === 'library' ? 'Adicionar jogo' : 'Adicionar jogador';
   const fromEl = document.getElementById('view-' + from);
@@ -2969,6 +2993,7 @@ const hubData = {
   deleteLayout: async (id) => { const i = demoLayouts.findIndex((x) => x.id === id && !x.builtin && !x.fromGame); if (i >= 0) demoLayouts.splice(i, 1); return i >= 0; },
   resetLayout: async (id) => { const l = demoLayouts.find((x) => x.id === id && x.fromGame); if (l) { l.modes = JSON.parse(JSON.stringify(l.shipped)); l.edited = false; } return l; },
   settings: async () => demoSettings,
+  updateGame: async () => { await sleep(1500); },
   setJoinPolicy: async (on) => { demoSettings.joinOnButton = on; },
   addresses: async () => [{ url: JOIN_URL, interface: 'Wi-Fi', current: true }, { url: 'http://172.24.160.1:27027/', interface: 'vEthernet (WSL)', current: false }],
   setJoinIp: async () => JOIN_URL,

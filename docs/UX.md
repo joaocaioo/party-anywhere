@@ -143,7 +143,8 @@ em modo de pareamento. O nosso:
   longa e macia e um leve desfoque radial de movimento. Ao sair, um recuo curto e macio (0,5 s) com
   esmaecimento; a outra aba entra logo depois.
 - **Jogar**: a câmera entra na tela do fliperama, a tela apaga (com um clarão de CRT) e o jogo abre.
-  Antes de abrir, na própria tela do fliperama, quando precisa: quantas pessoas o jogo aceita (só na primeira
+  Antes de abrir, na própria tela do fliperama, quando precisa: **versão nova** do mod ("Atualizar e jogar" ou
+  "Jogar a versão de agora"), quantas pessoas o jogo aceita (só na primeira
   vez de um jogo do PC), o aviso do componente dos celulares e, se houver mais gente do que o jogo aceita,
   **"Quem vai jogar?"**: cada um aperta A e a sua bolinha acende; B apaga; Start começa.
   **Sair do jogo** faz o caminho contrário: a tela religa e a câmera volta para a posição normal.

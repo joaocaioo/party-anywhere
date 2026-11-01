@@ -424,6 +424,19 @@
   // Jogar: abre o jogo de verdade; a animação do fliperama só roda se ele abriu
   // (a escolha de quem joga acontece antes, na tela do fliperama; ver preGame)
   window.startGame = (g, players) => invoke('game_play', { id: g.id, players });
+  // Abriu a Biblioteca: confere versões novas dos mods (além da conferência a cada 6 h do núcleo), no máximo a
+  // cada 15 min (a API do GitHub sem login aceita poucas consultas; com ETag, "nada mudou" não conta)
+  let lastUpdateCheck = 0;
+  hubData.libraryOpened = () => {
+    if (Date.now() - lastUpdateCheck < 15 * 60 * 1000) return;
+    lastUpdateCheck = Date.now();
+    invoke('library_check_updates').catch(() => {});
+  };
+  // "Atualizar e jogar": a versão nova pelo mesmo caminho da instalação (pacote conferido pelo hash, backup)
+  hubData.updateGame = async (g) => {
+    const list = await invoke('library_install', { url: g.repo, baseDir: null });
+    setGames(list, g.id);
+  };
   window.gameStopped = () => { invoke('game_stopped').catch(() => {}); };
   window.launch = (g) => invoke('game_play', { id: g.id }).then(() => toast(`Abrindo ${g.name}...`, null, 'ok')).catch(warn);
 

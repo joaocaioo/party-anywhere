@@ -482,7 +482,9 @@ pub async fn library_install(
             let why = report.issues.iter().find(|i| i.is_error()).map(|i| i.message.clone());
             return Err(why.unwrap_or(report.summary));
         };
-        let base_dir = base_dir.map(PathBuf::from).or_else(|| {
+        // atualização: a pasta do jogo original que a pessoa já escolheu (GOG, CD, outra pasta); senão, a Steam
+        let installed_base = libs.lib.lock().unwrap().get(&manifest.id).and_then(|e| e.installed.as_ref()?.base_dir.clone());
+        let base_dir = base_dir.map(PathBuf::from).or(installed_base).or_else(|| {
             let appid = manifest.requires.as_ref()?.base_game.as_ref()?.steam_app_id?;
             pcgames::steam_app_dir(appid)
         });

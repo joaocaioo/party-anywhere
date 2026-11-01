@@ -515,7 +515,10 @@ exatamente como estavam.
   novidade, a consulta nem conta no limite do GitHub). Versão nova: o ícone de atualização avisa; um clique
   baixa `PartyAnywhere-X.Y.Z-setup.exe` (só de `https://github.com/`), abre o instalador e fecha o Hub.
   Nunca durante uma partida, nunca sozinho.
-- Os jogos instalados por link são conferidos no mesmo ciclo; a novidade aparece como aviso com "Atualizar".
+- Os jogos instalados por link são conferidos no mesmo ciclo e também quando a Biblioteca abre (no máximo a
+  cada 15 min); a novidade aparece como aviso com "Atualizar" (cada versão é avisada uma vez) e, ao apertar
+  Jogar, como o passo "Versão nova" ("Atualizar e jogar" ou "Jogar a versão de agora"). A atualização usa a
+  mesma instalação (hash, backup) e a pasta do jogo original que a pessoa já tinha escolhido.
 - O release sai do workflow `.github/workflows/release.yml` a cada tag `vX.Y.Z` (instalador do Hub e a
   ferramenta `pa`).
 - **Antes da versão pública**: assinar o instalador (Authenticode) ou migrar para o updater do Tauri com
