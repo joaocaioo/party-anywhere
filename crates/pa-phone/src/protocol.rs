@@ -9,6 +9,7 @@
 //! | C→S | `0x05 STATE_T` | STATE + `[tipo u8][t f64]` (20 bytes): estado com o instante do toque no relógio do celular |
 //! | C→S | `0x06 SYNC`    | `[06][id u16][t0 f64]` |
 //! | C→S | `0x07 SYNC_DONE` | `[07][id u16][t1 f64]` |
+//! | C→S | `0x09 LOOK`    | `[09][dx i16][dy i16]`: câmera por deslocamento (arrastar o dedo), em centésimos de grau, direita e para cima positivos |
 //! | S→C | `0x83 PONG`    | `[83][t u16]` |
 //! | S→C | `0x84 RUMBLE`  | `[84][ms u16][força u8]` |
 //! | S→C | `0x85 SYNC_REPLY` | `[85][id u16]` |
@@ -35,6 +36,8 @@ pub const T_SYNC: u8 = 0x06;
 pub const T_SYNC_DONE: u8 = 0x07;
 /// O celular mostrou um quadro da tela do jogo: o Hub manda o próximo (controle de fluxo) e mede o atraso.
 pub const T_VIEW_ACK: u8 = 0x08;
+/// Câmera por deslocamento: quanto o dedo arrastou na área de câmera desde a última (centésimos de grau).
+pub const T_LOOK: u8 = 0x09;
 pub const T_PONG: u8 = 0x83;
 pub const T_RUMBLE: u8 = 0x84;
 pub const T_SYNC_REPLY: u8 = 0x85;
@@ -84,6 +87,8 @@ pub enum ClientMsg {
     Sync { id: u16, t0: f64 },
     SyncDone { id: u16, t1: f64 },
     ViewAck { id: u16 },
+    /// Graus (já com a sensibilidade escolhida no celular).
+    Look { dx: f32, dy: f32 },
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -134,6 +139,11 @@ pub fn decode_client(data: &[u8]) -> Result<ClientMsg, DecodeError> {
         T_VIEW_ACK => {
             need(2)?;
             Ok(ClientMsg::ViewAck { id: u16_at(rest, 0) })
+        }
+        T_LOOK => {
+            need(4)?;
+            let at = |i: usize| f32::from(i16::from_le_bytes([rest[i], rest[i + 1]])) / 100.0;
+            Ok(ClientMsg::Look { dx: at(0), dy: at(2) })
         }
         other => Err(DecodeError::UnknownType(other)),
     }
@@ -202,8 +212,16 @@ pub enum ClientText {
     Layout { id: String },
     /// Trocou o nome no menu do celular.
     Rename { name: String },
-    /// "Tela do jogo no celular", ligada ou desligada no menu (ligada por padrão).
-    Screen { on: bool },
+    /// "Tela do jogo no celular", ligada ou desligada no menu (desligada por padrão: quem quer, liga).
+    /// `aspect`: largura / altura da tela do celular deitado (0 = não disse); o jogo desenha nesse formato e a
+    /// imagem enche a tela, sem faixas. Mandado de novo quando a tela muda (girar, barra do navegador).
+    Screen {
+        on: bool,
+        #[serde(default)]
+        aspect: f32,
+    },
+    /// "Sair da partida" no menu do celular: a vaga fica livre (como remover no Hub).
+    Leave,
 }
 
 /// Mensagens de texto para o celular.
@@ -218,12 +236,14 @@ pub enum ServerText<'a> {
     Identify,
     /// Layouts que o celular pode usar e o escolhido. `items`: `[{ id, name, controls: [..] }]`
     /// (controles: stickL, stickR, dpad, A, B, X, Y, LB, RB, LT, RT, BACK, START, LS, RS). `mode`: o modo
-    /// que o jogo pediu (`pa_set_mode`), quando pediu.
+    /// que o jogo pediu (`pa_set_mode`), quando pediu. `look`: o jogo aberto lê a câmera por deslocamento
+    /// (`pa_take_look`): a metade direita do celular vira área de câmera (`LOOK`) no lugar do analógico direito.
     Layouts {
         items: &'a serde_json::Value,
         current: &'a str,
         #[serde(skip_serializing_if = "Option::is_none")]
         mode: Option<u8>,
+        look: bool,
     },
     /// Resultado da medição, para a página mostrar ao vivo. Formato livre (JSON do spike).
     Stats { data: serde_json::Value },
@@ -326,6 +346,11 @@ mod tests {
         assert_eq!(decode_client(&[]), Err(DecodeError::Empty));
         assert_eq!(decode_client(&[0x42]), Err(DecodeError::UnknownType(0x42)));
         assert!(matches!(decode_client(&[T_STATE, 1, 2]), Err(DecodeError::BadLength { .. })));
+        let mut look = vec![T_LOOK];
+        look.extend_from_slice(&150i16.to_le_bytes());
+        look.extend_from_slice(&(-25i16).to_le_bytes());
+        assert_eq!(decode_client(&look), Ok(ClientMsg::Look { dx: 1.5, dy: -0.25 }));
+        assert!(matches!(decode_client(&look[..4]), Err(DecodeError::BadLength { .. })));
         assert_eq!(decode_client(&[0u8; 65]), Err(DecodeError::TooLong));
         let mut nan = vec![T_SYNC, 0, 0];
         nan.extend_from_slice(&f64::NAN.to_le_bytes());

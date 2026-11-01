@@ -65,6 +65,8 @@ pub struct Hub {
     pub session_layout: Mutex<Option<(String, std::collections::HashSet<String>)>>,
     /// O que o jogo do SDK pediu para o controle do celular de cada vaga (layout, modo, nomes nos botões).
     pub sdk_phone: Mutex<crate::sdk_phone::SdkPhone>,
+    /// O jogo do SDK aberto lê a câmera por deslocamento: o celular mostra a área de câmera.
+    pub game_reads_look: std::sync::atomic::AtomicBool,
     /// A tela do jogo nos celulares que ligaram (ver view.rs).
     pub views: Mutex<crate::view::Views>,
 }
@@ -129,6 +131,7 @@ impl Hub {
             benched: Mutex::new([false; MAX_SEATS]),
             session_layout: Mutex::new(None),
             sdk_phone: Mutex::new(Default::default()),
+            game_reads_look: Default::default(),
             views: Mutex::new(Default::default()),
         })
     }
@@ -186,10 +189,20 @@ impl Hub {
                         hub.lobby.lock().unwrap().rename(seat as usize, &name);
                         hub.emit_lobby();
                     }
-                    PhoneEvent::Screen { seat, on } => hub.views.lock().unwrap().set(seat, on),
+                    PhoneEvent::Screen { seat, on, aspect } => hub.views.lock().unwrap().set(seat, on, aspect),
                     PhoneEvent::ViewAck { seat, id, at_ms } => hub.views.lock().unwrap().ack(seat, id, at_ms),
+                    // caminho da entrada: só soma na memória do SDK
+                    PhoneEvent::Look { seat, dx, dy } => {
+                        if let Some(shm) = hub.sdk.lock().unwrap().as_ref() {
+                            shm.add_look(seat as usize, dx, dy);
+                        }
+                    }
+                    PhoneEvent::Leave { seat } => {
+                        hub.views.lock().unwrap().set(seat, false, 0.0);
+                        hub.remove_seat(seat as usize);
+                    }
                     PhoneEvent::Disconnected { seat } => {
-                        hub.views.lock().unwrap().set(seat, false);
+                        hub.views.lock().unwrap().set(seat, false, 0.0);
                         hub.set_pad(seat as usize, Pad::NEUTRAL);
                         hub.unplug(seat as usize);
                         hub.emit_lobby();
@@ -240,7 +253,8 @@ impl Hub {
             (items, current, sdk.mode(seat as usize))
         };
         if let Some(p) = self.phone.lock().unwrap().as_ref() {
-            p.send_text(seat, &ServerText::Layouts { items: &items, current: &current, mode });
+            let look = self.game_reads_look.load(Ordering::Relaxed);
+            p.send_text(seat, &ServerText::Layouts { items: &items, current: &current, mode, look });
         }
     }
 

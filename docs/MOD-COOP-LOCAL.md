@@ -39,7 +39,7 @@ trabalho dá achar esses pontos.
 | Tipo de jogo | Como costuma ser |
 |---|---|
 | **Unreal Engine (4 e 5)** | O motor já tem jogadores locais e tela dividida (um "jogador local" por pessoa, cada um com a sua câmera e o seu pedaço da tela). Muitos jogos só não usam isso. Com o UE4SS, o mod pode criar os jogadores locais extras e ligar a divisão. Quando o jogo não quebrou esse caminho, é o caso mais fácil. |
-| **Unity** | Uma câmera por jogador com o retângulo dela na tela é nativo; o trabalho é criar o personagem extra e dar a cada um a sua câmera e a sua entrada. Mod por BepInEx ou MelonLoader. |
+| **Unity** | Uma câmera por jogador com o retângulo dela na tela é nativo; o trabalho é criar o personagem extra e dar a cada um a sua câmera e a sua entrada. Mod por BepInEx ou MelonLoader, com o SDK em C# (`sdk/csharp/PartyAnywhere.cs`, que o `pa new` já traz). Receita completa na seção 4 (é a do mod do MicroWorks: Unity + Mirror, 1 a 10 jogadores). |
 | **Motor próprio ou antigo** (DirectX 9/11, por exemplo) | Troca de contexto: por um instante, o motor enxerga o jogador extra como "o jogador" (foco, câmera, controle) e desenha a cena num pedaço da tela. Exige engenharia reversa; é o caso do mod de GTA San Andreas que serviu de referência para este guia (até 8 jogadores, numa cópia só). |
 
 **Onde fica difícil (e o que fazer):**
@@ -85,27 +85,112 @@ visões, o HUD, as regras de co-op e a escolha de personagem.
 | Muda no mod | Como |
 |---|---|
 | **Entrada** | Cada jogador lê o próprio controle pelo SDK (`pa_get_pad(pa, vaga)`), não o "controle 1" do Windows. Desligue a leitura de controle e teclado do próprio jogo para os jogadores: o Windows continua entregando o teclado ao jogo, e um teclado que é o P3 no Party Anywhere moveria o P1. |
-| **Imagem** | Uma visão por jogador (tela dividida na TV). Quem está no celular: a visão dele vai para o celular (`pa_view_wanted` / `pa_submit_view`), desenhada fora da tela e menor, e sai da TV. |
+| **Imagem** | Uma visão por jogador (tela dividida na TV, seção 3.1). Quem ligou a tela do jogo no celular: a visão dele vai para o celular (`pa_view_wanted`, `pa_view_size`, `pa_submit_view`), desenhada fora da tela no formato do celular, e sai da TV. |
 | **Quem é quem** | Nome e cor da vaga (`pa_get_seat`) no lugar do nome da conta online. |
 | **Entrar e sair** | Os eventos do SDK (`PA_EVENT_SEAT_JOINED`, `RECONNECTING`, `LEFT`): o jogador entra no meio da partida e volta para o mesmo personagem. |
-| **O controle do celular acompanha o jogo** | `pa_set_mode` ao entrar e sair do carro, `pa_set_label` com o nome de cada ação. |
+| **O controle do celular acompanha o jogo** | `controls` na ficha (seção 3.4), `pa_set_mode` ao entrar e sair do carro, `pa_set_label` com o nome de cada ação. |
+| **Câmera pelo celular** | `pa_take_look` (graus, como o mouse) somado ao ângulo da câmera, além do analógico direito para quem joga com controle. Com isso o celular troca o analógico direito por arrastar o dedo, como num jogo de celular. |
 
 **Checklist "não perdi nada"** (jogo com online): jogue a mesma partida no online original e no local e
 confira todos os modos de jogo, entrar e sair no meio, morrer e voltar, salvar e carregar, trocar de mapa, o
 HUD de cada jogador, o som (de quem é cada som) e a pausa (o local não pode travar os outros).
 
-## 4. Desempenho
+### 3.1 Tela dividida: o padrão de todo mod
+
+- **Grade sem cantos vazios.** O número de linhas segue 1; 2 lado a lado; 2x2; 3x2; 3x3; 4x3 (até 2
+  jogadores: 1 linha; até 6: 2 linhas; até 10: 3 linhas), mas **os jogadores se dividem por igual entre as
+  linhas e cada linha ocupa a largura toda**: 3 = 2+1, 5 = 3+2, 7 = 3+2+2, 8 = 3+3+2, 10 = 4+3+3. Nunca sobra
+  canto preto. As linhas de cima ficam com o jogador a mais.
+- **Ordem:** quem hospeda primeiro, depois por vaga (P1, P2...).
+- **Reorganiza no mesmo quadro** quando alguém entra, sai ou passa para o celular. Se todos estão no celular,
+  a TV fica preta com "Todos jogando pelo celular".
+- **Ver o corpo dos outros em primeira pessoa:** o jogo esconde o corpo do "jogador local", e agora todos são
+  locais. Ponha cada corpo numa camada só dele e faça a câmera de cada um esconder só a própria camada.
+  Ligar e desligar o corpo antes de cada câmera não funciona em pipelines que preparam todas as câmeras antes
+  de desenhar (HDRP).
+- **Som:** só uma câmera ouve (a de quem hospeda). Duas escutando dobram o som.
+- **Áreas sem visão** mostram restos de quadros antigos: pinte de preto o que nenhuma visão cobre.
+
+### 3.2 HUD por jogador
+
+- **HUD do jogador** (mira, vida, "usar"): o conteúdo dele vai para uma moldura do tamanho da parte dele.
+- **HUD da partida** (rodada, placar, posição, "passou/falhou"): o jogo costuma ter um só. Dê a cada jogador
+  extra **uma cópia só com as telas**, sem a lógica (pausa, espera pelos jogadores, rede: copiar a lógica
+  repete rodadas). As chamadas da partida vão ao original e se repetem em cada cópia, no contexto do jogador
+  dela; as do código de um extra vão só para a cópia dele.
+- **Escala:** HUD montado a partir do centro da tela sai da parte quando a largura é espremida. Encolha o HUD
+  inteiro sem mudar a proporção e encoste no alto da parte.
+- Avisos gerais (alguém entrou, votação) ficam um só, na parte de quem hospeda.
+
+### 3.3 Quem é quem
+
+- Nome e cor da vaga do Party Anywhere (`pa_get_seat`) no lugar do nome e da foto da conta (que seriam os da
+  mesma conta para todos): um avatar com a cor e "P2".
+- Um `pa_toast` ao entrar ("Você é o P2").
+
+### 3.4 Controle do celular
+
+- Todo mod declara `controls` na ficha, com os modos do jogo: o **meio livre**; andar na esquerda; câmera,
+  tiro e ações principais na direita; ações raras num segundo modo. Monte no editor do Hub (Controles → Criar
+  layout) e copie com "Copiar para a ficha do mod".
+- Nomes nos botões curtos (até ~8 letras), iguais no `controls` e no `pa_set_label`.
+- Câmera: leia `pa_take_look` (arrastar o dedo) além do analógico direito.
+
+### 3.5 Regras de produto
+
+- Nada de contornar pagamento, DRM, conta ou anti-cheat, nem "jogar offline" pulando a loja. Se um recurso
+  é pago no jogo (sala privada, por exemplo), o mod não libera, e diz isso na página dele.
+- Usar o código do próprio jogo para tudo (contexto), em vez de reimplementar: é o que não perde jogabilidade.
+
+## 4. Receita Unity (e jogo online com Mirror)
+
+É a do mod do MicroWorks (Unity 2019.3, Mirror, BepInEx, 1 a 10 jogadores numa cópia só). Adapte a outras
+redes (Netcode, Photon, a do próprio jogo) com as mesmas ideias.
+
+1. **Uma conexão de mentira por vaga, no servidor** (no Mirror, uma `NetworkConnectionToClient` com id
+   negativo). O personagem extra nasce pelo caminho normal do jogo (`AddPlayerForConnection`), então entra no
+   placar, nas fases e nas regras como qualquer jogador. A conexão engole as mensagens que mandaria pela rede,
+   inclusive o envio em lote.
+2. **Troca de contexto em volta de todo código do extra:** `Start`, `Update`, `LateUpdate`, `FixedUpdate`,
+   `OnEnable`, `OnDisable` e as corrotinas de cada componente dele e do que ele controla. Dentro, ele é "o
+   jogador local" (as referências estáticas do jogo e da rede, a entrada da vaga dele, a identidade dele).
+   Câmera, HUD, movimento e ações passam a usar o código do próprio jogo.
+3. **Mensagens de rede para o extra** (ClientRpc, TargetRpc) também rodam no contexto dele. Sem isso o jogo
+   acha que o personagem é de outro PC e reenvia para sempre.
+4. **Comandos do extra:** o servidor confere o dono; diga a ele qual é a conexão certa.
+5. **Identidade:** uma id de conta falsa que nunca colide com uma real (no MicroWorks, o SteamID real com outro
+   campo de "instância"). O jogo pede à loja os dados da conta e espera para sempre por uma id que não existe:
+   para ids falsas, responda na hora.
+6. **Pegadinha do Harmony:** os *finalizers* de vários patches no mesmo método rodam na ordem dos prefixes,
+   não na inversa. Entrar no contexto de quem já está nele não pode fazer nada (só a entrada de fora troca e
+   volta), senão o contexto fica preso.
+7. **Câmeras:** `Camera.rect` por jogador na grade da seção 3.1.
+8. **Tela no celular:** `sdk/csharp/Unity/PhoneViews.cs` pronto: a câmera de quem está no celular desenha
+   num `RenderTexture` no formato do celular (`ViewSize`), lido com `AsyncGPUReadback` (até 3 leituras em
+   andamento, uma pedida por quadro) e entregue com stride negativo (a imagem volta de baixo para cima). O HUD
+   dele passa a `ScreenSpaceCamera` com aquela câmera e volta ao modo original quando ele volta à TV. O
+   `CanvasScaler` mede a janela, não a imagem: compense, senão o HUD sai gigante no celular.
+9. **Ferramentas de diagnóstico que valem o tempo:** um vigia de travamento (com o jogo parado por 8 s, uma
+   thread interrompe a principal e o log mostra onde ela estava), um contador de mensagens de rede por quadro
+   e "onde o jogador X aparece na câmera de Y". Desligue tudo antes de entregar.
+
+## 5. Desempenho
 
 O custo de uma visão a mais é **desenhar a cena de novo**, não rodar o jogo de novo. Para manter o jogo liso:
 
 - Cada visão no tamanho do pedaço dela, nunca a tela inteira.
 - Nas visões extras, corte o que pesa e pouco se nota: distância de desenho e de detalhe (LOD) um pouco
   menores, sombras e reflexos mais simples, espelhos e passes caros só na visão principal.
-- Quem joga pelo celular não ocupa a TV: a visão dele é desenhada pequena (640x360 basta) para o celular.
-- Meça com o número máximo de jogadores, no PC mais fraco que você quer atender, e coloque na ficha só o que
-  ficou liso.
+- **Com mais de um jogador na tela, use o preset de vídeo mais leve do próprio jogo, só na memória:** as
+  configurações da pessoa voltam com um jogador, e gravar configurações grava as dela, nunca o preset. No
+  MicroWorks (Ryzen 7 5700U, vídeo integrado, 1080p): 4 jogadores foram de 20 para 34 quadros por segundo; 6
+  jogadores, 27; 10 jogadores, 19.
+- Quem joga pelo celular não ocupa a TV: a visão dele é desenhada pequena (360 de altura, no formato do
+  celular: `pa_view_size`).
+- Meça com o número máximo de jogadores, no PC mais fraco que você quer atender, com o **Hub release** (sem
+  otimização, o Hub comprime a imagem do celular devagar), e coloque na ficha só o que ficou liso.
 
-## 5. Passar do limite de jogadores
+## 6. Passar do limite de jogadores
 
 É o ponto que mais quebra. O limite raramente está num lugar só: **ache todos antes de mudar um**.
 
@@ -129,13 +214,13 @@ O custo de uma visão a mais é **desenhar a cena de novo**, não rodar o jogo d
 3. **Teste no limite:** com o máximo novo, todos ao mesmo tempo, uma partida inteira.
 4. Na ficha do mod (`players.max`), coloque o máximo que funcionou de verdade, não o desejado.
 
-## 6. Especial: jogo de 1 jogador para vários
+## 7. Especial: jogo de 1 jogador para vários
 
 Sem multiplayer nenhum para reaproveitar, os extras vêm do tipo de jogador do próprio jogo (ou do personagem
 mais parecido). Comece pelo menor passo que prova a ideia: um segundo personagem que anda com o controle da
 vaga 2, mesmo sem câmera própria. Depois a câmera e a visão, depois o HUD, depois o resto.
 
-## 7. Ferramentas para a parte do jogo
+## 8. Ferramentas para a parte do jogo
 
 Achar no jogo onde ficam os jogadores, a câmera e o desenho é engenharia reversa: um depurador e um
 desmontador (x64dbg, Ghidra, Cheat Engine para achar valores na memória), as ferramentas da engine (Unity:
@@ -144,7 +229,21 @@ jogos antigos há projetos de código reescrito e SDKs de plugin com os endereç
 programas têm servidor MCP, o que deixa o agente olhar o jogo junto com você. Só em jogos sem anti-cheat, e
 sem distribuir nada do jogo original.
 
-## 8. Ordem de trabalho sugerida (para o mod e para a IA)
+## 9. Testar sozinho (para quem faz e para a IA)
+
+1. O Hub **release** aberto.
+2. Celulares de mentira: `pa phone-sim --players 4 --screen --save-view prints` (cada um entra numa vaga,
+   pode ligar a tela do jogo e guarda o último quadro em `prints\P2.jpg`...). Para apertar botões e mexer a
+   câmera, um roteiro: `--pad roteiro.json`, com passos como `{ "ms": 800, "buttons": ["A"], "ly": 1, "look":
+   [90, 0] }` (look em graus por segundo).
+3. Opções de desenvolvimento do mod (pular tutorial, criar a partida sozinho, medir quadros por segundo),
+   **desligadas antes de entregar**.
+4. Um script que fecha o jogo, instala a DLL nova, abre o jogo, espera "P{k} entrou" no log e captura a janela
+   sem roubar o foco.
+5. **Pronto quando:** zero exceções no log do jogo; a partida roda vários minutos sem travar; capturas
+   conferidas com 1, 2, 3, 4, 6 e 10 jogadores; a tela do jogo no celular liga e desliga.
+
+## 10. Ordem de trabalho sugerida (para o mod e para a IA)
 
 1. Entrar no jogo: o mod carrega e manda um aviso para o celular (`pa_toast`).
 2. Entrada: o jogador 1 do jogo passa a ler a vaga 1 do SDK.
@@ -152,5 +251,6 @@ sem distribuir nada do jogo original.
 4. Imagem: a troca de contexto, e então duas visões na tela; depois a visão de quem está no celular.
 5. O que uma visão a mais quebra (passo 4 e 5 da receita): streaming, luzes, sombras, fade, HUD.
 6. Até o limite original do jogo, com o checklist "não perdi nada".
-7. Passar do limite, com o método da seção 5.
-8. Ficha, capa e controle do celular do mod; publicar (opcional).
+7. Passar do limite, com o método da seção 6.
+8. Ficha, capa e controle do celular do mod; publicar (opcional: `scripts\release.ps1 -Publicar`, com o
+   repositório público).

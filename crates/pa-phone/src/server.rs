@@ -64,9 +64,13 @@ pub enum PhoneEvent {
     /// O jogador trocou o nome pelo celular.
     Renamed { seat: u8, name: String },
     /// Ligou ou desligou a tela do jogo no celular.
-    Screen { seat: u8, on: bool },
+    Screen { seat: u8, on: bool, aspect: f32 },
     /// O celular mostrou o quadro `id` da tela do jogo (`at_ms` no relógio do servidor).
     ViewAck { seat: u8, id: u16, at_ms: f64 },
+    /// Câmera por deslocamento, em graus.
+    Look { seat: u8, dx: f32, dy: f32 },
+    /// "Sair da partida" no menu do celular.
+    Leave { seat: u8 },
 }
 
 type Outbox = mpsc::UnboundedSender<Message>;
@@ -119,6 +123,9 @@ impl PhoneServer {
 
         let app = Router::new()
             .route("/", get(page))
+            .route("/manifest.webmanifest", get(web_manifest))
+            .route("/icon-192.png", get(|| async { png(ICON_192) }))
+            .route("/icon-512.png", get(|| async { png(ICON_512) }))
             .route("/ws", get(ws_upgrade))
             .with_state(shared.clone());
         tokio::spawn(async move {
@@ -191,6 +198,32 @@ async fn bind_with_fallback(host: Ipv4Addr, port: u16) -> io::Result<TcpListener
 async fn page(State(shared): State<Arc<Shared>>) -> impl IntoResponse {
     // sem cache: depois de uma atualização do Hub, o celular tem de pegar a página nova
     ([(header::CACHE_CONTROL, "no-store")], Html(shared.page))
+}
+
+// "Adicionar à Tela de Início": aberto pelo ícone, o controle roda sem a barra do navegador, deitado e com fundo
+// preto (no iPhone é o único jeito de ter tela cheia; no Android também funciona).
+const ICON_192: &[u8] = include_bytes!("../web/icon-192.png");
+const ICON_512: &[u8] = include_bytes!("../web/icon-512.png");
+const WEB_MANIFEST: &str = r##"{
+  "name": "Party Anywhere",
+  "short_name": "Party Anywhere",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}"##;
+
+async fn web_manifest() -> impl IntoResponse {
+    ([(header::CONTENT_TYPE, "application/manifest+json")], WEB_MANIFEST)
+}
+
+fn png(bytes: &'static [u8]) -> impl IntoResponse {
+    ([(header::CONTENT_TYPE, "image/png"), (header::CACHE_CONTROL, "max-age=86400")], bytes)
 }
 
 async fn ws_upgrade(
@@ -305,6 +338,11 @@ async fn connection(socket: WebSocket, shared: Arc<Shared>, peer: SocketAddr) {
                         let _ = shared.events.send(PhoneEvent::ViewAck { seat, id, at_ms });
                     }
                 }
+                Ok(ClientMsg::Look { dx, dy }) => {
+                    if has_seat {
+                        let _ = shared.events.send(PhoneEvent::Look { seat, dx, dy });
+                    }
+                }
                 // tipo novo de uma página mais nova: ignorar é compatível
                 Err(DecodeError::UnknownType(_)) => {}
                 Err(_) => break,
@@ -316,8 +354,11 @@ async fn connection(socket: WebSocket, shared: Arc<Shared>, peer: SocketAddr) {
                 Ok(ClientText::Rename { name }) => {
                     let _ = shared.events.send(PhoneEvent::Renamed { seat, name: name.chars().take(40).collect() });
                 }
-                Ok(ClientText::Screen { on }) => {
-                    let _ = shared.events.send(PhoneEvent::Screen { seat, on });
+                Ok(ClientText::Screen { on, aspect }) => {
+                    let _ = shared.events.send(PhoneEvent::Screen { seat, on, aspect });
+                }
+                Ok(ClientText::Leave) => {
+                    let _ = shared.events.send(PhoneEvent::Leave { seat });
                 }
                 _ => {}
             },

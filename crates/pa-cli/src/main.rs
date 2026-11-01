@@ -20,6 +20,8 @@ Uso:
   pa inspect <link do repositório | dono/repo> [--json]
   pa add <link do repositório | dono/repo | pasta do projeto>   leva o mod para a Biblioteca (abre o Party Anywhere)
   pa docs [sdk | coop | manifest | schema]   a documentação para quem cria (a desta versão)
+  pa phone-sim --players N [--screen] [--pad roteiro.json] [--save-view pasta] [--seconds S] [--url endereço]
+                              celulares de mentira no Hub aberto: testar um jogo ou mod sozinho
   pa mcp                      servidor MCP (stdio), opcional: para agentes sem terminal
   pa --version
 
@@ -51,11 +53,21 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
                 Path::new(dir),
                 &NewOptions { name, id: opts.get("--id").map(Into::into), tagline: opts.get("--tagline").map(Into::into), base_game },
             )?;
+            let is_mod = created.iter().any(|p| p.ends_with("scripts/release.ps1"));
+            let steam_cover = !created.iter().any(|p| p.ends_with("assets/cover.png"));
             println!("Projeto criado em {dir} ({} arquivos).", created.len());
             println!("Próximos passos:");
-            println!("  1. Troque assets/cover.png pela capa de verdade (retrato 3:4, mínimo 600×800).");
-            println!("  2. Leia o SDK: os jogadores chegam pelo party_anywhere.h, sem código de controle.");
-            println!("  3. Ajuste o passo Build em .github/workflows/release.yml e crie a tag v0.1.0 para publicar.");
+            if steam_cover {
+                println!("  1. A capa é a do próprio jogo, da Steam (\"steam\" na ficha): nada a fazer.");
+            } else {
+                println!("  1. Troque assets/cover.png pela capa de verdade (retrato 3:4, mínimo 600×800).");
+            }
+            println!("  2. Leia o guia e o SDK: pa docs coop e pa docs sdk.");
+            if is_mod {
+                println!("  3. Ajuste o build em scripts/release.ps1; para testar no seu Hub: pa pack --from build e pa add .");
+            } else {
+                println!("  3. Ajuste o passo Build em .github/workflows/release.yml e crie a tag v0.1.0 para publicar.");
+            }
             println!("  4. Adicione o tópico party-anywhere-game ao repositório para aparecer em \"Descobrir\".");
             Ok(ExitCode::SUCCESS)
         }
@@ -68,6 +80,14 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
                 println!("Tudo certo: {} {} pode ser publicado.", v.id.unwrap_or_default(), v.version.unwrap_or_default());
             } else {
                 print_issues(&v.issues);
+                if !v.ok {
+                    // um campo novo da ficha numa pa velha aparece como erro: diga a versão e onde está a nova
+                    println!(
+                        "
+pa {}. Erro num campo que deveria valer? Pode ser uma pa velha: baixe a mais nova em                          https://github.com/joaocaioo/party-anywhere/releases/latest",
+                        env!("CARGO_PKG_VERSION")
+                    );
+                }
             }
             Ok(if v.ok { ExitCode::SUCCESS } else { ExitCode::FAILURE })
         }
@@ -148,6 +168,23 @@ Para criar o mod co-op: pa new <pasta> --name \"Meu Mod\" --base-game \"<nome ou
             println!("{}", add_to_hub(link)?);
             Ok(ExitCode::SUCCESS)
         }
+        "phone-sim" => {
+            let num = |k: &str| opts.get(k).map(|v| v.parse::<f64>().map_err(|_| format!("{k} precisa de um número")));
+            let script = match opts.get("--pad") {
+                Some(p) => Some(pa_cli::phonesim::parse_script(&std::fs::read_to_string(p).map_err(|e| format!("não li {p}: {e}"))?)?),
+                None => None,
+            };
+            pa_cli::phonesim::run(pa_cli::phonesim::Options {
+                players: num("--players").transpose()?.unwrap_or(1.0) as usize,
+                url: opts.get("--url").map(Into::into),
+                screen: opts.flag("--screen"),
+                aspect: num("--aspect").transpose()?.unwrap_or(0.0) as f32,
+                script,
+                save_view: opts.get("--save-view").map(PathBuf::from),
+                seconds: num("--seconds").transpose()?.map(|s| s as u64),
+            })?;
+            Ok(ExitCode::SUCCESS)
+        }
         "mcp" => {
             let root = std::env::current_dir().map_err(|e| e.to_string())?;
             let server = mcp::Server::new(root).with_host(Box::new(RealHost));
@@ -188,7 +225,9 @@ struct Opts {
 
 impl Opts {
     fn parse(args: &[String]) -> Result<Self, String> {
-        const WITH_VALUE: [&str; 6] = ["--name", "--id", "--tagline", "--from", "--tag", "--base-game"];
+        const WITH_VALUE: [&str; 12] = [
+            "--name", "--id", "--tagline", "--from", "--tag", "--base-game", "--players", "--url", "--pad", "--save-view", "--seconds", "--aspect",
+        ];
         let mut positional = Vec::new();
         let mut named = Vec::new();
         let mut it = args.iter();

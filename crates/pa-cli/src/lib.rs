@@ -4,6 +4,7 @@
 pub mod docs;
 pub mod host;
 pub mod mcp;
+pub mod phonesim;
 mod template;
 
 use std::fs;
@@ -66,6 +67,8 @@ pub fn resolve_base_game(query: &str) -> Result<BaseGameSpec, String> {
 }
 
 /// Cria um projeto de jogo já válido: manifesto, capa provisória, workflow de release, AGENTS.md e skill.
+/// Mod de jogo da Steam: a capa é a do jogo (`"steam"`), e a versão sai de `scripts/release.ps1` no PC (o build
+/// precisa do jogo instalado), não do GitHub Actions.
 pub fn new_project(dir: &Path, opts: &NewOptions) -> Result<Vec<PathBuf>, String> {
     if dir.join(MANIFEST_FILE).exists() {
         return Err(format!("{} já tem um {MANIFEST_FILE}. Use `pa validate` para conferir.", dir.display()));
@@ -85,19 +88,29 @@ pub fn new_project(dir: &Path, opts: &NewOptions) -> Result<Vec<PathBuf>, String
     let tagline = opts.tagline.clone().unwrap_or_else(|| "Uma frase curta que vende o jogo.".into());
     let manifest = template::manifest(&id, name, &tagline, &slug, opts.base_game.as_ref())?;
 
-    let files: Vec<(&str, Vec<u8>)> = vec![
+    let is_mod = opts.base_game.is_some();
+    let steam_cover = opts.base_game.as_ref().is_some_and(|b| b.steam_app_id.is_some());
+    let mut files: Vec<(&str, Vec<u8>)> = vec![
         (MANIFEST_FILE, manifest.into_bytes()),
         ("README.md", template::readme(name, &tagline, opts.base_game.as_ref()).into_bytes()),
-        ("assets/cover.png", template::placeholder_cover()?),
-        ("assets/cover.svg", template::COVER_SVG.as_bytes().to_vec()),
         (".gitignore", template::GITIGNORE.as_bytes().to_vec()),
         ("AGENTS.md", template::AGENTS.as_bytes().to_vec()),
         ("CLAUDE.md", template::CLAUDE.as_bytes().to_vec()),
-        (".github/workflows/release.yml", template::RELEASE_WORKFLOW.as_bytes().to_vec()),
         (".claude/skills/party-anywhere-game/SKILL.md", template::SKILL.as_bytes().to_vec()),
         ("sdk/party_anywhere.h", template::SDK_HEADER.as_bytes().to_vec()),
         ("sdk/examples/arena_console.c", template::SDK_EXAMPLE.as_bytes().to_vec()),
+        ("sdk/csharp/PartyAnywhere.cs", template::SDK_CSHARP.as_bytes().to_vec()),
+        ("sdk/csharp/Unity/PhoneViews.cs", template::SDK_UNITY_PHONE_VIEWS.as_bytes().to_vec()),
     ];
+    if !steam_cover {
+        files.push(("assets/cover.png", template::placeholder_cover()?));
+        files.push(("assets/cover.svg", template::COVER_SVG.as_bytes().to_vec()));
+    }
+    if is_mod {
+        files.push(("scripts/release.ps1", template::RELEASE_SCRIPT.as_bytes().to_vec()));
+    } else {
+        files.push((".github/workflows/release.yml", template::RELEASE_WORKFLOW.as_bytes().to_vec()));
+    }
     let mut created = Vec::new();
     for (rel, bytes) in files {
         let path = dir.join(rel);
@@ -154,19 +167,22 @@ pub fn validate_dir(dir: &Path) -> Validation {
     if manifest.tagline == "Uma frase curta que vende o jogo." {
         issues.push(Issue::warning("tagline", "escreva a frase que aparece embaixo da capa (ex.: \"Tela dividida para 4 no mundo inteiro\")."));
     }
-    match fs::read(dir.join(&manifest.art.cover)) {
-        Ok(bytes) => {
-            if let Err(issue) = check_cover(&bytes) {
-                issues.push(issue);
+    // "steam": a capa do jogo base, lida da Steam de quem joga (o manifesto já confere o steamAppId)
+    if manifest.art.cover != pa_manifest::STEAM_COVER {
+        match fs::read(dir.join(&manifest.art.cover)) {
+            Ok(bytes) => {
+                if let Err(issue) = check_cover(&bytes) {
+                    issues.push(issue);
+                }
+                if template::placeholder_cover().is_ok_and(|p| p == bytes) {
+                    issues.push(Issue::warning("art.cover", "a capa ainda é a provisória: troque assets/cover.png pela arte do seu mod (retrato 3:4)."));
+                }
             }
-            if template::placeholder_cover().is_ok_and(|p| p == bytes) {
-                issues.push(Issue::warning("art.cover", "a capa ainda é a provisória: troque assets/cover.png pela arte do seu mod (retrato 3:4)."));
-            }
+            Err(_) => issues.push(Issue::error(
+                "art.cover",
+                format!("não achei {}. A capa é obrigatória (retrato 3:4, mínimo 600×800).", manifest.art.cover),
+            )),
         }
-        Err(_) => issues.push(Issue::error(
-            "art.cover",
-            format!("não achei {}. A capa é obrigatória (retrato 3:4, mínimo 600×800).", manifest.art.cover),
-        )),
     }
     for (field, p) in [("art.hero", &manifest.art.hero), ("art.logo", &manifest.art.logo)] {
         if let Some(p) = p {
@@ -372,6 +388,10 @@ mod tests {
         assert_eq!(m.install.target, InstallTarget::BaseGame);
         assert_eq!(m.install.files[0].from, "san-andreas-party.dll");
         assert_eq!(m.launch.exe, "gta_sa.exe");
+        assert_eq!(m.art.cover, "steam", "a capa do próprio jogo: o repositório não leva arte do jogo");
+        assert!(!dir.path().join("assets/cover.png").exists());
+        assert!(dir.path().join("scripts/release.ps1").exists(), "a versão sai do PC (o build precisa do jogo)");
+        assert!(!dir.path().join(".github/workflows/release.yml").exists());
         assert!(fs::read_to_string(dir.path().join("README.md")).unwrap().contains("Grand Theft Auto: San Andreas"));
 
         // o build do mod tem a DLL, não o jogo

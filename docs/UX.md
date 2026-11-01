@@ -212,12 +212,21 @@ O Hub lê nome e ícone do próprio executável, procura a capa pelo nome e, se 
 
 ## O controle no celular
 
-- Tela em paisagem e sempre acesa (Wake Lock). Analógico **livre**: nasce onde o dedo tocar na metade da
-  tela dele (esquerda), fora dos botões; não fica parado num lugar.
+- Tela em paisagem e sempre acesa. Analógico **livre**: nasce onde o dedo tocar na metade da tela dele
+  (esquerda), fora dos botões; não fica parado num lugar.
+- **Câmera como nos jogos de celular:** nos jogos que leem a câmera por deslocamento, a metade direita vira
+  área de câmera (arrastar = girar) no lugar do analógico direito, e segurar um botão da direita e arrastar
+  também gira. Sensibilidade no menu (Devagar, Normal, Rápida).
+- **Tela cheia:** no Android, o primeiro toque já deixa em tela cheia e deitado. No iPhone nenhum navegador
+  faz tela cheia: na primeira vez, um aviso ensina "Compartilhar → Adicionar à Tela de Início"; aberto pelo
+  ícone, roda sem a barra do navegador, com fundo preto.
 - **Layouts**: Simples (analógico, A, B, X, Y grandes e Start), Avançado (tudo) e os criados na aba
   Controles. Nada se sobrepõe, em nenhum celular. O Hub lembra o layout de cada celular.
-- **Tela do jogo no celular** (ligada por padrão, no menu): nos jogos que mostram, a sua parte do jogo
-  aparece no celular, atrás dos controles, e sai da TV. O Diagnóstico mostra quadros por segundo e o atraso.
+- **Tela do jogo no celular** (desligada; a pessoa liga no menu, e fica guardado naquele celular): nos jogos
+  que mostram, a sua parte do jogo aparece no celular, no formato da tela dele (sem faixas, fundo preto), e
+  sai da TV. Os controles ficam de contorno, quase transparentes, com o meio livre; o nome de cada botão
+  continua legível. O Diagnóstico mostra quadros por segundo e o atraso.
+- **Sair da partida** (menu, segurando): a vaga fica livre e o jogo reorganiza a tela na hora.
 - **Modos**: um layout pode ter vários (ex.: A pé e Veículo). Os nomes ficam no topo; um toque troca na hora.
 - **Padrão do jogo**: cada jogo pode ter o seu controle (o que veio com o jogo, ou o que a pessoa escolheu em
   Organizar → editar o jogo). Quando o jogo abre, os celulares trocam sozinhos; ao voltar, cada um volta para o
@@ -230,7 +239,7 @@ O Hub lê nome e ícone do próprio executável, procura a capa pelo nome e, se 
   tela cheia e, em Diagnóstico, medir a conexão. Abrir o menu solta todos os botões.
 - Identificar: a tela pisca na cor do jogador (e vibra no Android).
 - Perdeu a conexão: tela "Reconectando..." que tenta sozinha e volta para a mesma vaga.
-- Planejado: o jogo do SDK escolhe o layout e dá nome aos botões pelo SDK ("Correr", "Atirar").
+- O jogo do SDK troca o modo e dá nome aos botões pelo SDK ("Correr", "Atirar").
 
 ## Navegação por controle no Hub
 

@@ -17,6 +17,10 @@ serde_json.workspace = true
 png.workspace = true
 semver.workspace = true
 zip.workspace = true
+tungstenite = { version = "0.29", default-features = false, features = ["handshake"] }
+
+[target.'cfg(windows)'.dependencies]
+pa-sdk.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

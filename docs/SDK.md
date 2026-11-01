@@ -132,6 +132,7 @@ void pa_set_accepting_players(pa_client* pa, bool accepting);
 void pa_set_layout(pa_client* pa, int seat, pa_layout layout);                 // GAMEPAD | SIMPLE | DRIVING | MENU
 void pa_set_label(pa_client* pa, int seat, uint32_t button, const char* label); // "Correr", "Atirar"; "" tira
 void pa_set_mode(pa_client* pa, int seat, int mode);                           // modo do controle: 0 = "A pé"
+bool pa_take_look(pa_client* pa, int seat, float* dx_deg, float* dy_deg);     // câmera por deslocamento (abaixo)
 void pa_toast(pa_client* pa, int seat, const char* text);                      // aviso curto no celular
 void pa_rumble(pa_client* pa, int seat, float low, float high, int duration_ms);
 void pa_set_light(pa_client* pa, int seat, uint8_t r, uint8_t g, uint8_t b);   // luz do controle, se houver
@@ -153,13 +154,35 @@ O que o jogo pede para o celular vale enquanto ele está conectado, inclusive pa
 jogo desconecta, cada celular volta ao layout de antes. `pa_set_mode` e `PA_LABEL_*` entraram depois na ABI
 1, sem mudar nada do que existia: um Hub mais velho só ignora.
 
-### Tela do jogo no celular (padrão)
+### Câmera pelo celular (arrastar o dedo)
 
-Todo jogo e mod do Party Anywhere deve ter: **quem joga pelo celular vê a própria parte do jogo nele, e ela
-sai da TV.** O jogador liga ou desliga no menu do celular ("Tela do jogo no celular", ligada por padrão).
+Nos jogos de celular, a câmera gira arrastando o dedo na metade direita da tela: é deslocamento (como o
+mouse), não velocidade (como o analógico). O Party Anywhere entrega assim:
+
+```c
+float dx, dy;
+if (pa_take_look(pa, s, &dx, &dy)) {   // graus desde a última chamada, direita e para cima positivos
+    yaw += dx; pitch += dy;            // como o mouse; o analógico direito continua valendo para o controle
+}
+```
+
+- Chamar `pa_take_look` já avisa o Hub: a partir daí, a metade direita do celular vira área de câmera (e
+  segurar um botão da direita e arrastar também gira, para atirar e mirar ao mesmo tempo). Sem chamar, o
+  celular mostra o analógico direito, como antes.
+- A sensibilidade é do jogador (menu do celular: Devagar, Normal, Rápida); o jogo só soma os graus.
+- Aditivo na ABI 1: com um Hub mais velho, `pa_take_look` devolve sempre `false`.
+- Giroscópio: ainda não. Os navegadores só dão os sensores de movimento em HTTPS, e o controle abre por
+  `http://` na rede local.
+
+### Tela do jogo no celular (todo jogo oferece; o jogador liga)
+
+Todo jogo e mod do Party Anywhere deve oferecer: **quem liga "Tela do jogo no celular" no menu do celular vê
+a própria parte do jogo nele, e ela sai da TV.** Vem **desligada**: só quem quer liga, e a escolha fica
+guardada naquele celular.
 
 ```c
 bool pa_view_wanted(pa_client* pa, int seat);
+void pa_view_size(pa_client* pa, int seat, int* width, int* height);
 bool pa_submit_view(pa_client* pa, int seat, const void* bgra, int width, int height, int stride_bytes);
 ```
 
@@ -167,26 +190,44 @@ A cada frame, para cada vaga:
 
 ```c
 if (pa_view_wanted(pa, s)) {
+    int w, h;
+    pa_view_size(pa, s, &w, &h);       // o formato da tela do celular: 360 de altura (ex.: 780x360)
     // 1. não desenhe a parte deste jogador na TV (a tela dividida fica para os outros)
-    // 2. desenhe a visão dele num alvo à parte (sugestão: 640x360), leia os pixels (BGRA) e entregue
-    pa_submit_view(pa, s, pixels, 640, 360, 640 * 4);
+    // 2. desenhe a visão dele num alvo à parte de w x h, leia os pixels (BGRA) e entregue
+    pa_submit_view(pa, s, pixels, w, h, w * 4);
 }
 ```
 
 - `pa_view_wanted` é `false` sem o Hub, sem celular ou com a tela desligada: o jogo segue como sempre.
-- Até 1280x720. Tamanhos menores chegam mais rápido (o exemplo usa 320x176; 640x360 é um bom padrão).
+- **Desenhe no tamanho de `pa_view_size`:** é o formato da tela daquele celular deitado, e a imagem enche a
+  tela sem faixas (16:9 se o Hub não souber). Muda se o celular girar: confira a cada quadro.
+- `stride_bytes` negativo vale: imagem de baixo para cima (como a leitura da placa de vídeo costuma devolver),
+  com `bgra` apontando a última linha.
+- Até 1280x720. Tamanhos menores chegam mais rápido.
 - Entregue a cada frame ou a cada 2: o Hub manda para o celular no ritmo que a rede aguenta (até 30 por
   segundo) e sempre o quadro mais novo, sem fila.
-- Ler os pixels da placa de vídeo tem custo: use um alvo pequeno e, se der, leitura assíncrona (PBO no OpenGL,
-  staging texture no Direct3D).
+- Ler os pixels da placa de vídeo tem custo: use um alvo pequeno e leitura assíncrona (PBO no OpenGL,
+  staging texture no Direct3D, `AsyncGPUReadback` no Unity: `sdk/csharp/Unity/PhoneViews.cs` já faz).
 - O exemplo [`arena_console.c`](../sdk/c/examples/arena_console.c) faz tudo isso: desenha a arena em volta
   de quem está no celular e tira essa pessoa da tela principal.
+
+## C# (Unity, .NET, Godot C#)
+
+`sdk/csharp/PartyAnywhere.cs`: o mesmo SDK, um arquivo só, sem DLL nativa (lê a mesma memória). Copie para o
+projeto e permita código `unsafe`. `Client.Connect`, `Poll`, `NextEvent`, `GetPad`, `TakeLook`, `ViewWanted`,
+`ViewSize`, `SubmitView` e o resto, com os mesmos nomes do C. Compila em C# 7.3 / .NET Standard 2.0 (o Unity
+antigo). Para a tela no celular num jogo Unity, `sdk/csharp/Unity/PhoneViews.cs`. O `pa new` já traz os dois.
 
 ## Como funciona por dentro
 
 A tela do jogo no celular usa uma memória por vaga, `Local\PartyAnywhere.v1.view.<vaga>` (cabeçalho
-`pa_view_header` de 64 bytes + os pixels), que o Hub cria quando o celular liga a tela e marca `wanted`. O
-jogo escreve com seqlock e o instante do quadro (QueryPerformanceCounter); é aditivo, a ABI continua 1.
+`pa_view_header` de 64 bytes + os pixels), que o Hub cria quando o celular liga a tela e marca `wanted`; o Hub
+também escreve ali o formato da tela do celular (`aspect_milli`). O jogo escreve com seqlock e o instante do
+quadro (QueryPerformanceCounter); é aditivo, a ABI continua 1.
+
+A câmera por deslocamento fica no fim da memória principal (`look`, por vaga, em milésimos de grau): o Hub
+soma, o jogo troca por zero (`InterlockedExchange`). O jogo marca `game_caps` ao chamar `pa_take_look`, e o
+Hub avisa os celulares. Um Hub mais velho tem a memória menor, sem `look`: o SDK confere o tamanho.
 
 Memória compartilhada `Local\PartyAnywhere.v1`, criada pelo Hub (layout `pa_shm` no cabeçalho). Cada vaga
 tem um seqlock: o jogo nunca lê um estado pela metade e nunca trava. Os eventos saem da comparação de um

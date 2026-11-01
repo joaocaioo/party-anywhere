@@ -36,7 +36,7 @@ pub fn start(hub: Arc<Hub>) {
 }
 
 fn tick(hub: &Hub) {
-    let (pid, commands) = {
+    let (pid, commands, caps) = {
         let guard = hub.sdk.lock().unwrap();
         let Some(shm) = guard.as_ref() else { return };
         shm.heartbeat();
@@ -46,8 +46,17 @@ fn tick(hub: &Hub) {
             shm.release_game(pid);
             pid = 0;
         }
-        (pid, shm.drain_commands())
+        if pid == 0 && shm.game_caps() != 0 {
+            shm.clear_game_caps();
+        }
+        (pid, shm.drain_commands(), shm.game_caps())
     };
+
+    // o jogo começou (ou deixou) de ler a câmera por deslocamento: o celular troca o analógico direito pela área
+    let look = caps & pa_sdk::GAME_CAP_LOOK != 0;
+    if hub.game_reads_look.swap(look, Ordering::AcqRel) != look {
+        hub.broadcast_layouts();
+    }
 
     let connected = pid != 0;
     if hub.game_connected.swap(connected, Ordering::AcqRel) != connected {

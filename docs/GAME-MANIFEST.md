@@ -75,7 +75,7 @@ está em [`templates/game/`](../templates/game/), e o esquema JSON em
 | `name` | sim | Até 40 caracteres. |
 | `tagline` | sim | Até 90 caracteres. Aparece embaixo da capa. |
 | `version` | sim | Semver, igual à tag do release (`v0.3.0` ou `0.3.0`). |
-| `art.cover` | sim | PNG/JPG/WebP, **3:4**, mínimo 600×800, máximo 2 MB. Sem texto pequeno (vista de longe na TV). |
+| `art.cover` | sim | PNG/JPG/WebP, **3:4**, mínimo 600×800, máximo 2 MB. Sem texto pequeno (vista de longe na TV). Num mod de jogo da Steam, `"steam"` usa a capa do próprio jogo, que a Steam já guarda no PC de quem joga (precisa de `requires.baseGame.steamAppId`; o repositório não leva arte do jogo). |
 | `players` | sim | `1 ≤ min ≤ max ≤ 10`. |
 | `sdk.abi` | sim | Versão maior do SDK. |
 | `requires.baseGame` | não | Use quando o mod precisa do jogo original. O Hub procura na Steam (`steamAppId`), na Epic (`epicAppName`) e nos jogos do PC pelo `exe`; se não achar, oferece instalar pela Steam ou Epic, a loja (`storeUrl`) ou escolher o `.exe`/a pasta (cópia de qualquer lugar). Com `acceptedSha256`, confere a versão e mostra o `help` se não bater. |
@@ -169,6 +169,7 @@ Sem o workflow: `pa pack --from build --tag v0.3.0` e anexe os dois arquivos de 
 | `pa inspect dono/repo` | Lê o jogo publicado como o Hub lê e diz se instala. Também aceita a pasta do projeto. |
 | `pa add <dono/repo ou pasta>` | Leva o mod para a Biblioteca: abre o Hub com a prévia (o Hub acha o jogo original e a pessoa confirma). Com a pasta do projeto, o criador joga o próprio mod **sem publicar** (precisa do `pa pack`). |
 | `pa docs [sdk \| coop \| manifest \| schema]` | A documentação para quem cria, a da versão instalada (o SDK, o guia de co-op local, esta ficha e o esquema). É por onde os agentes de IA leem. |
+| `pa phone-sim --players N [--screen] [--pad roteiro.json] [--save-view pasta]` | Celulares de mentira no Hub aberto: cada um entra numa vaga pelo mesmo caminho de um celular de verdade, segue o roteiro de botões e câmera, liga a tela do jogo e guarda o último quadro. Para testar um mod de 1 a 10 jogadores sozinho. |
 | `--json` | Em `games`, `validate`, `pack`, `inspect` e `hub`: a saída para agentes e scripts. |
 | `pa mcp` | Opcional: as mesmas ferramentas para agentes de IA sem terminal (Model Context Protocol, local, por stdio), com a documentação em `get_docs`. |
 

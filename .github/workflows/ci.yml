@@ -19,3 +19,5 @@ jobs:
         run: cargo test --workspace --locked
       - name: Lint
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: SDK em C# (o mesmo layout da memória, no nível do Unity antigo)
+        run: dotnet build sdk/csharp/check -c Release

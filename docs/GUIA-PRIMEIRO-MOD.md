@@ -68,7 +68,8 @@ pa add .
 ```
 
 O Hub abre com a prévia do mod, acha o seu jogo (Steam, Epic ou a pasta que você escolher) e você confirma em
-**Instalar o mod**. Ele aparece na Biblioteca com a marca "Seu mod (do PC)". Entre com controles ou
+**Instalar o mod**. Para testar com vários jogadores sem chamar ninguém: `pa phone-sim --players 4 --screen
+--save-view prints` (celulares de mentira; veja `pa docs coop`, seção 9). Ele aparece na Biblioteca com a marca "Seu mod (do PC)". Entre com controles ou
 celulares e aperte **Jogar**. Para remover: Biblioteca → Organizar → o mod → Remover (os arquivos originais do
 jogo voltam).
 

@@ -43,6 +43,10 @@ pub struct GameManifest {
     pub controls: Option<crate::controls::Controls>,
 }
 
+/// `art.cover` de um mod de jogo da Steam: a capa do próprio jogo, que a Steam já guarda no PC de quem joga
+/// (o repositório não leva arte do jogo).
+pub const STEAM_COVER: &str = "steam";
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Art {
     pub cover: String,
@@ -146,6 +150,14 @@ fn dot() -> String {
 }
 
 impl GameManifest {
+    /// A capa vem da Steam (`art.cover: "steam"`): o appid do jogo base.
+    pub fn steam_cover(&self) -> Option<u32> {
+        if self.art.cover != STEAM_COVER {
+            return None;
+        }
+        self.requires.as_ref()?.base_game.as_ref()?.steam_app_id
+    }
+
     /// Lê e valida. `Err` traz as mensagens prontas para mostrar; avisos vêm junto do `Ok`.
     pub fn parse(json: &str) -> Result<(Self, Vec<Issue>), Vec<Issue>> {
         let manifest: GameManifest = serde_json::from_str(json).map_err(|e| {
@@ -205,7 +217,13 @@ impl GameManifest {
                 out.push(Issue::error("controls", format!("{e} Monte no editor do Hub (Controles → Criar layout) e copie de lá.")));
             }
         }
-        check_image_path(&mut out, "art.cover", Some(&self.art.cover));
+        if self.art.cover == STEAM_COVER {
+            if self.steam_cover().is_none() {
+                out.push(Issue::error("art.cover", "\"steam\" usa a capa do jogo base: preencha requires.baseGame.steamAppId."));
+            }
+        } else {
+            check_image_path(&mut out, "art.cover", Some(&self.art.cover));
+        }
         check_image_path(&mut out, "art.hero", self.art.hero.as_ref());
         check_image_path(&mut out, "art.logo", self.art.logo.as_ref());
 
@@ -373,6 +391,27 @@ mod tests {
         let fields = errors(&m);
         assert!(fields.contains(&"install.files[0].to".to_string()));
         assert!(fields.contains(&"requires.baseGame.acceptedSha256[0]".to_string()));
+    }
+
+    #[test]
+    fn steam_cover_needs_the_steam_app_id() {
+        let mut m = base();
+        m.art.cover = STEAM_COVER.into();
+        assert!(errors(&m).contains(&"art.cover".to_string()));
+        assert_eq!(m.steam_cover(), None);
+        m.requires = Some(Requires {
+            base_game: Some(BaseGame {
+                name: "MicroWorks".into(),
+                steam_app_id: Some(1233410),
+                epic_app_name: None,
+                store_url: None,
+                exe: "MicroWorks.exe".into(),
+                accepted_sha256: vec![],
+                help: None,
+            }),
+        });
+        assert!(!errors(&m).contains(&"art.cover".to_string()));
+        assert_eq!(m.steam_cover(), Some(1233410));
     }
 
     #[test]

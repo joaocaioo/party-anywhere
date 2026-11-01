@@ -113,22 +113,34 @@ void pa_set_accepting_players(pa_client* pa, bool accepting);
 void pa_set_layout(pa_client* pa, int seat, pa_layout layout);
 void pa_set_label(pa_client* pa, int seat, uint32_t button, const char* label); /* "Correr", "Atirar"; "" tira */
 void pa_set_mode(pa_client* pa, int seat, int mode); /* modo do controle do celular: 0 = o primeiro ("A pé") */
+
+/* Câmera por deslocamento: quanto o jogador arrastou o dedo na metade direita do celular desde a última
+ * chamada, em graus (direita e para cima positivos). Some ao ângulo da câmera, como o mouse, e continue
+ * lendo o analógico direito para quem joga com controle. Chamar já avisa o Hub, que passa a mostrar a área de
+ * câmera no celular (sem chamar, o celular mostra o analógico direito). Devolve false quando não houve
+ * movimento. Um Hub mais velho não tem: sempre false. */
+bool pa_take_look(pa_client* pa, int seat, float* dx_deg, float* dy_deg);
 void pa_toast(pa_client* pa, int seat, const char* text);                      /* aviso curto no celular */
 void pa_rumble(pa_client* pa, int seat, float low, float high, int duration_ms);
 void pa_set_light(pa_client* pa, int seat, uint8_t r, uint8_t g, uint8_t b);
 
-/* A tela do jogo no celular (padrão para todo jogo e mod): quem joga pelo celular vê a própria parte do
- * jogo nele, e ela sai da TV.
+/* A tela do jogo no celular (todo jogo e mod oferece; o jogador liga no menu do celular): quem liga vê a
+ * própria parte do jogo nele, e ela sai da TV.
  *
  *   if (pa_view_wanted(pa, s)) {           // este jogador está vendo no celular:
+ *       int w, h;
+ *       pa_view_size(pa, s, &w, &h);       // o formato da tela do celular (ex.: 780x360): enche, sem faixas
  *       // não desenhe a parte dele na TV (a tela dividida fica para os outros)
- *       // desenhe a visão dele num alvo à parte, leia os pixels (BGRA, até 1280x720) e entregue:
- *       pa_submit_view(pa, s, pixels, 640, 360, 640 * 4);
+ *       // desenhe a visão dele num alvo à parte de w x h, leia os pixels (BGRA) e entregue:
+ *       pa_submit_view(pa, s, pixels, w, h, w * 4);
  *   }
  *
  * Sem o Hub, ou com o jogador sem celular, pa_view_wanted é false e o jogo segue como sempre. Entregue a
  * cada frame (ou a cada 2): o Hub manda para o celular no ritmo que a rede aguenta. */
 bool pa_view_wanted(pa_client* pa, int seat);
+void pa_view_size(pa_client* pa, int seat, int* width, int* height); /* 360 de altura; 640x360 se não souber */
+/* stride_bytes negativo vale: imagem de baixo para cima, com bgra apontando a última linha (útil com a leitura
+ * da placa de vídeo, que costuma vir assim). */
 bool pa_submit_view(pa_client* pa, int seat, const void* bgra, int width, int height, int stride_bytes);
 
 /* ------------------------------------------------------------------------------------------------
@@ -167,15 +179,20 @@ typedef struct pa_shm {
     uint32_t size;
     volatile uint32_t hub_heartbeat; /* o Hub soma 1 a cada 100 ms */
     volatile int32_t game_pid;       /* 0 = livre; o jogo conectado escreve o próprio pid */
-    uint32_t reserved_;
+    volatile uint32_t game_caps;     /* o jogo escreve: PA__CAP_* */
     char join_url[128];
     pa_shm_seat seats[PA_MAX_SEATS];
     volatile uint32_t cmd_write; /* só o jogo escreve */
     volatile uint32_t cmd_read;  /* só o Hub escreve */
     pa_shm_cmd cmds[PA_SHM_CMDS];
+    /* depois, na ABI 1 (só existe se size >= PA_SHM_SIZE): câmera por deslocamento, milésimos de grau, por
+     * vaga. O Hub soma; o jogo pega e zera. */
+    volatile int32_t look[PA_MAX_SEATS][2];
 } pa_shm;
 
-#define PA_SHM_SIZE 4976
+#define PA_SHM_SIZE 5056
+#define PA__SHM_SIZE_V1 4976 /* a primeira versão da ABI 1, sem look: um Hub assim continua servindo */
+#define PA__CAP_LOOK 1u
 typedef char pa__shm_size_check[(sizeof(pa_shm) == PA_SHM_SIZE) ? 1 : -1];
 typedef char pa__seat_size_check[(sizeof(pa_shm_seat) == 72) ? 1 : -1];
 typedef char pa__cmd_size_check[(sizeof(pa_shm_cmd) == 64) ? 1 : -1];
@@ -199,7 +216,8 @@ typedef struct pa_view_header {
     volatile uint32_t seq;    /* seqlock: ímpar = o jogo está escrevendo */
     uint32_t reserved_;
     uint64_t timestamp_us;    /* QueryPerformanceCounter em microssegundos, ao terminar o quadro */
-    uint8_t pad_[24];
+    volatile uint32_t aspect_milli; /* o Hub escreve: largura / altura da tela do celular x 1000 (0 = não sabe) */
+    uint8_t pad_[20];
 } pa_view_header;
 typedef char pa__view_header_check[(sizeof(pa_view_header) == PA_VIEW_HEADER) ? 1 : -1];
 
@@ -240,6 +258,8 @@ struct pa_client {
     pa_event events[PA__EVENTS];
     uint32_t ev_head, ev_tail;
     uint8_t sent_accepting; /* 0 = nunca mandado, 1 = não, 2 = sim (chamadas repetidas não geram tráfego) */
+    bool has_look;          /* o Hub tem a câmera por deslocamento (memória do tamanho novo) */
+    bool said_look;         /* já avisou o Hub que lê a câmera */
     /* a tela de cada jogador no celular: aberta quando o Hub cria; procura de novo a cada ~1 s */
     HANDLE view_map[PA_MAX_SEATS];
     pa_view_header* view[PA_MAX_SEATS];
@@ -275,7 +295,7 @@ pa_result pa__attach(pa_shm* shm, int32_t pid, pa_client** out) {
     LONG owner;
     if (!shm || !out) return PA_ERR_INVALID_ARG;
     if (shm->magic != PA_SHM_MAGIC) return PA_ERR_HUB_NOT_RUNNING;
-    if (shm->abi != PA_ABI_VERSION || shm->size < sizeof(pa_shm)) return PA_ERR_VERSION;
+    if (shm->abi != PA_ABI_VERSION || shm->size < PA__SHM_SIZE_V1) return PA_ERR_VERSION;
     owner = InterlockedCompareExchange((volatile LONG*)&shm->game_pid, (LONG)pid, 0);
     if (owner != 0 && owner != pid) return PA_ERR_BUSY;
     pa = (pa_client*)calloc(1, sizeof *pa);
@@ -285,6 +305,7 @@ pa_result pa__attach(pa_shm* shm, int32_t pid, pa_client** out) {
     }
     pa->shm = shm;
     pa->pid = pid;
+    pa->has_look = shm->size >= sizeof(pa_shm);
     pa->last_heartbeat = shm->hub_heartbeat;
     pa->heartbeat_at = GetTickCount64();
     *out = pa;
@@ -299,7 +320,7 @@ pa_result pa_connect(const pa_game_info* info, pa_client** out) {
     *out = NULL;
     mapping = OpenFileMappingW(FILE_MAP_ALL_ACCESS, FALSE, PA_SHM_NAME_W);
     if (!mapping) return PA_ERR_HUB_NOT_RUNNING;
-    view = MapViewOfFile(mapping, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(pa_shm));
+    view = MapViewOfFile(mapping, FILE_MAP_ALL_ACCESS, 0, 0, 0); /* a memória inteira: um Hub mais velho tem menos */
     if (!view) { CloseHandle(mapping); return PA_ERR_HUB_NOT_RUNNING; }
     r = pa__attach((pa_shm*)view, (int32_t)GetCurrentProcessId(), out);
     if (r != PA_OK) { UnmapViewOfFile(view); CloseHandle(mapping); return r; }
@@ -460,6 +481,22 @@ void pa_set_mode(pa_client* pa, int seat, int mode) {
     pa__commit(pa);
 }
 
+bool pa_take_look(pa_client* pa, int seat, float* dx_deg, float* dy_deg) {
+    LONG x, y;
+    if (dx_deg) *dx_deg = 0.0f;
+    if (dy_deg) *dy_deg = 0.0f;
+    if (!pa || !pa->has_look || seat < 0 || seat >= PA_MAX_SEATS) return false;
+    if (!pa->said_look) {
+        InterlockedOr((volatile LONG*)&pa->shm->game_caps, (LONG)PA__CAP_LOOK);
+        pa->said_look = true;
+    }
+    x = InterlockedExchange((volatile LONG*)&pa->shm->look[seat][0], 0);
+    y = InterlockedExchange((volatile LONG*)&pa->shm->look[seat][1], 0);
+    if (dx_deg) *dx_deg = (float)x / 1000.0f;
+    if (dy_deg) *dy_deg = (float)y / 1000.0f;
+    return x != 0 || y != 0;
+}
+
 void pa_toast(pa_client* pa, int seat, const char* text) {
     pa_shm_cmd* c = pa__cmd(pa, PA_CMD_TOAST, seat);
     if (!c) return;
@@ -516,6 +553,17 @@ bool pa_view_wanted(pa_client* pa, int seat) {
     return pa->seen[seat].state == PA_SEAT_ACTIVE;
 }
 
+void pa_view_size(pa_client* pa, int seat, int* width, int* height) {
+    pa_view_header* v = pa__view(pa, seat);
+    uint32_t a = v ? v->aspect_milli : 0;
+    int h = 360, w;
+    if (a < 1000 || a > 3000) a = 16000 / 9; /* sem o formato: 16:9 */
+    w = (int)((h * a + 500) / 1000) & ~1; /* par: os codificadores de vídeo e JPEG preferem */
+    if (w > PA_VIEW_MAX_W) w = PA_VIEW_MAX_W;
+    if (width) *width = w;
+    if (height) *height = h;
+}
+
 bool pa_submit_view(pa_client* pa, int seat, const void* bgra, int width, int height, int stride_bytes) {
     pa_view_header* v;
     LARGE_INTEGER t, f;
@@ -529,7 +577,8 @@ bool pa_submit_view(pa_client* pa, int seat, const void* bgra, int width, int he
     row = w * 4;
     dst = (uint8_t*)v + PA_VIEW_HEADER;
     InterlockedIncrement((volatile LONG*)&v->seq); /* ímpar: escrevendo */
-    for (y = 0; y < h; y++) memcpy(dst + (size_t)y * row, src + (size_t)y * stride_bytes, (size_t)row);
+    /* stride negativo: imagem de baixo para cima (como a leitura da placa de vídeo devolve); bgra aponta a última linha */
+    for (y = 0; y < h; y++) memcpy(dst + (size_t)y * row, src + (ptrdiff_t)y * stride_bytes, (size_t)row);
     v->width = (uint32_t)w;
     v->height = (uint32_t)h;
     v->stride = (uint32_t)row;

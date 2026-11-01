@@ -3,8 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#0b0c0f">
+<meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Party Anywhere">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <title>Party Anywhere</title>
 <!--
   Controle do celular (protocolo v1, ver crates/pa-phone/src/protocol.rs). Servido pelo Hub na rede local,
@@ -14,8 +19,11 @@
   mais modos (ex.: A pé e Veículo) e cada modo, peças posicionadas numa tela de referência deitada de
   proporção CANVAS (ver apps/hub/src-tauri/src/settings.rs). Esta página encaixa essa tela na do celular:
   a altura encolhe junto e a largura só estica, então o que não se sobrepõe no editor não se sobrepõe aqui.
-  Tela do jogo no celular (padrão): nos jogos do SDK, a parte deste jogador chega como quadros JPEG
-  (0x86) e aparece atrás dos controles; cada quadro é confirmado (0x08), e o Hub só manda outro depois.
+  Tela do jogo no celular (desligada por padrão; a pessoa liga no menu): nos jogos do SDK, a parte deste
+  jogador chega como quadros JPEG (0x86) no formato da tela deste celular e aparece atrás dos controles, que
+  ficam transparentes; cada quadro é confirmado (0x08), e o Hub só manda outro depois.
+  Câmera por deslocamento: quando o jogo lê (o Hub avisa em `layouts.look`), a metade direita vira área de
+  câmera (arrastar = girar, como num jogo de celular) e segurar um botão da direita e arrastar também gira.
   Com mais de um modo, os nomes aparecem no topo e um toque troca. A pílula do topo (jogador, conexão, Menu)
   fica no meio, por cima da tela; os cantos ficam para os controles. Analógicos livres: o esquerdo nasce onde
   o dedo tocar na metade da tela dele, fora das outras peças (o direito, na outra metade).
@@ -50,11 +58,21 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 ::-webkit-scrollbar-button { display: none; height: 0; width: 0; }
 
 /* a tela do jogo deste jogador, atrás dos controles (só aparece quando o jogo manda) */
-#view { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; display: none; }
+/* a imagem chega no formato da tela do celular (o jogo desenha assim): enche, sem faixas; se um jogo mandar
+   outro formato, corta um pouco em vez de mostrar bordas */
+#view { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; display: none; }
+html.viewing, html.viewing body { background: #000; }
 body.viewing #view { display: block; }
 body.viewing .pad { background: transparent; }
-body.viewing .area > * { opacity: .62; }
 body.viewing .area > .stick .hint { display: none; }
+/* como nos jogos de celular: o meio livre, peças de contorno quase transparentes, cheias só ao tocar */
+body.viewing .sh, body.viewing .small, body.viewing .dpad button, body.viewing .fb {
+  background: rgba(0, 0, 0, .18); border: 2px solid rgba(255, 255, 255, .34); color: rgba(255, 255, 255, .85);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .8);
+}
+body.viewing .fb { border-color: color-mix(in srgb, var(--c) 60%, transparent); }
+body.viewing .base { border-color: rgba(255, 255, 255, .22); background: transparent; }
+body.viewing .knob { background: rgba(255, 255, 255, .35); box-shadow: none; }
 .pad {
   position: fixed; inset: 0;
   background: radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, var(--seat) 14%, transparent), transparent 70%), var(--bg);
@@ -110,8 +128,11 @@ body.viewing .area > .stick .hint { display: none; }
   color: var(--c);
 }
 .area button { display: grid; place-content: center; justify-items: center; gap: 2px; line-height: 1; }
-.area button em { font-style: normal; font-weight: 700; font-size: calc(var(--u) * .038 * var(--s)); opacity: .9; max-width: 92%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fb em { font-size: calc(var(--u) * .034 * var(--s)); }
+/* nome da ação: sempre legível (12 px no mínimo) e inteiro; pode passar da borda da peça */
+.area button em { font-style: normal; font-weight: 700; font-size: max(12px, calc(var(--u) * .038 * var(--s))); opacity: .95; white-space: nowrap; }
+.fb em { font-size: max(12px, calc(var(--u) * .034 * var(--s))); }
+/* área de câmera: invisível; a dica some no primeiro toque */
+.look .hint { border-style: dotted; }
 .down { filter: brightness(1.6); transform: scale(.94); }
 .fb.down { background: var(--c); color: rgba(0, 0, 0, .75); }
 .sh.down, .small.down, .dpad .down { background: var(--seat); color: rgba(0, 0, 0, .78); }
@@ -143,6 +164,16 @@ body.viewing .area > .stick .hint { display: none; }
 .opt .dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--muted); flex: none; }
 .opt.on { border-color: color-mix(in srgb, var(--seat) 70%, transparent); background: color-mix(in srgb, var(--seat) 10%, transparent); }
 .opt.on .dot { border-color: var(--seat); background: radial-gradient(circle, var(--seat) 45%, transparent 50%); }
+.seg { display: flex; gap: 6px; margin-bottom: 8px; }
+.seg button { flex: 1; height: 40px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255, 255, 255, .03); font-weight: 800; font-size: 13px; color: var(--muted); }
+.seg button.on { border-color: color-mix(in srgb, var(--seat) 70%, transparent); background: color-mix(in srgb, var(--seat) 12%, transparent); color: var(--text); }
+.leave { position: relative; overflow: hidden; }
+.leave::before { content: ""; position: absolute; inset: 0; width: calc(var(--p, 0) * 100%); background: rgba(239, 68, 68, .25); }
+.leave b { color: #fca5a5; }
+.hint-card { position: fixed; z-index: 45; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(460px, calc(100% - 28px));
+  display: none; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 16px; background: #15161a; border: 1px solid var(--line); box-shadow: 0 12px 40px rgba(0, 0, 0, .6); font-size: 13px; }
+.hint-card.on { display: flex; }
+.hint-card button { flex: none; height: 34px; padding: 0 14px; border-radius: 999px; background: var(--seat); color: rgba(0, 0, 0, .8); font-weight: 800; }
 .opt .sw { margin-left: auto; width: 40px; height: 24px; border-radius: 12px; background: rgba(255, 255, 255, .15); position: relative; flex: none; }
 .opt .sw::after { content: ""; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .2s; }
 .opt.on .sw { background: var(--seat); }
@@ -194,6 +225,12 @@ body.viewing .area > .stick .hint { display: none; }
     <button class="opt" id="optVibe"><span><b>Vibrar ao tocar</b><small>Um toque leve a cada botão</small></span><span class="sw"></span></button>
     <button class="opt" id="optFs"><span><b>Tela cheia</b><small>Esconde as barras do navegador</small></span><span class="sw"></span></button>
     <button class="opt" id="optScreen"><span><b>Tela do jogo no celular</b><small>Nos jogos que mostram, a sua parte aparece aqui e sai da TV</small></span><span class="sw"></span></button>
+    <div id="lookPrefs" hidden>
+      <h3>Câmera (arrastar o dedo na direita)</h3>
+      <div class="seg" id="lookSens"><button data-sens="low">Devagar</button><button data-sens="mid">Normal</button><button data-sens="high">Rápida</button></div>
+    </div>
+    <h3>Partida</h3>
+    <button class="opt leave" id="leaveBtn"><span><b>Sair da partida</b><small>Segure. A sua vaga fica livre para outra pessoa</small></span></button>
     <h3>Diagnóstico</h3>
     <button class="opt" id="optDiag"><span><b>Medir a conexão</b><small>Atraso do toque até o PC</small></span><span class="sw"></span></button>
     <div id="diag" hidden>
@@ -212,6 +249,7 @@ body.viewing .area > .stick .hint { display: none; }
 <div class="layer" id="offline"><div class="spinner"></div><h2>Reconectando...</h2><p>O celular está no mesmo Wi-Fi do PC?</p></div>
 <div class="layer" id="rejected"><h2 id="rejTitle">Não deu para entrar</h2><p id="rejText"></p></div>
 <div class="layer rotate"><h2>Gire o celular</h2><p>O controle funciona deitado.</p></div>
+<div class="hint-card" id="iosHint"><span>Tela cheia no iPhone: toque em <b>Compartilhar</b> e depois em <b>Adicionar à Tela de Início</b>. Abra pelo ícone.</span><button id="iosHintOk">Entendi</button></div>
 
 <script>
 'use strict';
@@ -245,8 +283,15 @@ let stopped = false;
 let layouts = FALLBACK;
 let currentLayout = 'advanced';
 let modeIdx = 0;
-const prefs = { vibe: true, screen: true };
+const prefs = { vibe: true, screen: false, sens: 'mid' };
 try { Object.assign(prefs, JSON.parse(localStorage.getItem('pa.prefs') || '{}')); } catch (_) {}
+// a tela do jogo no celular só liga quando a pessoa escolhe (antes nascia ligada e ficava guardada assim)
+if (!prefs.screenChosen) prefs.screen = false;
+const savePrefs = () => { try { localStorage.setItem('pa.prefs', JSON.stringify(prefs)); } catch (_) {} };
+const LOOK_SENS = { low: 0.12, mid: 0.2, high: 0.32 }; // graus por pixel arrastado
+let lookOn = false; // o jogo aberto lê a câmera por deslocamento (o Hub avisa)
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const standalone = navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches);
 try { const l = JSON.parse(localStorage.getItem('pa.layout') || 'null'); if (l && l.modes && l.modes.length) { layouts = [l]; currentLayout = l.id; } } catch (_) {}
 
 const $ = (id) => document.getElementById(id);
@@ -261,6 +306,7 @@ function render() {
   const arrows = { UP: '▲', LEFT: '◀', RIGHT: '▶', DOWN: '▼' };
   $('area').innerHTML = layout.modes[modeIdx].pieces.filter((p) => SIZE[p.kind]).map((p, i) => {
     const k = p.kind, at = `data-i="${i}"`;
+    if (k === 'stickR' && lookOn) return `<div class="stick look${prefs.lookSeen ? ' used' : ''}" ${at} data-look><div class="hint">Arraste<br>para olhar</div></div>`;
     if (k === 'stickL' || k === 'stickR') return `<div class="stick${prefs.stickSeen ? ' used' : ''}" ${at} data-stick="${k === 'stickL' ? 'l' : 'r'}"><div class="hint">Toque e<br>arraste</div></div>`;
     if (k === 'dpad') return `<div class="dpad" ${at}>${Object.keys(arrows).map((d) => `<button data-b="${d}">${arrows[d]}</button>`).join('')}</div>`;
     // nome da ação no jogo ("Pular", "Impulso"), quando o layout tem: embaixo da letra
@@ -371,7 +417,8 @@ function onText(m) {
     $('seatName').textContent = `P${m.seat} · ${m.name}`;
     $('nameInput').value = /^Jogador \d+$/.test(m.name) ? '' : m.name;
     vibrate(60);
-    sendText({ t: 'screen', on: !!prefs.screen });
+    sendScreen();
+    if (isIOS && !standalone && !prefs.iosHint) $('iosHint').classList.add('on');
   } else if (m.t === 'layouts') {
     // mudou o layout ou o próprio layout foi editado no Hub: redesenha
     const before = JSON.stringify(currentLayoutObj());
@@ -381,7 +428,10 @@ function onText(m) {
     currentLayout = m.current;
     // o jogo pediu um modo (entrou no carro): troca sozinho; o jogador ainda pode trocar pelo topo
     if (typeof m.mode === 'number' && m.mode < currentLayoutObj().modes.length) modeIdx = m.mode;
-    const changed = before !== JSON.stringify(currentLayoutObj()) || modeIdx !== modeBefore;
+    const lookBefore = lookOn;
+    lookOn = !!m.look;
+    $('lookPrefs').hidden = !lookOn;
+    const changed = before !== JSON.stringify(currentLayoutObj()) || modeIdx !== modeBefore || lookOn !== lookBefore;
     const l = layouts.find((x) => x.id === currentLayout);
     try { if (l) localStorage.setItem('pa.layout', JSON.stringify(l)); } catch (_) {}
     renderLayoutList();
@@ -450,13 +500,44 @@ function showFrame(dv) {
     if (viewCanvas.width !== w || viewCanvas.height !== h) { viewCanvas.width = w; viewCanvas.height = h; }
     viewCtx.drawImage(bmp, 0, 0);
     bmp.close();
-    document.body.classList.add('viewing');
+    setViewing(true);
     clearTimeout(viewTimer);
-    viewTimer = setTimeout(() => document.body.classList.remove('viewing'), 1500);
+    viewTimer = setTimeout(() => setViewing(false), 1500);
     const ack = new DataView(new ArrayBuffer(3));
     ack.setUint8(0, 0x08); ack.setUint16(1, id, true);
     sendRaw(ack.buffer);
   }).catch(() => {});
+}
+
+function setViewing(on) {
+  document.body.classList.toggle('viewing', on);
+  document.documentElement.classList.toggle('viewing', on);
+}
+
+// Liga/desliga a tela do jogo e diz o formato desta tela deitada (o jogo desenha nele: a imagem enche, sem
+// faixas). Manda de novo quando a tela muda (girar, barra do navegador).
+function sendScreen() {
+  const w = Math.max(innerWidth, innerHeight), h = Math.min(innerWidth, innerHeight);
+  sendText({ t: 'screen', on: !!prefs.screen, aspect: h ? Math.round((w / h) * 1000) / 1000 : 0 });
+}
+let screenResize = 0;
+addEventListener('resize', () => {
+  if (!prefs.screen) return;
+  clearTimeout(screenResize);
+  screenResize = setTimeout(sendScreen, 300);
+});
+
+// LOOK: [09][dx i16][dy i16], centésimos de grau (direita e para cima positivos)
+let lookRest = [0, 0];
+function sendLook(dxPx, dyPx) {
+  const k = LOOK_SENS[prefs.sens] || LOOK_SENS.mid;
+  const x = lookRest[0] + dxPx * k * 100, y = lookRest[1] - dyPx * k * 100;
+  const ix = Math.max(-32767, Math.min(32767, Math.trunc(x))), iy = Math.max(-32767, Math.min(32767, Math.trunc(y)));
+  lookRest = [x - ix, y - iy]; // o que não coube num centésimo vai na próxima
+  if (!ix && !iy) return;
+  const b = new DataView(new ArrayBuffer(5));
+  b.setUint8(0, 0x09); b.setInt16(1, ix, true); b.setInt16(3, iy, true);
+  sendRaw(b.buffer);
 }
 
 function sendRaw(buf) {
@@ -518,11 +599,19 @@ function wire() {
       el.classList.toggle('down', on);
       sendState(KIND.touch, touchTime(e));
     };
+    let lx = 0, ly = 0;
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       capture(el, e);
       set(true, e);
+      lx = e.clientX; ly = e.clientY;
       if (prefs.vibe) vibrate(8);
+    });
+    // segurar um botão da metade direita e arrastar também gira a câmera (atirar e mirar ao mesmo tempo)
+    el.addEventListener('pointermove', (e) => {
+      if (!lookOn || !el.classList.contains('down') || lx < innerWidth / 2) return;
+      sendLook(e.clientX - lx, e.clientY - ly);
+      lx = e.clientX; ly = e.clientY;
     });
     const up = (e) => { if (el.classList.contains('down')) set(false, e); };
     el.addEventListener('pointerup', up);
@@ -530,6 +619,28 @@ function wire() {
     el.addEventListener('lostpointercapture', up);
   });
   document.querySelectorAll('#pad [data-stick]').forEach((zone) => stick(zone, zone.dataset.stick === 'l' ? ['lx', 'ly'] : ['rx', 'ry']));
+  document.querySelectorAll('#pad [data-look]').forEach(lookZone);
+}
+
+// área de câmera: arrastar = girar (deslocamento, como o mouse), sem analógico na tela
+function lookZone(zone) {
+  let id = null, lx = 0, ly = 0;
+  zone.addEventListener('pointerdown', (e) => {
+    if (id !== null) return;
+    e.preventDefault();
+    capture(zone, e);
+    id = e.pointerId; lx = e.clientX; ly = e.clientY;
+    zone.classList.add('used');
+    if (!prefs.lookSeen) { prefs.lookSeen = true; savePrefs(); }
+  });
+  zone.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== id) return;
+    sendLook(e.clientX - lx, e.clientY - ly);
+    lx = e.clientX; ly = e.clientY;
+  });
+  const end = (e) => { if (e.pointerId === id) id = null; };
+  zone.addEventListener('pointerup', end);
+  zone.addEventListener('pointercancel', end);
 }
 
 // analógico flutuante: nasce onde o dedo toca
@@ -620,6 +731,7 @@ function openMenu() {
   $('optVibe').classList.toggle('on', prefs.vibe);
   $('optFs').classList.toggle('on', !!document.fullscreenElement);
   $('optScreen').classList.toggle('on', !!prefs.screen);
+  document.querySelectorAll('#lookSens [data-sens]').forEach((b) => b.classList.toggle('on', b.dataset.sens === prefs.sens));
   $('sheet').classList.add('on');
 }
 $('closeMenu').addEventListener('click', () => $('sheet').classList.remove('on'));
@@ -658,10 +770,55 @@ $('nameForm').addEventListener('submit', (e) => {
 });
 $('optScreen').addEventListener('click', () => {
   prefs.screen = !prefs.screen;
+  prefs.screenChosen = true;
   $('optScreen').classList.toggle('on', prefs.screen);
-  try { localStorage.setItem('pa.prefs', JSON.stringify(prefs)); } catch (_) {}
-  sendText({ t: 'screen', on: prefs.screen });
-  if (!prefs.screen) document.body.classList.remove('viewing');
+  savePrefs();
+  sendScreen();
+  if (!prefs.screen) setViewing(false);
+});
+$('lookSens').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-sens]');
+  if (!b) return;
+  prefs.sens = b.dataset.sens;
+  savePrefs();
+  document.querySelectorAll('#lookSens [data-sens]').forEach((x) => x.classList.toggle('on', x === b));
+  vibrate(10);
+});
+// Sair da partida: segurar ~1 s (sair sem querer no meio do jogo seria pior que demorar um pouco)
+const leaveBtn = $('leaveBtn');
+let leaveHold = null;
+leaveBtn.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  capture(leaveBtn, e);
+  const t0 = performance.now();
+  const tick = () => {
+    const p = Math.min(1, (performance.now() - t0) / 1000);
+    leaveBtn.style.setProperty('--p', p);
+    if (p >= 1) {
+      leaveHold = null;
+      leaveBtn.style.setProperty('--p', 0);
+      sendText({ t: 'leave' });
+      vibrate(60);
+      $('sheet').classList.remove('on');
+      return;
+    }
+    leaveHold = requestAnimationFrame(tick);
+  };
+  leaveHold = requestAnimationFrame(tick);
+});
+const leaveStop = () => {
+  if (!leaveHold) return;
+  cancelAnimationFrame(leaveHold);
+  leaveHold = null;
+  leaveBtn.style.setProperty('--p', 0);
+  showToast('Segure para sair da partida');
+};
+leaveBtn.addEventListener('pointerup', leaveStop);
+leaveBtn.addEventListener('pointercancel', leaveStop);
+$('iosHintOk').addEventListener('click', () => {
+  prefs.iosHint = true;
+  savePrefs();
+  $('iosHint').classList.remove('on');
 });
 $('optVibe').addEventListener('click', () => {
   prefs.vibe = !prefs.vibe;
@@ -670,6 +827,8 @@ $('optVibe').addEventListener('click', () => {
   if (prefs.vibe) vibrate(20);
 });
 $('optFs').addEventListener('click', () => {
+  // iPhone: nenhum navegador faz tela cheia fora de vídeo; o jeito é abrir pelo ícone da Tela de Início
+  if (isIOS) { $('sheet').classList.remove('on'); $('iosHint').classList.add('on'); return; }
   const el = document.documentElement;
   if (document.fullscreenElement) document.exitFullscreen();
   else (el.requestFullscreen || el.webkitRequestFullscreen || (() => {})).call(el);
@@ -742,6 +901,18 @@ async function keepAwake() {
   if (awakeVideo.paused) awakeVideo.play().catch(() => {});
 }
 document.addEventListener('pointerdown', keepAwake, { capture: true, passive: true });
+// Android: no primeiro toque (precisa ser dentro de um gesto), tela cheia e deitado. O iPhone não deixa.
+let fsTried = false;
+document.addEventListener('pointerdown', () => {
+  if (fsTried || isIOS || standalone || document.fullscreenElement) return;
+  fsTried = true;
+  const el = document.documentElement;
+  const go = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!go) return;
+  Promise.resolve(go.call(el)).then(() => {
+    if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
+  }).catch(() => {});
+}, { capture: true, passive: true });
 // A captura garante o "soltou" mesmo se o dedo escorregar para fora; se falhar, o botão ainda funciona.
 function capture(el, e) { try { el.setPointerCapture(e.pointerId); } catch (_) {} }
 // Android: Vibration API. iPhone: não tem; o Safari 18+ dá um toque de vibração ao acionar um interruptor

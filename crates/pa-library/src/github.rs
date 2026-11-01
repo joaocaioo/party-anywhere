@@ -135,7 +135,10 @@ pub fn inspect(http: &dyn Http, input: &str) -> Result<InspectReport, String> {
             return Ok(report);
         }
     };
-    report.cover_url = Some(repo.raw(&game.art.cover));
+    report.cover_url = Some(match game.steam_cover() {
+        Some(appid) => format!("steam:{appid}"),
+        None => repo.raw(&game.art.cover),
+    });
     report.issues.extend(game.validate().into_iter().filter(|i| !i.is_error()));
     match fetch_latest(http, &repo, &game) {
         Ok(Some(latest)) => {
@@ -190,7 +193,10 @@ pub fn inspect_local(dir: &std::path::Path) -> Result<InspectReport, String> {
             return Ok(report);
         }
     };
-    report.cover_url = crate::pcgames::data_url(&dir.join(&game.art.cover));
+    report.cover_url = match game.steam_cover() {
+        Some(appid) => Some(format!("steam:{appid}")),
+        None => crate::pcgames::data_url(&dir.join(&game.art.cover)),
+    };
     report.issues.extend(game.validate());
     let release = std::fs::read(dir.join("release").join(RELEASE_FILE))
         .ok()

@@ -8,11 +8,15 @@ const MANIFEST: &str = include_str!("../../../templates/game/party-anywhere.json
 pub const COVER_SVG: &str = include_str!("../../../templates/game/assets/cover.svg");
 pub const GITIGNORE: &str = include_str!("../../../templates/game/.gitignore");
 pub const RELEASE_WORKFLOW: &str = include_str!("../../../templates/game/.github/workflows/release.yml");
+/// Mod de jogo existente: o build precisa do jogo instalado, então a versão sai do PC de quem faz.
+pub const RELEASE_SCRIPT: &str = include_str!("../../../templates/game/scripts/release.ps1");
 pub const AGENTS: &str = include_str!("../../../templates/game/AGENTS.md");
 pub const CLAUDE: &str = include_str!("../../../templates/game/CLAUDE.md");
 pub const SKILL: &str = include_str!("../../../templates/game/.claude/skills/party-anywhere-game/SKILL.md");
 pub const SDK_HEADER: &str = include_str!("../../../sdk/c/party_anywhere.h");
 pub const SDK_EXAMPLE: &str = include_str!("../../../sdk/c/examples/arena_console.c");
+pub const SDK_CSHARP: &str = include_str!("../../../sdk/csharp/PartyAnywhere.cs");
+pub const SDK_UNITY_PHONE_VIEWS: &str = include_str!("../../../sdk/csharp/Unity/PhoneViews.cs");
 
 pub fn manifest(id: &str, name: &str, tagline: &str, slug: &str, base: Option<&BaseGameSpec>) -> Result<String, String> {
     let (mut m, _) = GameManifest::parse(MANIFEST).map_err(|_| "o template embutido está inválido".to_string())?;
@@ -40,6 +44,9 @@ pub fn manifest(id: &str, name: &str, tagline: &str, slug: &str, base: Option<&B
         m.install.files = vec![InstallFile { from: format!("{slug}.dll"), to: format!("{slug}.dll") }];
         m.launch.exe = b.exe.clone();
         m.tags = vec!["mod".into(), "co-op".into()];
+        if b.steam_app_id.is_some() {
+            m.art.cover = pa_manifest::STEAM_COVER.into(); // a capa do próprio jogo, da Steam de quem joga
+        }
     }
     let issues: Vec<_> = m.validate().into_iter().filter(|i| i.is_error()).collect();
     if let Some(i) = issues.first() {
@@ -55,8 +62,10 @@ pub fn readme(name: &str, tagline: &str, base: Option<&BaseGameSpec>) -> String 
                 "## Como este mod funciona\n\n\
                  Mod co-op local para **{}**. Quem instala precisa ter o jogo{}; o Hub acha a pasta sozinho, \
                  copia os arquivos do mod com backup e abre o jogo.\n\n\
-                 - O mod é uma DLL carregada pelo jogo (por um proxy como `version.dll`/`dinput8.dll` ou um ASI \
-                 loader). Ajuste `install.files` no `{MANIFEST_FILE}` para o nome que o jogo carrega.\n\
+                 - Uma cópia do jogo, com todos os jogadores dentro dela e uma visão por jogador (`pa docs coop`).\n\
+                 - O mod é carregado pelo jogo (uma DLL por proxy como `version.dll`/`dinput8.dll` ou ASI loader; \
+                 BepInEx ou MelonLoader em Unity; UE4SS em Unreal). Ajuste `install.files` no `{MANIFEST_FILE}` \
+                 para os arquivos que vão para a pasta do jogo.\n\
                  - Os jogadores chegam pelo `sdk/party_anywhere.h`: chame `pa_poll` no mesmo ponto em que o jogo \
                  lê os controles e use `pa_get_pad` para cada vaga.\n\
                  - Em `requires.baseGame.acceptedSha256`, coloque o hash do `{}` da versão que o mod suporta.\n\
@@ -67,6 +76,15 @@ pub fn readme(name: &str, tagline: &str, base: Option<&BaseGameSpec>) -> String 
             )
         })
         .unwrap_or_default();
+    let develop = if base.is_some() {
+        "- `powershell -File scripts\\release.ps1` compila, confere e empacota em `release\\`; `pa add .` leva para o \
+         seu Hub sem publicar.\n\
+         - Com `-Publicar`, cria o release `vX.Y.Z` (igual ao `version` do `party-anywhere.json`) no GitHub. O build \
+         não roda no GitHub Actions porque precisa do jogo instalado.\n"
+    } else {
+        "- `pa validate` confere o manifesto e a capa.\n\
+         - Crie a tag `vX.Y.Z` (igual ao `version` do `party-anywhere.json`) para publicar uma versão.\n"
+    };
     let needs = base
         .map(|b| format!("Precisa do **{}** (a sua cópia: Steam, Epic ou de onde for). O app acha sozinho ou deixa você escolher a pasta.\n\n", b.name))
         .unwrap_or_default();
@@ -81,8 +99,7 @@ pub fn readme(name: &str, tagline: &str, base: Option<&BaseGameSpec>) -> String 
          repositório: o `AGENTS.md` diz a ele o que fazer (conferir o app, instalar se faltar e levar o mod para a sua \
          Biblioteca).\n\n\
          {mod_section}## Desenvolver\n\n\
-         - `pa validate` confere o manifesto e a capa.\n\
-         - Crie a tag `vX.Y.Z` (igual ao `version` do `{MANIFEST_FILE}`) para publicar uma versão.\n"
+         {develop}"
     )
 }
 

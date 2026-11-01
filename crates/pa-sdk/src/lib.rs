@@ -49,15 +49,23 @@ pub struct Shm {
     pub size: u32,
     pub hub_heartbeat: u32,
     pub game_pid: i32,
-    pub reserved_: u32,
+    /// O jogo escreve o que ele usa (`GAME_CAP_*`), para o Hub ajustar o celular. 0 = nada além do básico.
+    pub game_caps: u32,
     pub join_url: [u8; 128],
     pub seats: [ShmSeat; MAX_SEATS],
     pub cmd_write: u32,
     pub cmd_read: u32,
     pub cmds: [ShmCmd; CMDS],
+    /// Câmera por deslocamento (arrastar o dedo), por vaga: milésimos de grau acumulados. O Hub soma, o jogo
+    /// pega e zera (`pa_take_look`). Entrou depois na ABI 1: um jogo mais velho não lê, um Hub mais velho não tem.
+    pub look: [[i32; 2]; MAX_SEATS],
 }
 
-pub const SHM_SIZE: usize = 4976;
+pub const SHM_SIZE: usize = 5056;
+/// O tamanho da primeira versão da ABI 1 (sem `look`): jogos e Hubs desse tamanho continuam compatíveis.
+pub const SHM_SIZE_V1: usize = 4976;
+/// `game_caps`: o jogo lê a câmera por deslocamento (`pa_take_look`).
+pub const GAME_CAP_LOOK: u32 = 1;
 const _: () = assert!(std::mem::size_of::<Shm>() == SHM_SIZE);
 const _: () = assert!(std::mem::size_of::<ShmSeat>() == 72);
 const _: () = assert!(std::mem::size_of::<ShmCmd>() == 64);
@@ -251,6 +259,28 @@ impl HubShm {
         unsafe { AtomicI32::from_ptr(addr_of_mut!((*self.as_ptr()).game_pid)) }.load(Ordering::Acquire)
     }
 
+    /// O que o jogo conectado usa (`GAME_CAP_*`).
+    pub fn game_caps(&self) -> u32 {
+        self.atomic_u32(|p| unsafe { addr_of_mut!((*p).game_caps) }).load(Ordering::Acquire)
+    }
+
+    /// Sem jogo: nada do que o último usava vale mais.
+    pub fn clear_game_caps(&self) {
+        self.atomic_u32(|p| unsafe { addr_of_mut!((*p).game_caps) }).store(0, Ordering::Release);
+    }
+
+    /// Soma um deslocamento da câmera (graus) ao da vaga. Caminho da entrada: só atômicos.
+    pub fn add_look(&self, i: usize, dx_deg: f32, dy_deg: f32) {
+        if i >= MAX_SEATS || !dx_deg.is_finite() || !dy_deg.is_finite() {
+            return;
+        }
+        let p = self.as_ptr();
+        for (axis, v) in [(0, dx_deg), (1, dy_deg)] {
+            let milli = (v * 1000.0).clamp(-1.0e6, 1.0e6) as i32;
+            unsafe { AtomicI32::from_ptr(addr_of_mut!((*p).look[i][axis])) }.fetch_add(milli, Ordering::AcqRel);
+        }
+    }
+
     /// O jogo morreu sem desconectar: libera para o próximo.
     pub fn release_game(&self, pid: i32) {
         let _ = unsafe { AtomicI32::from_ptr(addr_of_mut!((*self.as_ptr()).game_pid)) }.compare_exchange(
@@ -305,6 +335,33 @@ impl Drop for HubShm {
                 windows_sys::Win32::Foundation::CloseHandle(h);
             },
         }
+    }
+}
+
+/// O endereço do controle do celular do Hub aberto (o mesmo do QR), lido da memória do SDK. `None` sem Hub.
+/// Para ferramentas (o `pa phone-sim`), não para jogos.
+#[cfg(windows)]
+pub fn hub_join_url() -> Option<String> {
+    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::System::Memory::{OpenFileMappingW, MapViewOfFile, UnmapViewOfFile, FILE_MAP_READ, MEMORY_MAPPED_VIEW_ADDRESS};
+    let name: Vec<u16> = NAME.encode_utf16().chain(Some(0)).collect();
+    unsafe {
+        let h = OpenFileMappingW(FILE_MAP_READ, 0, name.as_ptr());
+        if h.is_null() {
+            return None;
+        }
+        let view = MapViewOfFile(h, FILE_MAP_READ, 0, 0, SHM_SIZE_V1);
+        let p = view.Value as *const Shm;
+        let url = if p.is_null() || addr_of!((*p).magic).read_volatile() != MAGIC {
+            None
+        } else {
+            Some(text_of(&addr_of!((*p).join_url).read_volatile())).filter(|u| !u.is_empty())
+        };
+        if !p.is_null() {
+            UnmapViewOfFile(MEMORY_MAPPED_VIEW_ADDRESS { Value: view.Value });
+        }
+        CloseHandle(h);
+        url
     }
 }
 
@@ -386,6 +443,7 @@ mod tests {
         fn pa_set_label(pa: *mut c_void, seat: c_int, button: u32, label: *const c_char);
         fn pa_set_layout(pa: *mut c_void, seat: c_int, layout: c_int);
         fn pa_set_mode(pa: *mut c_void, seat: c_int, mode: c_int);
+        fn pa_take_look(pa: *mut c_void, seat: c_int, dx: *mut f32, dy: *mut f32) -> bool;
     }
 
     struct Game(*mut c_void);
@@ -509,6 +567,40 @@ mod tests {
             ]
         );
         assert!(hub.drain_commands().is_empty());
+    }
+
+    #[test]
+    fn look_is_summed_by_the_hub_and_taken_by_the_game() {
+        let hub = HubShm::heap();
+        let game = Game::attach(&hub, 1).unwrap();
+        let take = |seat| {
+            let (mut x, mut y) = (0.0f32, 0.0f32);
+            let moved = unsafe { pa_take_look(game.0, seat, &mut x, &mut y) };
+            (moved, x, y)
+        };
+        assert_eq!(hub.game_caps(), 0);
+        assert_eq!(take(1), (false, 0.0, 0.0));
+        assert_eq!(hub.game_caps(), GAME_CAP_LOOK, "ler a câmera avisa o Hub");
+        hub.add_look(1, 1.5, -0.25);
+        hub.add_look(1, 0.5, 0.0);
+        hub.add_look(2, f32::NAN, 1.0); // lixo não entra
+        assert_eq!(take(1), (true, 2.0, -0.25));
+        assert_eq!(take(1), (false, 0.0, 0.0), "pegou, zerou");
+        assert_eq!(take(2), (false, 0.0, 0.0));
+        hub.clear_game_caps();
+        assert_eq!(hub.game_caps(), 0);
+    }
+
+    #[test]
+    fn a_hub_without_look_still_serves_new_games() {
+        let hub = HubShm::heap();
+        unsafe { (*hub.as_ptr()).size = SHM_SIZE_V1 as u32 };
+        let game = Game::attach(&hub, 1).expect("Hub da primeira ABI 1");
+        hub.add_look(0, 3.0, 3.0);
+        let (mut x, mut y) = (9.0f32, 9.0f32);
+        assert!(!unsafe { pa_take_look(game.0, 0, &mut x, &mut y) }, "sem a câmera nova: nada");
+        assert_eq!((x, y), (0.0, 0.0));
+        assert_eq!(hub.game_caps(), 0);
     }
 
     #[test]

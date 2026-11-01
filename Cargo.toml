@@ -45,3 +45,8 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 
 [profile.release]
 debug = 1
+
+# A tela do jogo no celular comprime JPEG a cada quadro: sem otimização (cargo run), o celular cai para ~7
+# quadros por segundo. Otimizado também no modo de desenvolvimento; para medir desempenho, use o Hub release.
+[profile.dev.package.jpeg-encoder]
+opt-level = 3

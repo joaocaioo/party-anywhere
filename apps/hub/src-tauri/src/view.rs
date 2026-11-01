@@ -38,17 +38,19 @@ pub struct Views {
 }
 
 impl Views {
-    /// O celular ligou (ou desligou) a tela do jogo.
-    pub fn set(&mut self, seat: u8, on: bool) {
+    /// O celular ligou (ou desligou) a tela do jogo, ou a tela dele mudou de formato (`aspect`).
+    pub fn set(&mut self, seat: u8, on: bool, aspect: f32) {
         if !on {
             self.streams.remove(&seat);
             return;
         }
-        if self.streams.contains_key(&seat) {
+        if let Some(s) = self.streams.get(&seat) {
+            s.shm.set_aspect(aspect);
             return;
         }
         match ViewShm::create(seat as usize) {
             Ok(shm) => {
+                shm.set_aspect(aspect);
                 shm.set_wanted(true);
                 let now = Instant::now();
                 self.streams.insert(

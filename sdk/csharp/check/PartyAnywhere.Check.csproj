@@ -1,0 +1,13 @@
+<!-- Só para o CI: compila o PartyAnywhere.cs no nível do Unity antigo (C# 7.3, .NET Standard 2.0). -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../PartyAnywhere.cs" />
+  </ItemGroup>
+</Project>

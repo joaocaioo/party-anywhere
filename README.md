@@ -261,7 +261,8 @@ os mods de graça.
 **Quantos jogadores?** De 1 a 10. O mod diz quantos aceita na ficha; se tiver mais gente, o app pergunta
 quem vai jogar.
 
-**Que linguagem posso usar?** C ou C++ hoje. Outras linguagens e motores estão nos planos.
+**Que linguagem posso usar?** C e C++ (`party_anywhere.h`) e C# (`PartyAnywhere.cs`, para Unity com BepInEx
+ou MelonLoader). O `pa new` traz os dois.
 
 **Os celulares têm atraso?** Pouco: na rede de casa, o toque chega ao PC em cerca de 25 ms.
 

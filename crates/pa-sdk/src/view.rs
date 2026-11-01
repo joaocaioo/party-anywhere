@@ -23,7 +23,9 @@ struct Header {
     seq: u32,
     reserved: u32,
     timestamp_us: u64,
-    pad: [u8; 24],
+    /// O Hub escreve: largura / altura da tela do celular x 1000 (0 = não sabe). O jogo desenha nesse formato.
+    aspect_milli: u32,
+    pad: [u8; 20],
 }
 const _: () = assert!(std::mem::size_of::<Header>() == VIEW_HEADER);
 
@@ -81,6 +83,12 @@ impl ViewShm {
 
     fn atomic(&self, f: impl FnOnce(*mut Header) -> *mut u32) -> &AtomicU32 {
         unsafe { AtomicU32::from_ptr(f(self.header())) }
+    }
+
+    /// O formato da tela do celular (largura / altura): o jogo lê com `pa_view_size`.
+    pub fn set_aspect(&self, aspect: f32) {
+        let milli = if aspect.is_finite() && aspect > 0.0 { (aspect * 1000.0).round().clamp(1000.0, 3000.0) as u32 } else { 0 };
+        self.atomic(|h| unsafe { std::ptr::addr_of_mut!((*h).aspect_milli) }).store(milli, Ordering::Release);
     }
 
     /// O celular quer (ou não) a tela deste jogador: o jogo lê com `pa_view_wanted`.
@@ -161,6 +169,7 @@ mod tests {
         fn pa_poll(pa: *mut c_void);
         fn pa_view_wanted(pa: *mut c_void, seat: c_int) -> bool;
         fn pa_submit_view(pa: *mut c_void, seat: c_int, bgra: *const c_void, w: c_int, h: c_int, stride: c_int) -> bool;
+        fn pa_view_size(pa: *mut c_void, seat: c_int, w: *mut c_int, h: *mut c_int);
     }
 
     #[test]
@@ -182,6 +191,17 @@ mod tests {
         // o SDK procura a memória de novo a cada ~1 s
         std::thread::sleep(std::time::Duration::from_millis(1100));
         assert!(unsafe { pa_view_wanted(game, 3) });
+        // o formato da tela do celular: sem saber, 16:9; um celular de 19,5:9 pede uma imagem mais larga
+        let size = || {
+            let (mut w, mut h) = (0, 0);
+            unsafe { pa_view_size(game, 3, &mut w, &mut h) };
+            (w, h)
+        };
+        assert_eq!(size(), (640, 360));
+        view.set_aspect(19.5 / 9.0);
+        assert_eq!(size(), (780, 360));
+        view.set_aspect(f32::NAN);
+        assert_eq!(size(), (640, 360));
         assert!(unsafe { pa_submit_view(game, 3, pixels.as_ptr() as *const c_void, 4, 2, 6 * 4) });
 
         let mut out = Vec::new();
@@ -191,6 +211,14 @@ mod tests {
         assert_eq!(&out[16..32], &pixels[24..40], "segunda linha, respeitando o stride");
         assert!(qpc_us() >= f.timestamp_us && qpc_us() - f.timestamp_us < 5_000_000);
         assert!(view.read(f.seq, &mut out).is_none(), "nada novo");
+
+        // de baixo para cima (como a placa de vídeo devolve): stride negativo, começando da última linha
+        let last = unsafe { pixels.as_ptr().add(6 * 4) };
+        assert!(unsafe { pa_submit_view(game, 3, last as *const c_void, 4, 2, -(6 * 4)) });
+        let g = view.read(f.seq, &mut out).expect("outro quadro");
+        assert_eq!(&out[..16], &pixels[24..40], "a última linha da origem vira a primeira");
+        assert_eq!(&out[16..32], &pixels[..16]);
+        let _ = g;
 
         view.set_wanted(false);
         assert!(!unsafe { pa_view_wanted(game, 3) });

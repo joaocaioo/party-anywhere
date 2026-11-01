@@ -39,11 +39,20 @@ multiplayer online: **não reescreva o multiplayer, reaproveite** as entidades e
 vários jogadores, na mesma cópia. Para passar do limite de jogadores, ache todos os lugares do limite antes de
 mudar um.
 
-## Padrão: a tela do jogo no celular
+## Padrões de todo mod (seção 3 do `pa docs coop`)
 
-Todo jogo e mod: para cada vaga com `pa_view_wanted(pa, s)`, não desenhe a parte daquele jogador na TV e
-entregue a visão dele com `pa_submit_view` (BGRA, 640x360 é um bom tamanho). Sem o Hub ou sem celular, nada
-muda. O exemplo `sdk/examples/arena_console.c` mostra o jeito.
+Tela dividida sem cantos vazios (os jogadores divididos por igual entre as linhas, cada linha com a largura
+toda), HUD por jogador, cor e número da vaga no lugar do nome da conta, `controls` na ficha com o meio livre,
+câmera pelo celular com `pa_take_look`, preset de vídeo leve só na memória com mais de um jogador na tela.
+Teste com `pa phone-sim` (seção 9) antes de entregar.
+
+## Tela do jogo no celular (o jogador liga)
+
+Todo jogo e mod oferece; vem desligada e o jogador liga no menu do celular. Para cada vaga com
+`pa_view_wanted(pa, s)`, não desenhe a parte daquele jogador na TV, desenhe a visão dele no tamanho de
+`pa_view_size` (o formato da tela do celular) e entregue com `pa_submit_view` (BGRA; stride negativo para
+imagem de baixo para cima). Sem o Hub ou sem celular, nada muda. Exemplos: `sdk/examples/arena_console.c` (C)
+e `sdk/csharp/Unity/PhoneViews.cs` (Unity).
 
 ## Fluxo
 

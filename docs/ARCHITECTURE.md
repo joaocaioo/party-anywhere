@@ -145,9 +145,15 @@ Transporte: `ws://<ip>:<porta>/ws`. A página é servida em `http://<ip>:<porta>
 | S→C | `0x84 RUMBLE` | `[84][ms u16][força u8]` | `navigator.vibrate` onde existir. |
 | S→C | `0x86 VIEW` | `[86][id u16][idade ms u16][largura u16][altura u16]` + JPEG | Um quadro da tela do jogo deste jogador. No máximo 1 a caminho por celular. |
 | C→S | `0x08 VIEW_ACK` | `[08][id u16]` | O celular mostrou o quadro: o Hub manda o próximo e mede o atraso. |
+| C→S | `0x09 LOOK` | `[09][dx i16][dy i16]` | Câmera por deslocamento (arrastar o dedo), centésimos de grau, já com a sensibilidade do celular. O Hub soma na memória do SDK (`pa_take_look`). Só vai quando `layouts.look` está ligado. |
 
-Texto, além dos de layout: `screen` (C→S, `{on}`: liga ou desliga a tela do jogo) e `screen` (S→C, `{fps, ms}`
-a cada segundo: quadros mostrados e o atraso do jogo até a tela do celular, para o Diagnóstico).
+Texto, além dos de layout: `screen` (C→S, `{on, aspect}`: liga ou desliga a tela do jogo e diz o formato da
+tela deitada, mandado de novo quando ela muda), `screen` (S→C, `{fps, ms}` a cada segundo: quadros mostrados
+e o atraso do jogo até a tela do celular, para o Diagnóstico) e `leave` (C→S: "Sair da partida", a vaga fica
+livre como ao remover no Hub). `layouts` (S→C) leva `look`: o jogo aberto lê a câmera por deslocamento.
+
+A página também é um app da Tela de Início: `/manifest.webmanifest` (tela cheia, deitado, fundo preto) e os
+ícones `/icon-192.png` e `/icon-512.png`. No iPhone é o único jeito de ter tela cheia.
 
 **Medição** (a página do Hub usa sempre; uma página mínima pode usar só STATE):
 
@@ -265,16 +271,19 @@ Dá para ter vários teclados jogando ao mesmo tempo, cada um como um jogador, e
 ## Modo SDK (IPC)
 
 Contrato completo em [SDK.md](SDK.md). O mecanismo é **só memória compartilhada** `Local\PartyAnywhere.v1`
-(4976 bytes, layout `pa_shm` no cabeçalho, espelhado em `crates/pa-sdk`):
+(5056 bytes, layout `pa_shm` no cabeçalho, espelhado em `crates/pa-sdk`; a primeira versão da ABI 1 tinha
+4976, sem `look`, e continua compatível nos dois sentidos):
 
 - cabeçalho: `magic` ("PAH1"), `abi` (1), tamanho, `hub_heartbeat` (+1 a cada 100 ms), `game_pid` (o jogo
-  conectado), endereço do QR;
+  conectado), `game_caps` (o que o jogo usa: lê a câmera por deslocamento), endereço do QR;
 - 10 vagas, cada uma com `seqlock` (ímpar = o Hub escrevendo), estado, aparelho, cor, nome e o `Pad`.
   O Hub escreve (atrás de uma trava, um escritor por vez); o jogo lê sem trava e repete se pegou o meio,
   com limite de tentativas: um Hub encerrado à força no meio de uma escrita não pode travar o jogo (fica a
   leitura anterior, e o heartbeat parado zera os controles);
 - anel de 64 comandos do jogo para o Hub (`rumble`, `toast`, `accepting`, `label`, `layout`, `light`, `mode`): o jogo
-  escreve e avança `cmd_write`, o Hub lê a cada 100 ms e avança `cmd_read`.
+  escreve e avança `cmd_write`, o Hub lê a cada 100 ms e avança `cmd_read`;
+- `look`: por vaga, o deslocamento da câmera acumulado (milésimos de grau). O Hub soma (atômico, no caminho da
+  entrada); o jogo troca por zero.
 
 Regras:
 - **Um jogo por vez**: o jogo reserva com `InterlockedCompareExchange(game_pid, 0 → pid)`; outro recebe
@@ -403,7 +412,9 @@ O visual é fixo; o desempenho vem de não fazer trabalho à toa (medido com 200
 
 O jogador vê a própria parte do jogo no celular, com os controles por cima, como um jogo de celular, e ela
 sai da TV. Serve para jogos em que um não pode ver a tela do outro (prop hunt, esconde-esconde) ou para quem
-prefere olhar para o celular. **Padrão em todo jogo e mod do SDK** (docs/SDK.md, "Tela do jogo no celular").
+prefere olhar para o celular. **Todo jogo e mod do SDK oferece; o jogador liga no menu do celular** (vem
+desligada). O celular diz o formato da tela dele e o jogo desenha nele (`pa_view_size`): a imagem enche, sem
+faixas.
 
 **Implementado (v1, quadros JPEG):** o jogo entrega a visão do jogador (`pa_submit_view`) numa memória por
 vaga → o Hub (`view.rs`) lê o quadro mais novo, comprime em JPEG (qualidade 70) e manda pela conexão do

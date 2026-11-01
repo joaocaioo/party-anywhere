@@ -15,7 +15,7 @@ mod repo;
 pub use cover::{check_cover, CoverInfo, COVER_MAX_BYTES, COVER_MIN_HEIGHT, COVER_MIN_WIDTH};
 pub use game::{
     Art, BaseGame, GameManifest, Install, InstallFile, InstallSource, InstallTarget, Launch, Players, Requires, Sdk,
-    MAX_NAME_CHARS, MAX_TAGLINE_CHARS,
+    MAX_NAME_CHARS, MAX_TAGLINE_CHARS, STEAM_COVER,
 };
 pub use issues::{Issue, Severity};
 pub use release::{sha256_hex, ReleaseManifest};
