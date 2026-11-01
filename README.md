@@ -8,6 +8,12 @@
 <p align="center"><b>Qualquer jogo. Qualquer controle. Até 10 pessoas no mesmo sofá.</b></p>
 
 <p align="center">
+  <a href="https://github.com/joaocaioo/party-anywhere/releases/latest"><img src="https://img.shields.io/badge/Baixar_para_Windows-3cf060?style=for-the-badge&logo=windows&logoColor=0b0c0f&labelColor=3cf060&color=3cf060" alt="Baixar o Party Anywhere para Windows (versão mais nova)" height="44"></a>
+  <br>
+  <a href="https://github.com/joaocaioo/party-anywhere/releases/latest"><img src="https://img.shields.io/github/v/release/joaocaioo/party-anywhere?label=vers%C3%A3o%20mais%20nova&color=1a1d22" alt="Versão mais nova"></a>
+</p>
+
+<p align="center">
   <a href="#jogar">Jogar</a> ·
   <a href="#transformar-um-jogo-em-co-op-local">Transformar um jogo</a> ·
   <a href="#perguntas-rápidas">Perguntas</a> ·
@@ -37,7 +43,8 @@ Cada pessoa vira um jogador, de **P1 a P10**, com a sua cor. Depois é só escol
 
 ## Jogar
 
-1. Baixe e instale o **`PartyAnywhere-X.Y.Z-setup.exe`** (a versão mais nova) na página de [Releases](../../releases).
+1. Clique em **[Baixar para Windows](https://github.com/joaocaioo/party-anywhere/releases/latest)**, baixe o
+   **`PartyAnywhere-X.Y.Z-setup.exe`** (a versão mais nova) e abra.
    Se o Windows mostrar "O Windows protegeu o computador", é porque o instalador ainda não tem assinatura
    digital: clique em **Mais informações** → **Executar assim mesmo**.
 2. Abra o app. Ligue os controles ou escaneie o QR com o celular (no mesmo Wi-Fi do PC).
