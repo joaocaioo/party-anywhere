@@ -879,6 +879,8 @@ pub fn game_play(app: tauri::AppHandle, hub: Hubs, libs: Libs, id: String, playe
     match (&entry.source, &entry.installed) {
         (Source::Pc { launch, .. }, _) => {
             if launch.contains("://") {
+                // pela Steam ou pela Epic: a janela do jogo é de um programa que o Hub não abriu
+                crate::foreground::launching(crate::foreground::Target::AnyNew);
                 app.opener().open_url(launch, None::<&str>).map_err(|e| format!("não consegui abrir {}: {e}", entry.name))
             } else {
                 spawn(&PathBuf::from(launch), &[], None)
@@ -909,7 +911,11 @@ pub fn game_stopped(hub: Hubs) {
     hub.set_session_layout(None);
 }
 
+/// Abre o jogo e traz a janela dele para a frente do Hub quando ela aparecer.
 fn spawn(exe: &std::path::Path, args: &[String], cwd: Option<PathBuf>) -> Result<(), String> {
+    let is_exe = exe.extension().is_some_and(|e| e.eq_ignore_ascii_case("exe"));
+    let name = exe.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    crate::foreground::launching(if is_exe { crate::foreground::Target::Exe(name) } else { crate::foreground::Target::AnyNew });
     let mut cmd = std::process::Command::new(exe);
     cmd.args(args);
     if let Some(dir) = cwd.or_else(|| exe.parent().map(|p| p.to_path_buf())) {

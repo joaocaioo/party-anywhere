@@ -5,6 +5,7 @@
 //! teclados em controles de Xbox para qualquer jogo (Modo Universal) e mantém a Biblioteca ligada ao GitHub.
 
 mod commands;
+mod foreground;
 mod gamepads;
 mod hub;
 mod keyboards;
