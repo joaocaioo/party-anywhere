@@ -14,9 +14,10 @@ Uso:
   pa hub install              baixa e abre o instalador (instala ou atualiza)
   pa games [busca] [--json]   jogos instalados (Steam e Epic) que podem virar co-op
   pa new <pasta> --name \"Meu Jogo\" [--id com.usuario.jogo] [--tagline \"...\"]
-  pa new <pasta> --name \"Meu Mod\" --base-game \"<nome ou appid>\"   mod co-op de um jogo instalado
+  pa new <pasta> --name \"Meu Mod\" --base-game \"<nome, appid, pasta ou .exe>\"   mod co-op de um jogo instalado
   pa validate [pasta] [--json]
   pa pack [pasta] [--from build] [--tag v0.1.0] [--json]
+  pa release [pasta] [--from build] [--publish]   confere, empacota a versão da ficha e (com --publish) cria o release
   pa inspect <link do repositório | dono/repo> [--json]
   pa add <link do repositório | dono/repo | pasta do projeto>   leva o mod para a Biblioteca (abre o Party Anywhere)
   pa docs [sdk | coop | manifest | schema]   a documentação para quem cria (a desta versão)
@@ -111,6 +112,27 @@ pa {}. Erro num campo que deveria valer? Pode ser uma pa velha: baixe a mais nov
                     Ok(ExitCode::FAILURE)
                 }
             }
+        }
+        "release" => {
+            // o build é do projeto (o de um mod precisa do jogo instalado): aqui, da ficha conferida ao release
+            let dir = opts.dir();
+            let from = opts.get("--from").map(PathBuf::from);
+            let p = match pack_dir(&dir, from.as_deref(), None) {
+                Ok(p) => p,
+                Err(issues) => {
+                    print_issues(&issues);
+                    return Ok(ExitCode::FAILURE);
+                }
+            };
+            let tag = format!("v{}", p.release.version.trim_start_matches('v'));
+            println!("Versão {tag} pronta: {} ({} arquivos).", p.package.display(), p.files);
+            if !opts.flag("--publish") {
+                println!("Para testar no seu Hub: pa add .   Para publicar: pa release --publish");
+                return Ok(ExitCode::SUCCESS);
+            }
+            publish_release(&dir, &tag, &[&p.package, &p.release_manifest])?;
+            println!("Publicado: {tag}. Com o repositório público e o tópico party-anywhere-game, qualquer pessoa instala pelo link.");
+            Ok(ExitCode::SUCCESS)
         }
         "hub" => {
             if opts.positional.first().map(String::as_str) == Some("install") {
@@ -254,5 +276,26 @@ impl Opts {
 
     fn dir(&self) -> PathBuf {
         PathBuf::from(self.positional.first().map(String::as_str).unwrap_or("."))
+    }
+}
+
+/// Cria o release no GitHub com o `gh` (a ferramenta oficial do GitHub, já logada), na pasta do projeto.
+fn publish_release(dir: &std::path::Path, tag: &str, files: &[&std::path::Path]) -> Result<(), String> {
+    let gh = std::process::Command::new("gh").arg("--version").output();
+    if !gh.is_ok_and(|o| o.status.success()) {
+        return Err("para publicar, instale o gh (https://cli.github.com) e entre com `gh auth login`. Ou crie o release                     no site do GitHub com os dois arquivos da pasta release."
+            .into());
+    }
+    let status = std::process::Command::new("gh")
+        .current_dir(dir)
+        .args(["release", "create", tag])
+        .args(files)
+        .args(["--title", tag, "--notes", "Instale pelo Party Anywhere: Biblioteca → Adicionar → por link, com o link deste repositório."])
+        .status()
+        .map_err(|e| e.to_string())?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("o gh não criou o release {tag}: a tag já existe? o repositório está no GitHub (git remote)?"))
     }
 }

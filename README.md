@@ -119,7 +119,7 @@ Com o jogo instalado no seu PC:
 pa new meu-mod --name "Meu Mod Co-op" --base-game "nome do jogo"
 ```
 
-A ferramenta acha o jogo (Steam ou Epic) e já preenche a ficha com ele: o nome, o executável e de onde ele
+A ferramenta acha o jogo (Steam ou Epic; de outro lugar, passe a pasta ou o `.exe` dele) e já preenche a ficha com ele: o nome, o executável e de onde ele
 vem. Assim o app de quem baixar sabe procurar e, se precisar, ajudar a pessoa a instalar. Você ganha:
 
 | Arquivo | Para que serve |

@@ -85,6 +85,8 @@ pub struct SeatView {
     pub color: &'static str,
     pub battery: Option<u8>,
     pub ping: Option<u32>,
+    /// Há quanto tempo a vaga está em "Reconectando" (ms); a carta avisa quem hospeda depois de alguns minutos.
+    pub away_ms: Option<u64>,
 }
 
 #[derive(Clone, Serialize)]
@@ -371,6 +373,7 @@ impl Hub {
     }
 
     pub fn snapshot(&self) -> LobbyView {
+        let now = self.now_ms();
         let lobby = self.lobby.lock().unwrap();
         let meta = self.meta.lock().unwrap();
         let seats = lobby
@@ -396,6 +399,10 @@ impl Hub {
                     color: SEAT_COLORS[s.index],
                     battery: m.battery,
                     ping: m.ping_ms.filter(|_| s.kind == DeviceKind::Phone),
+                    away_ms: match s.state {
+                        SeatState::Reconnecting { since_ms } if since_ms > 0 => Some(now.saturating_sub(since_ms)),
+                        _ => None,
+                    },
                 }
             })
             .collect();

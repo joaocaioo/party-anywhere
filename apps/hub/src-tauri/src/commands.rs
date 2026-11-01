@@ -824,9 +824,17 @@ pub fn library_edit(libs: Libs, id: String, edit: GameEdit) -> bool {
     true
 }
 
+/// "Descobrir": a lista vale 5 minutos (a busca do GitHub sem login aceita poucas consultas por minuto).
+static DISCOVER: Mutex<Option<pa_library::DiscoverCache>> = Mutex::new(None);
+
 #[tauri::command]
 pub async fn library_discover() -> Result<Vec<Discovered>, String> {
-    tauri::async_runtime::spawn_blocking(|| pa_library::discover(&Ureq::default())).await.map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(|| {
+        let mut cache = DISCOVER.lock().unwrap();
+        cache.get_or_insert_with(Default::default).get(std::time::Instant::now(), &Ureq::default())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

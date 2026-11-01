@@ -274,6 +274,34 @@ pub fn discover(http: &dyn Http) -> Result<Vec<Discovered>, String> {
         .collect())
 }
 
+/// Quanto tempo a lista do "Descobrir" vale: a busca do GitHub sem login aceita poucas consultas por minuto.
+pub const DISCOVER_FRESH: std::time::Duration = std::time::Duration::from_secs(5 * 60);
+
+/// A última lista do "Descobrir" e quando chegou.
+#[derive(Default)]
+pub struct DiscoverCache {
+    last: Option<(std::time::Instant, Vec<Discovered>)>,
+}
+
+impl DiscoverCache {
+    /// A lista guardada se ainda vale; senão busca de novo. Se o GitHub recusar (limite, sem internet), a última
+    /// lista que chegou serve melhor que um erro.
+    pub fn get(&mut self, now: std::time::Instant, http: &dyn Http) -> Result<Vec<Discovered>, String> {
+        if let Some((at, items)) = &self.last {
+            if now.duration_since(*at) < DISCOVER_FRESH {
+                return Ok(items.clone());
+            }
+        }
+        match discover(http) {
+            Ok(items) => {
+                self.last = Some((now, items.clone()));
+                Ok(items)
+            }
+            Err(e) => self.last.as_ref().map(|(_, items)| items.clone()).ok_or(e),
+        }
+    }
+}
+
 fn api_issue(status: u16) -> Issue {
     match status {
         403 | 429 => Issue::error("rede", "o GitHub pediu uma pausa (limite de consultas). Tente de novo em alguns minutos."),
@@ -387,5 +415,24 @@ pub(crate) mod tests {
         let found = discover(&http).unwrap();
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].repo, "a/kart");
+    }
+
+    #[test]
+    fn discover_is_cached_and_survives_the_rate_limit() {
+        let url = "https://api.github.com/search/repositories?q=topic:party-anywhere-game+fork:false&sort=stars&order=desc&per_page=50";
+        let body = serde_json::json!({ "items": [{ "full_name": "a/kart", "description": null, "stargazers_count": 1, "pushed_at": null }] });
+        let mut http = FakeHttp::default();
+        http.on(url, 200, body.to_string());
+        let mut cache = DiscoverCache::default();
+        let t0 = std::time::Instant::now();
+        assert_eq!(cache.get(t0, &http).unwrap().len(), 1);
+        // dentro do prazo: nem pergunta ao GitHub (que agora recusaria)
+        let mut limited = FakeHttp::default();
+        limited.on(url, 403, "{}");
+        assert_eq!(cache.get(t0 + std::time::Duration::from_secs(60), &limited).unwrap().len(), 1);
+        // venceu e o GitHub recusa: a última lista serve
+        assert_eq!(cache.get(t0 + DISCOVER_FRESH * 2, &limited).unwrap()[0].repo, "a/kart");
+        // sem nada guardado, o erro diz o que fazer
+        assert!(DiscoverCache::default().get(t0, &limited).unwrap_err().contains("alguns minutos"));
     }
 }

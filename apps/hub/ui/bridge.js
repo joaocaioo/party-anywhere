@@ -42,6 +42,7 @@
         via: s.kind === 'keyboard' ? ({ 'Do notebook': 'Notebook', 'Com fio': 'USB' }[s.via] || s.via) : (s.via || 'Conectado'),
         battery: s.battery, ping: s.kind === 'phone' ? (s.ping ?? '–') : null,
         deviceKey: s.deviceKey.replace(/[^a-z0-9]/gi, '').slice(-24), state: s.state,
+        awayAt: s.awayMs != null ? Date.now() - s.awayMs : null,
       };
     }
     for (let i = 0; i < MAX; i++) {

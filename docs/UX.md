@@ -76,7 +76,8 @@ P1 a P4 seguem a convenção dos consoles. A cor sempre aparece junto do número
   **Adicionar jogador → Teclado**: aperta-se Enter no teclado que vai jogar (ou "Conectar" na lista de
   teclados encontrados). Cada teclado é um jogador diferente.
 - **Queda**: a carta fica cinza com "Reconectando..." e **guarda a vaga**. Se o mesmo dispositivo
-  voltar, volta para a mesma vaga. Remover é manual (botão na carta).
+  voltar, volta para a mesma vaga. Remover é manual (botão na carta). Depois de 2 minutos a carta diz "Caiu há N
+  min" e lembra do X para liberar a vaga (sem aviso por cima de nada: quem hospeda vê quando olha o lobby).
 - **Ir jogar**: botão "Jogar" leva à Biblioteca. No Modo Universal, o lobby continua valendo enquanto
   qualquer jogo estiver aberto.
 

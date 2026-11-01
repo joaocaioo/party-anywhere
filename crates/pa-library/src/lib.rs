@@ -12,7 +12,7 @@ pub mod store;
 pub mod updates;
 pub mod vigem;
 
-pub use github::{discover, fetch_latest, fetch_manifest, inspect, Discovered, InspectReport, LatestRelease};
+pub use github::{discover, fetch_latest, DiscoverCache, fetch_manifest, inspect, Discovered, InspectReport, LatestRelease};
 pub use store::{Installed, Library, LibraryEntry, LoadNote, Source};
 pub use updates::{check_games, check_hub, latest_hub, GameUpdate, HubUpdate};
 

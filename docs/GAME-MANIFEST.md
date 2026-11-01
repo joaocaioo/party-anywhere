@@ -172,9 +172,10 @@ Sem o workflow: `pa pack --from build --tag v0.3.0` e anexe os dois arquivos de 
 | `pa hub` / `pa hub install` | Confere se o Party Anywhere está instalado e atualizado; instala ou atualiza (instalador conferido pelo hash). |
 | `pa games [busca]` | Jogos instalados (Steam e Epic) com pasta, executável e aviso de anti-cheat. |
 | `pa new <pasta> --name "Jogo"` | Projeto pronto: manifesto, capa provisória 900×1200, SDK com exemplo, workflow, `AGENTS.md` e skill para agentes. |
-| `pa new <pasta> --name "Mod" --base-game "<nome ou appid>"` | O mod co-op de um jogo instalado: `requires.baseGame` (nome, appid, executável) e `install.target: "baseGame"` já preenchidos. Recusa jogos com anti-cheat. |
+| `pa new <pasta> --name "Mod" --base-game "<nome, appid, pasta ou .exe>"` | O mod co-op de um jogo instalado: `requires.baseGame` (nome, appid, executável) e `install.target: "baseGame"` já preenchidos. Jogo de fora da Steam e da Epic (GOG, CD): passe a pasta ou o `.exe`. Recusa jogos com anti-cheat. |
 | `pa validate` | Confere manifesto e capa, com o que fazer em cada problema. |
 | `pa pack --from build --tag vX.Y.Z` | Pacote `.zip` reproduzível + `party-anywhere.release.json`. |
+| `pa release [--from build] [--publish]` | Confere a ficha e empacota a versão dela; com `--publish`, cria o release `vX.Y.Z` no GitHub com os dois arquivos (pelo `gh`). O build continua sendo do projeto (o de um mod precisa do jogo instalado). |
 | `pa inspect dono/repo` | Lê o jogo publicado como o Hub lê e diz se instala. Também aceita a pasta do projeto. |
 | `pa add <dono/repo ou pasta>` | Leva o mod para a Biblioteca: abre o Hub com a prévia (o Hub acha o jogo original e a pessoa confirma). Com a pasta do projeto, o criador joga o próprio mod **sem publicar** (precisa do `pa pack`). |
 | `pa docs [sdk \| coop \| manifest \| schema]` | A documentação para quem cria, a da versão instalada (o SDK, o guia de co-op local, esta ficha e o esquema). É por onde os agentes de IA leem. |

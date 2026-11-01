@@ -1243,6 +1243,7 @@ function setReconnecting(idx) {
   const s = seats[idx];
   if (!s || s.state !== 'active') return;
   s.state = 'reconnecting';
+  s.awayAt = Date.now();
   renderLobby();
   toast(`P${idx + 1} caiu. Guardando a vaga...`, s, 'warn');
 }
@@ -1356,7 +1357,16 @@ function playerCardHTML(s) {
       <div class="meta"><small>${escapeHtml(s.deviceName)}</small>${seatStatHTML(s)}</div>
       <button class="mini" data-identify="${s.index}" title="Identificar: vibra e acende o controle"><span class="t">IDENTIFICAR</span>${icon('chevron')}</button>
     </div>
-    <div class="reco">${icon('spinner')}<div>Reconectando...<br><small>A vaga de P${s.index + 1} está guardada</small></div></div>`;
+    <div class="reco">${icon('spinner')}<div>${recoHTML(s)}</div></div>`;
+}
+
+// Quem caiu: a vaga fica guardada. Passados alguns minutos, a carta diz há quanto tempo e como liberar (sem
+// remover sozinho e sem aviso por cima de nada: quem hospeda vê quando olha o lobby).
+const AWAY_HINT_MS = 2 * 60 * 1000;
+function recoHTML(s) {
+  const away = s.awayAt ? Date.now() - s.awayAt : 0;
+  if (away < AWAY_HINT_MS) return `Reconectando...<br><small>A vaga de P${s.index + 1} está guardada</small>`;
+  return `Caiu há ${Math.floor(away / 60000)} min<br><small>Volta sozinho para P${s.index + 1}. Não vai voltar? Toque no X</small>`;
 }
 
 function seatStatHTML(s) {
@@ -1410,6 +1420,8 @@ function renderLobby(newSeatIndex) {
       const stat = seatStatHTML(it.seat), statEl = el.querySelector('.meta > b');
       if (statEl && el.dataset.stat !== stat) { statEl.outerHTML = stat; el.dataset.stat = stat; }
       el.classList.toggle('reconnecting', it.seat.state === 'reconnecting');
+      const reco = recoHTML(it.seat), recoEl = el.querySelector('.reco > div');
+      if (recoEl && el.dataset.reco !== reco) { recoEl.innerHTML = reco; el.dataset.reco = reco; }
     } else {
       const sig = 'add' + (items.length - 1);
       if (el.dataset.sig !== sig) { el.innerHTML = addCardHTML(items.length - 1); el.dataset.sig = sig; }
@@ -1492,6 +1504,11 @@ function identify(idx) {
 }
 const COLOR_NAMES = ['azul', 'vermelho', 'verde', 'amarelo', 'roxo', 'laranja', 'ciano', 'rosa', 'lima', 'branco'];
 const colorName = (i) => COLOR_NAMES[i];
+
+// "Caiu há N min": a carta de quem está reconectando se atualiza sozinha
+setInterval(() => {
+  if (currentView === 'lobby' && seats.some((s) => s && s.state === 'reconnecting' && s.awayAt)) renderLobby();
+}, 15000);
 
 // latência dos celulares oscila (no Hub real vem do PING/PONG)
 setInterval(() => {

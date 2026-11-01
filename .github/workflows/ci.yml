@@ -14,9 +14,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+          targets: i686-pc-windows-msvc
       - uses: Swatinem/rust-cache@v2
       - name: Testes (inclui o SDK em C compilado com MSVC)
         run: cargo test --workspace --locked
+      - name: SDK em 32 bits (mods de jogos antigos são x86; o layout da memória é o mesmo do Hub de 64 bits)
+        run: cargo test -p pa-sdk --locked --target i686-pc-windows-msvc
       - name: Lint
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: SDK em C# (o mesmo layout da memória, no nível do Unity antigo)

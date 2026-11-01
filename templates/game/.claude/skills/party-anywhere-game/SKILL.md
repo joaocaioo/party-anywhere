@@ -20,7 +20,7 @@ O servidor MCP `party-anywhere` (`pa mcp`) é opcional e tem as mesmas ferrament
 | Instalar ou atualizar o Hub | `pa hub install` (peça permissão: abre o instalador) | `install_hub` |
 | Jogos instalados que podem virar co-op | `pa games [busca]` | `find_installed_games` |
 | Começar um jogo novo | `pa new <pasta> --name "..."` | `create_game` |
-| Começar o mod co-op de um jogo do PC | `pa new <pasta> --name "..." --base-game "<nome ou appid>"` | `create_game` com `base_game` |
+| Começar o mod co-op de um jogo do PC | `pa new <pasta> --name "..." --base-game "<nome, appid, pasta ou .exe>"` | `create_game` com `base_game` |
 | Online → co-op local e passar do limite de jogadores | `pa docs coop` | `get_docs` `coop` |
 | Ler o contrato do SDK | `pa docs sdk` | `get_docs` `sdk` |
 | Ver o formato do manifesto | `pa docs manifest` (e `schema`) | `get_docs` `manifest` |

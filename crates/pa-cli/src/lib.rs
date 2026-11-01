@@ -28,7 +28,7 @@ pub struct NewOptions {
     pub base_game: Option<BaseGameSpec>,
 }
 
-/// O jogo-base de um mod, achado na Steam ou na Epic deste PC.
+/// O jogo-base de um mod, achado na Steam ou na Epic deste PC (ou na pasta que quem cria indicou).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BaseGameSpec {
@@ -39,12 +39,21 @@ pub struct BaseGameSpec {
     pub exe: String,
 }
 
-/// Acha o jogo instalado (nome ou appid da Steam) e confere se dá para fazer um mod co-op dele.
+/// Acha o jogo instalado (nome ou appid da Steam, ou a pasta ou o `.exe` do jogo) e confere se dá para fazer um
+/// mod co-op dele.
 pub fn resolve_base_game(query: &str) -> Result<BaseGameSpec, String> {
     use pa_library::pcgames;
+    let path = Path::new(query.trim().trim_matches('"'));
+    if path.is_dir() || path.extension().is_some_and(|e| e.eq_ignore_ascii_case("exe")) {
+        return base_game_at(path);
+    }
     let found = pcgames::find(query);
     let game = match found.as_slice() {
-        [] => return Err(format!("não achei \"{query}\" na Steam nem na Epic deste PC. `pa games` lista o que está instalado.")),
+        [] => {
+            return Err(format!(
+                "não achei \"{query}\" na Steam nem na Epic deste PC. `pa games` lista o que está instalado; jogo de outro                  lugar (GOG, CD, outra pasta): passe a pasta ou o .exe dele em --base-game."
+            ))
+        }
         [one] => one.clone(),
         many => match many.iter().find(|g| g.name.eq_ignore_ascii_case(query.trim())) {
             Some(exact) => exact.clone(),
@@ -64,6 +73,28 @@ pub fn resolve_base_game(query: &str) -> Result<BaseGameSpec, String> {
     }
     let exe = pcgames::exe_candidates(&dir).into_iter().next().ok_or_else(|| format!("não achei o executável de {} em {}.", game.name, dir.display()))?;
     Ok(BaseGameSpec { name: game.name, steam_app_id: game.steam_app_id, epic_app_name: game.epic_app_name, exe })
+}
+
+/// Jogo de fora da Steam e da Epic: a pasta (o maior .exe dela) ou o próprio .exe. O nome é o da pasta; quem
+/// instalar o mod aponta a cópia dela (o Hub pergunta), e o `exe` na ficha é como ele acha o jogo.
+fn base_game_at(path: &Path) -> Result<BaseGameSpec, String> {
+    use pa_library::pcgames;
+    let (dir, exe) = if path.is_dir() {
+        let exe = pcgames::exe_candidates(path).into_iter().next().ok_or_else(|| format!("não achei um .exe de jogo em {}.", path.display()))?;
+        (path.to_path_buf(), exe)
+    } else {
+        if !path.is_file() {
+            return Err(format!("não achei {}.", path.display()));
+        }
+        let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        (path.parent().map(Path::to_path_buf).unwrap_or_default(), name)
+    };
+    if let Some(ac) = pcgames::anti_cheat(&dir) {
+        return Err(format!("esse jogo usa anti-cheat ({ac}). O Party Anywhere não faz mods para esses jogos: contornar anti-cheat pode banir a conta de quem joga."));
+    }
+    let folder = dir.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    let name = if folder.trim().is_empty() { exe.trim_end_matches(".exe").to_string() } else { folder };
+    Ok(BaseGameSpec { name, steam_app_id: None, epic_app_name: None, exe })
 }
 
 /// Cria um projeto de jogo já válido: manifesto, capa provisória, workflow de release, AGENTS.md e skill.
@@ -310,6 +341,23 @@ fn fold_accent(c: char) -> Option<char> {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn base_game_from_a_folder_or_an_exe_outside_the_stores() {
+        let dir = tempfile::tempdir().unwrap();
+        let game = dir.path().join("Jogo Antigo");
+        std::fs::create_dir(&game).unwrap();
+        std::fs::write(game.join("unins000.exe"), b"x").unwrap();
+        std::fs::write(game.join("Jogo.exe"), vec![0u8; 4096]).unwrap();
+        let b = resolve_base_game(game.to_str().unwrap()).unwrap();
+        assert_eq!((b.name.as_str(), b.exe.as_str(), b.steam_app_id), ("Jogo Antigo", "Jogo.exe", None));
+        let b = resolve_base_game(game.join("Jogo.exe").to_str().unwrap()).unwrap();
+        assert_eq!(b.exe, "Jogo.exe");
+        std::fs::write(game.join("EasyAntiCheat_Setup.exe"), b"x").unwrap();
+        std::fs::create_dir(game.join("EasyAntiCheat")).unwrap();
+        assert!(resolve_base_game(game.to_str().unwrap()).unwrap_err().contains("anti-cheat"));
+    }
+
     use super::*;
 
     fn project() -> tempfile::TempDir {

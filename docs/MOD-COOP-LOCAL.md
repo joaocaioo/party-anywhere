@@ -127,6 +127,9 @@ HUD de cada jogador, o som (de quem é cada som) e a pausa (o local não pode tr
 - Nome e cor da vaga do Party Anywhere (`pa_get_seat`) no lugar do nome e da foto da conta (que seriam os da
   mesma conta para todos): um avatar com a cor e "P2".
 - Um `pa_toast` ao entrar ("Você é o P2").
+- Com a tela dividida: a etiqueta "P2 · nome" na cor da vaga num canto de cada parte, e "P3" sobre a cabeça de
+  cada jogador do sofá, desenhado no HUD de quem vê (uma placa no mundo não vira para cada câmera em motores que
+  preparam todas as câmeras antes de desenhar, como o HDRP).
 
 ### 3.4 Controle do celular
 
@@ -137,7 +140,27 @@ HUD de cada jogador, o som (de quem é cada som) e a pausa (o local não pode tr
 - Nomes nos botões curtos (até ~8 letras), iguais no `controls` e no `pa_set_label`.
 - Câmera: leia `pa_take_look` (arrastar o dedo) além do analógico direito.
 
-### 3.5 Regras de produto
+### 3.5 Todo jogador tem tudo, como no online
+
+O teste: cada jogador do sofá faz tudo o que um jogador da internet faz, e os pontos caem na conta dele. Dois
+lugares escondem jogabilidade perdida:
+
+- **O que é de um jogador e nasce depois dele** (a arma na mão, a bola, o veículo que ele controla, os
+  projéteis). Num jogo de rede, cada PC tem autoridade sobre o que é seu. Aqui, o jogo de quem hospeda só dá
+  autoridade ao que é da conexão de quem hospeda: o extra pega a bola e não consegue arremessar. Dê ao extra a
+  autoridade sobre o que é dele (no jogo de quem hospeda), avise o objeto como a rede avisaria no jogo dele
+  (no Mirror, `OnStartAuthority`), no contexto do extra, e ponha a troca de contexto no código desses objetos
+  (a vaga sai do dono do objeto na rede).
+- **O que o jogo mostra só "ao jogador local"** (um aparelho de perguntas, um campo de digitar, uma tela de
+  escolha). Fica um só, de quem hospeda, às vezes cobrindo a tela inteira. Cada jogador ganha o seu, na parte
+  dele (e no celular de quem joga por lá), usável no controle: teclado numérico no direcional, opções para
+  escolher, e a resposta vai pelo mesmo evento de rede do jogo, no contexto do jogador. O original fica na
+  parte de quem hospeda. Campo de texto livre não cabe num controle: troque por opções (a certa e outras do
+  próprio jogo).
+
+Antes de publicar, passe por **todos** os modos e desafios do jogo com 2 jogadores e confira cada um.
+
+### 3.6 Regras de produto
 
 - Nada de contornar pagamento, DRM, conta ou anti-cheat, nem "jogar offline" pulando a loja. Se um recurso
   é pago no jogo (sala privada, por exemplo), o mod não libera, e diz isso na página dele.
@@ -253,5 +276,5 @@ sem distribuir nada do jogo original.
 5. O que uma visão a mais quebra (passo 4 e 5 da receita): streaming, luzes, sombras, fade, HUD.
 6. Até o limite original do jogo, com o checklist "não perdi nada".
 7. Passar do limite, com o método da seção 6.
-8. Ficha, capa e controle do celular do mod; publicar (opcional: `scripts\release.ps1 -Publicar`, com o
-   repositório público).
+8. Ficha, capa e controle do celular do mod; publicar (opcional: `scripts\release.ps1 -Publicar`, que compila e chama
+   `pa release --publish`, com o repositório público).
