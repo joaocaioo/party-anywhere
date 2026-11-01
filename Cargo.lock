@@ -2599,6 +2599,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tungstenite 0.29.0",
+ "windows-sys 0.59.0",
  "zip",
 ]
 

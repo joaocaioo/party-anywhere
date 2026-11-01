@@ -1,7 +1,8 @@
 //! `pa phone-sim`: celulares de mentira, para testar um jogo ou mod com 1 a 10 jogadores sem chamar ninguém.
 //! Cada um entra no Hub pelo mesmo caminho de um celular de verdade (WebSocket do controle, protocolo v1):
 //! ganha uma vaga, manda o controle de um roteiro, pode ligar a tela do jogo (e confirma cada quadro, como a
-//! página faz) e guarda o último quadro em disco.
+//! página faz) e guarda o último quadro em disco. Ao terminar (tempo, Ctrl+C), cada um sai da partida: nenhuma vaga
+//! fica presa em "Reconectando".
 
 use std::io::ErrorKind;
 use std::net::TcpStream;
@@ -114,6 +115,7 @@ pub fn run(opts: Options) -> Result<(), String> {
     println!("{} celular(es) de mentira em {ws_url}. Ctrl+C para sair.", opts.players);
 
     let stop = Arc::new(AtomicBool::new(false));
+    on_ctrl_c();
     let opts = Arc::new(opts);
     let statuses: Vec<Arc<Mutex<Status>>> = (0..opts.players).map(|_| Arc::default()).collect();
     let mut threads = Vec::new();
@@ -154,7 +156,7 @@ pub fn run(opts: Options) -> Result<(), String> {
                 .collect();
             println!("{}", line.join("  ·  "));
         }
-        if done || threads.iter().all(|t| t.is_finished()) {
+        if done || CTRL_C.load(Ordering::Relaxed) || threads.iter().all(|t| t.is_finished()) {
             break;
         }
     }
@@ -164,6 +166,21 @@ pub fn run(opts: Options) -> Result<(), String> {
     }
     Ok(())
 }
+
+static CTRL_C: AtomicBool = AtomicBool::new(false);
+
+/// Ctrl+C só pede para parar: os celulares saem da partida antes de o programa fechar.
+#[cfg(windows)]
+fn on_ctrl_c() {
+    unsafe extern "system" fn handler(_: u32) -> windows_sys::Win32::Foundation::BOOL {
+        CTRL_C.store(true, Ordering::Relaxed);
+        1
+    }
+    unsafe { windows_sys::Win32::System::Console::SetConsoleCtrlHandler(Some(handler), 1) };
+}
+
+#[cfg(not(windows))]
+fn on_ctrl_c() {}
 
 #[cfg(windows)]
 fn hub_url() -> Option<String> {
@@ -191,7 +208,7 @@ fn phone(k: usize, ws_url: &str, opts: &Options, stop: &AtomicBool, status: &Mut
     let mut last_save = Instant::now() - SAVE_EVERY;
     let mut screen_asked = false;
 
-    while !stop.load(Ordering::Relaxed) {
+    while !stop.load(Ordering::Relaxed) && !CTRL_C.load(Ordering::Relaxed) {
         // tudo o que chegou
         loop {
             match ws.read() {
@@ -247,6 +264,10 @@ fn phone(k: usize, ws_url: &str, opts: &Options, stop: &AtomicBool, status: &Mut
             }
         }
     }
+    // sai da partida (a vaga fica livre) em vez de deixar "Reconectando"
+    let _ = ws.send(Message::text(r#"{"t":"leave"}"#));
+    let _ = ws.flush();
+    std::thread::sleep(Duration::from_millis(100));
     let _ = ws.close(None);
     Ok(())
 }
