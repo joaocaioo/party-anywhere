@@ -156,7 +156,10 @@ A página também é um app da Tela de Início: `/manifest.webmanifest` (tela ch
 ícones `/icon-192.png` e `/icon-512.png`. No iPhone é o único jeito de ter tela cheia. O app da Tela de Início
 do iPhone não enxerga o que o Safari guardou, então o token também vai no endereço: depois do `welcome` a página
 passa a ser `/?t=<token>` e o manifesto vira `/manifest.webmanifest?t=<token>` (com `start_url` `/?t=<token>`).
-Aberto pelo ícone, o celular volta à mesma vaga em vez de entrar como jogador novo.
+Aberto pelo ícone, o celular volta à mesma vaga em vez de entrar como jogador novo. Sem token o manifesto não tem
+`start_url` (o ícone abre o endereço da página, que já leva o token). E, como garantia, um celular que chega sem um
+token conhecido, vindo do mesmo endereço da rede de um celular que está no lobby, volta para a vaga dele (dois
+celulares na mesma rede não têm o mesmo endereço; 127.0.0.1 não conta).
 
 **Medição** (a página do Hub usa sempre; uma página mínima pode usar só STATE):
 

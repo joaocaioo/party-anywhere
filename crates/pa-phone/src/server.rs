@@ -7,9 +7,9 @@
 //! Identidade: na primeira conexão o celular recebe um token no `welcome` e o guarda; nas próximas
 //! ele manda o token no `hello` e volta para a mesma vaga, mesmo reabrindo a página.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::io;
-use std::net::{Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -83,6 +83,8 @@ struct Shared {
     next_conn: AtomicU64,
     events: mpsc::UnboundedSender<PhoneEvent>,
     page: &'static str,
+    /// O token do último celular de cada endereço da rede (ver [`same_phone`]).
+    phones_by_ip: Mutex<HashMap<IpAddr, String>>,
 }
 
 impl Shared {
@@ -111,6 +113,7 @@ impl PhoneServer {
             next_conn: AtomicU64::new(1),
             events,
             page: config.page,
+            phones_by_ip: Mutex::new(HashMap::new()),
         });
 
         let host = if config.loopback_only { Ipv4Addr::LOCALHOST } else { Ipv4Addr::UNSPECIFIED };
@@ -222,19 +225,38 @@ const WEB_MANIFEST: &str = r##"{
 }"##;
 
 async fn web_manifest(Query(q): Query<ManifestQuery>) -> impl IntoResponse {
-    let start = match q.t {
-        Some(t) if valid_token(&t) => format!("/?t={t}"),
-        _ => "/".to_owned(),
+    // sem token, sem start_url: o ícone abre o endereço da página na hora de adicionar (que já leva o token)
+    let body = match q.t {
+        Some(t) if valid_token(&t) => WEB_MANIFEST.replacen("/START", &format!("/?t={t}"), 1),
+        _ => WEB_MANIFEST.replacen("  \"start_url\": \"/START\",\n", "", 1),
     };
-    (
-        [(header::CONTENT_TYPE, "application/manifest+json"), (header::CACHE_CONTROL, "no-store")],
-        WEB_MANIFEST.replacen("/START", &start, 1),
-    )
+    ([(header::CONTENT_TYPE, "application/manifest+json"), (header::CACHE_CONTROL, "no-store")], body)
 }
 
 #[derive(serde::Deserialize)]
 struct ManifestQuery {
     t: Option<String>,
+}
+
+/// O token com que este celular entra. O dele, se o lobby conhece; senão, o do jogador que já está no lobby vindo do
+/// mesmo endereço da rede: é o mesmo celular, que perdeu o token. No iPhone, o controle aberto pelo ícone da Tela de
+/// Início não enxerga o que o Safari guardou; sem isto o Hub via um celular novo (P2 caía, entrava um P3, os dois a
+/// mesma pessoa). Dois celulares na mesma rede não têm o mesmo endereço; 127.0.0.1 (testes, simulador) não conta.
+fn same_phone(lobby: &Lobby, by_ip: &HashMap<IpAddr, String>, ip: IpAddr, token: Option<String>) -> Option<String> {
+    let in_lobby = |t: &str| lobby.seat_of_device(&DeviceKey(format!("phone:{t}"))).is_some();
+    if let Some(t) = &token {
+        if in_lobby(t) {
+            return token;
+        }
+    }
+    if !ip.is_loopback() {
+        if let Some(t) = by_ip.get(&ip) {
+            if in_lobby(t) {
+                return Some(t.clone());
+            }
+        }
+    }
+    token
 }
 
 fn valid_token(t: &str) -> bool {
@@ -269,7 +291,15 @@ async fn connection(socket: WebSocket, shared: Arc<Shared>, peer: SocketAddr) {
         _ => return,
     };
     // token do celular, ou um novo de 128 bits; formato inválido é tratado como celular novo
-    let token = token.filter(|t| valid_token(t)).unwrap_or_else(new_token);
+    let token = {
+        let lobby = shared.lobby.lock().unwrap();
+        let mut by_ip = shared.phones_by_ip.lock().unwrap();
+        let token = same_phone(&lobby, &by_ip, peer.ip(), token.filter(|t| valid_token(t))).unwrap_or_else(new_token);
+        if !peer.ip().is_loopback() {
+            by_ip.insert(peer.ip(), token.clone());
+        }
+        token
+    };
     let key = DeviceKey(format!("phone:{token}"));
     let conn = shared.next_conn.fetch_add(1, Ordering::Relaxed);
 
@@ -466,4 +496,42 @@ fn new_token() -> String {
 
 fn reject(reason: &str) -> Message {
     Message::Text(serde_json::to_string(&ServerText::Reject { reason }).unwrap().into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn lobby_with(token: &str) -> Lobby {
+        let mut lobby = Lobby::default();
+        lobby.connected(Device { key: DeviceKey(format!("phone:{token}")), kind: DeviceKind::Phone, name: None });
+        lobby
+    }
+
+    #[test]
+    fn phone_without_its_token_comes_back_by_address() {
+        let saved = "a".repeat(32);
+        let lobby = lobby_with(&saved);
+        let ip: IpAddr = "192.168.0.20".parse().unwrap();
+        let by_ip = HashMap::from([(ip, saved.clone())]);
+        // o app da Tela de Início do iPhone chega sem o token do Safari
+        assert_eq!(same_phone(&lobby, &by_ip, ip, None), Some(saved.clone()));
+        assert_eq!(same_phone(&lobby, &by_ip, ip, Some("b".repeat(32))), Some(saved.clone()));
+        // outro celular, outro endereço: jogador novo
+        assert_eq!(same_phone(&lobby, &by_ip, "192.168.0.21".parse().unwrap(), None), None);
+        // o próprio token vale primeiro
+        let other = "c".repeat(32);
+        let lobby = lobby_with(&other);
+        assert_eq!(same_phone(&lobby, &by_ip, ip, Some(other.clone())), Some(other));
+    }
+
+    #[test]
+    fn loopback_and_removed_players_are_not_matched() {
+        let saved = "a".repeat(32);
+        let lobby = lobby_with(&saved);
+        let local: IpAddr = "127.0.0.1".parse().unwrap();
+        assert_eq!(same_phone(&lobby, &HashMap::from([(local, saved.clone())]), local, None), None);
+        let ip: IpAddr = "192.168.0.20".parse().unwrap();
+        assert_eq!(same_phone(&Lobby::default(), &HashMap::from([(ip, saved)]), ip, None), None);
+    }
 }

@@ -163,6 +163,15 @@ lugares escondem jogabilidade perdida:
   (o chão que mata, a placa de pressão) guarda o primeiro que encostou e trata todo mundo como ele. Enquanto um
   jogador procura alvos, ponha os outros jogadores do sofá na camada "dos outros PCs" e devolva logo depois; e
   faça cada encostada valer para quem encostou.
+- **A parte "de cliente" de cada desafio.** Num jogo de rede, cada PC roda o código do desafio para o seu jogador
+  ("já se mexeu?", "pulou 3 vezes?", "pisou no ladrilho certo?"). Num jogo só, ele roda uma vez, para quem
+  hospeda. Rode-o também para cada jogador do sofá, no contexto dele, com a parte de servidor desligada, o estado
+  do desafio separado por jogador e o mesmo sorteio; e não registre de novo os ouvintes de evento.
+- **Uma "câmera ativa" global.** A mira, o "usar", o arremesso e o tiro costumam sair dela: dê uma por jogador.
+- **Comandos de objetos da fase** (que aceitam comando de qualquer um): o servidor tem de saber qual jogador do sofá
+  mandou, senão tudo conta para quem hospeda.
+- **O que o jogo entrega quando "todos chegaram"** (veículos): com uma pessoa só no lobby, isso pode acontecer antes
+  de os jogadores do sofá nascerem.
 - **Gestos do mouse** (chacoalhar uma lata movendo o mouse rápido de um lado ao outro). O analógico, usado como
   mouse, não chega lá a tempo: no controle, faça o analógico ser a posição do gesto (até o fim de um lado, até o
   fim do outro).

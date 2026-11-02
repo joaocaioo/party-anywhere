@@ -414,6 +414,8 @@ function keepToken(token) {
   if (link) link.href = `/manifest.webmanifest?t=${token}`;
 }
 
+keepToken(savedToken()); // reaberta com o token: o manifesto já o leva
+
 function connect() {
   if (stopped || document.hidden) return;
   ws = new WebSocket(`ws://${location.host}/ws`);

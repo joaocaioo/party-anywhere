@@ -124,8 +124,9 @@ async fn home_screen_app_keeps_the_same_seat() {
 
     let manifest = http_get(&server, &format!("/manifest.webmanifest?t={token}")).await;
     assert!(manifest.contains(&format!("\"start_url\": \"/?t={token}\"")), "{manifest}");
-    // sem token (ou com lixo), o ícone abre a página normal
-    assert!(http_get(&server, "/manifest.webmanifest?t=zz").await.contains("\"start_url\": \"/\""));
+    // sem token (ou com lixo), sem start_url: o ícone abre o endereço da página, que já leva o token
+    let plain = http_get(&server, "/manifest.webmanifest?t=zz").await;
+    assert!(!plain.contains("start_url") && plain.contains("\"display\""), "{plain}");
 
     let (_app, again) = phone(&server, Some(&token)).await;
     assert_eq!(again["seat"].as_u64(), Some(1));
