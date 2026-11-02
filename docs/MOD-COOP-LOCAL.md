@@ -209,7 +209,7 @@ O custo de uma visão a mais é **desenhar a cena de novo**, não rodar o jogo d
   configurações da pessoa voltam com um jogador, e gravar configurações grava as dela, nunca o preset. No
   MicroWorks (Ryzen 7 5700U, vídeo integrado, 1080p): 4 jogadores foram de 20 para 34 quadros por segundo; 6
   jogadores, 27; 10 jogadores, 19.
-- Quem joga pelo celular não ocupa a TV: a visão dele é desenhada pequena (360 de altura, no formato do
+- Quem joga pelo celular não ocupa a TV: a visão dele é desenhada menor (540 de altura, no formato do
   celular: `pa_view_size`).
 - Meça com o número máximo de jogadores, no PC mais fraco que você quer atender, com o **Hub release** (sem
   otimização, o Hub comprime a imagem do celular devagar), e coloque na ficha só o que ficou liso.

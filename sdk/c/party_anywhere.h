@@ -129,7 +129,7 @@ void pa_set_light(pa_client* pa, int seat, uint8_t r, uint8_t g, uint8_t b);
  *
  *   if (pa_view_wanted(pa, s)) {           // este jogador está vendo no celular:
  *       int w, h;
- *       pa_view_size(pa, s, &w, &h);       // o formato da tela do celular (ex.: 780x360): enche, sem faixas
+ *       pa_view_size(pa, s, &w, &h);       // o formato da tela do celular (ex.: 1170x540): enche, sem faixas
  *       // não desenhe a parte dele na TV (a tela dividida fica para os outros)
  *       // desenhe a visão dele num alvo à parte de w x h, leia os pixels (BGRA) e entregue:
  *       pa_submit_view(pa, s, pixels, w, h, w * 4);
@@ -138,7 +138,7 @@ void pa_set_light(pa_client* pa, int seat, uint8_t r, uint8_t g, uint8_t b);
  * Sem o Hub, ou com o jogador sem celular, pa_view_wanted é false e o jogo segue como sempre. Entregue a
  * cada frame (ou a cada 2): o Hub manda para o celular no ritmo que a rede aguenta. */
 bool pa_view_wanted(pa_client* pa, int seat);
-void pa_view_size(pa_client* pa, int seat, int* width, int* height); /* 360 de altura; 640x360 se não souber */
+void pa_view_size(pa_client* pa, int seat, int* width, int* height); /* 540 de altura; 960x540 se não souber */
 /* stride_bytes negativo vale: imagem de baixo para cima, com bgra apontando a última linha (útil com a leitura
  * da placa de vídeo, que costuma vir assim). */
 bool pa_submit_view(pa_client* pa, int seat, const void* bgra, int width, int height, int stride_bytes);
@@ -556,10 +556,11 @@ bool pa_view_wanted(pa_client* pa, int seat) {
 void pa_view_size(pa_client* pa, int seat, int* width, int* height) {
     pa_view_header* v = pa__view(pa, seat);
     uint32_t a = v ? v->aspect_milli : 0;
-    int h = 360, w;
+    int h = 540, w;
     if (a < 1000 || a > 3000) a = 16000 / 9; /* sem o formato: 16:9 */
     w = (int)((h * a + 500) / 1000) & ~1; /* par: os codificadores de vídeo e JPEG preferem */
-    if (w > PA_VIEW_MAX_W) w = PA_VIEW_MAX_W;
+    /* tela muito larga: a largura para no máximo e a altura diminui junto (cortar só a largura esticaria) */
+    if (w > PA_VIEW_MAX_W) { w = PA_VIEW_MAX_W; h = (int)((w * 1000 + a / 2) / a) & ~1; }
     if (width) *width = w;
     if (height) *height = h;
 }

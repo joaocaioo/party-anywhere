@@ -62,7 +62,7 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 /* a tela do jogo deste jogador, atrás dos controles (só aparece quando o jogo manda) */
 /* a imagem chega no formato da tela do celular (o jogo desenha assim): enche, sem faixas; se um jogo mandar
    outro formato, corta um pouco em vez de mostrar bordas */
-#view { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; display: none; }
+#view { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); background: #000; display: none; }
 html.viewing, html.viewing body { background: #000; }
 body.viewing #view { display: block; }
 body.viewing .pad { background: transparent; }
@@ -393,15 +393,34 @@ function deviceName() {
   return 'Navegador';
 }
 
+// O token que devolve a mesma vaga. Fica guardado no navegador e também no endereço da página: no iPhone, o
+// controle aberto pelo ícone da Tela de Início não enxerga o que o Safari guardou, e sem o token o Hub veria um
+// celular novo (P2 caía e entrava um P3, os dois a mesma pessoa). O ícone guarda o endereço (e o manifesto
+// também leva o token), então o token vai junto.
+const TOKEN_RE = /^[0-9a-f]{32}$/i;
+function savedToken() {
+  const fromUrl = new URLSearchParams(location.search).get('t');
+  if (fromUrl && TOKEN_RE.test(fromUrl)) return fromUrl;
+  try { const t = localStorage.getItem('pa.token'); if (t && TOKEN_RE.test(t)) return t; } catch (_) {}
+  return null;
+}
+function keepToken(token) {
+  if (!token || !TOKEN_RE.test(token)) return;
+  try { localStorage.setItem('pa.token', token); } catch (_) {}
+  if (new URLSearchParams(location.search).get('t') !== token) {
+    try { history.replaceState(null, '', `/?t=${token}`); } catch (_) {}
+  }
+  const link = document.querySelector('link[rel="manifest"]');
+  if (link) link.href = `/manifest.webmanifest?t=${token}`;
+}
+
 function connect() {
   if (stopped || document.hidden) return;
   ws = new WebSocket(`ws://${location.host}/ws`);
   ws.binaryType = 'arraybuffer';
   ws.onopen = () => {
     // o token guardado faz o Hub devolver a mesma vaga, mesmo reabrindo a página
-    let token = null;
-    try { token = localStorage.getItem('pa.token'); } catch (_) {}
-    ws.send(JSON.stringify({ t: 'hello', v: 1, device: deviceName(), token }));
+    ws.send(JSON.stringify({ t: 'hello', v: 1, device: deviceName(), token: savedToken() }));
     $('offline').classList.remove('on');
     // rajada de sincronização para achar logo uma ida e volta curta; depois, uma a cada 2 s
     let n = 0;
@@ -423,7 +442,7 @@ function connect() {
 
 function onText(m) {
   if (m.t === 'welcome') {
-    try { if (m.token) localStorage.setItem('pa.token', m.token); } catch (_) {}
+    keepToken(m.token);
     document.documentElement.style.setProperty('--seat', m.color);
     $('seatNum').textContent = m.seat;
     $('sheetSeat').textContent = m.seat;
@@ -510,7 +529,7 @@ function showFrame(dv) {
   const blob = new Blob([new Uint8Array(dv.buffer, dv.byteOffset + 9, dv.byteLength - 9)], { type: 'image/jpeg' });
   createImageBitmap(blob).then((bmp) => {
     if (!prefs.screen) { bmp.close(); return; }
-    if (viewCanvas.width !== w || viewCanvas.height !== h) { viewCanvas.width = w; viewCanvas.height = h; }
+    if (viewCanvas.width !== w || viewCanvas.height !== h) { viewCanvas.width = w; viewCanvas.height = h; fitView(); }
     viewCtx.drawImage(bmp, 0, 0);
     bmp.close();
     setViewing(true);
@@ -520,6 +539,15 @@ function showFrame(dv) {
     ack.setUint8(0, 0x08); ack.setUint16(1, id, true);
     sendRaw(ack.buffer);
   }).catch(() => {});
+}
+
+// a imagem cobre a tela mantendo a proporção (sobra cortada nas bordas, nunca esticada)
+function fitView() {
+  const w = viewCanvas.width, h = viewCanvas.height;
+  if (!w || !h) return;
+  const k = Math.max(innerWidth / w, innerHeight / h);
+  viewCanvas.style.width = `${Math.ceil(w * k)}px`;
+  viewCanvas.style.height = `${Math.ceil(h * k)}px`;
 }
 
 function setViewing(on) {
@@ -538,6 +566,7 @@ function sendScreen() {
 }
 let screenResize = 0;
 addEventListener('resize', () => {
+  fitView();
   if (!prefs.screen) return;
   clearTimeout(screenResize);
   screenResize = setTimeout(sendScreen, 300);

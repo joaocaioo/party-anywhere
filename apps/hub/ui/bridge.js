@@ -180,9 +180,19 @@
         box.innerHTML = `<div class="modal-note" style="display:block">
           <b style="color:var(--text)">Confira estas três coisas:</b><br>
           • O celular está no <b>mesmo Wi-Fi</b>? Redes de convidados costumam bloquear celulares de falarem com o PC.<br>
-          • O Windows perguntou sobre a rede quando o Hub abriu? Permita em <b>redes privadas</b>.<br>
+          • O firewall do Windows pode estar bloqueando os celulares: <button class="linkish" id="fwAllow">Permitir no firewall do Windows</button><span id="fwState"></span><br>
           • O PC tem mais de uma rede? Tente outro endereço (toque para trocar o QR):
           <div class="alt-ips">${addrs.length ? addrs.map((a) => `<span class="linkish" data-url="${escapeHtml(a.url)}">${escapeHtml(a.url.replace('http://', ''))}</span> (${escapeHtml(a.interface)})${a.current ? ' ✓' : ''}`).join('<br>') : 'Nenhuma rede encontrada: o PC está conectado?'}</div></div>`;
+        document.getElementById('fwAllow').addEventListener('click', async () => {
+          const state = document.getElementById('fwState');
+          state.textContent = ' · confirme no aviso do Windows...';
+          try {
+            await invoke('firewall_allow');
+            state.textContent = ' · pronto. Tente conectar de novo.';
+          } catch (e) {
+            state.textContent = ` · ${String(e)}`;
+          }
+        });
         box.querySelectorAll('[data-url]').forEach((el) => el.addEventListener('click', () => {
           document.getElementById('phoneQr').innerHTML = qrSvg(el.dataset.url);
           document.getElementById('phoneUrl').textContent = el.dataset.url.replace('http://', '');

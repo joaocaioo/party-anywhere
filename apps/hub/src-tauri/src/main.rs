@@ -136,6 +136,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::firewall_allow,
             commands::hub_info,
             commands::network_addresses,
             commands::settings_get,

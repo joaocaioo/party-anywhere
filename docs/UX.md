@@ -52,7 +52,9 @@ P1 a P4 seguem a convenção dos consoles. A cor sempre aparece junto do número
 
 ## Fluxo 1: primeira abertura
 
-1. Instalador de um clique (sem perguntas além de "instalar").
+1. Instalador de um clique. No fim, uma pergunta só, com uma confirmação só do Windows, para o que faz tudo
+   funcionar: celulares chegarem ao PC (firewall) e o componente dos controles virtuais. Recusou? Dá para
+   fazer depois pelo Hub.
 2. O Hub abre direto no **Lobby**, com o QR já visível na carta "+".
 3. Controles já conectados (USB ou já pareados) **já aparecem** como P1, P2...
 4. Nenhum assistente de boas-vindas com 5 telas. Uma dica discreta, que some depois do primeiro jogador:

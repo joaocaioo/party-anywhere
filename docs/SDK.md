@@ -191,7 +191,7 @@ A cada frame, para cada vaga:
 ```c
 if (pa_view_wanted(pa, s)) {
     int w, h;
-    pa_view_size(pa, s, &w, &h);       // o formato da tela do celular: 360 de altura (ex.: 780x360)
+    pa_view_size(pa, s, &w, &h);       // o formato da tela do celular: 540 de altura (ex.: 1170x540)
     // 1. não desenhe a parte deste jogador na TV (a tela dividida fica para os outros)
     // 2. desenhe a visão dele num alvo à parte de w x h, leia os pixels (BGRA) e entregue
     pa_submit_view(pa, s, pixels, w, h, w * 4);

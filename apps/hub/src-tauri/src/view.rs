@@ -16,7 +16,8 @@ use crate::hub::Hub;
 
 const MAX_IN_FLIGHT: usize = 1;
 const MAX_FPS: f64 = 30.0;
-const JPEG_QUALITY: u8 = 70;
+// 540 linhas a 80: nítido num celular; o controle de fluxo (um quadro a caminho) segura redes lentas
+const JPEG_QUALITY: u8 = 80;
 /// Sem confirmação por este tempo: o celular perdeu quadros (tela apagada, rede): libera de novo.
 const ACK_TIMEOUT: Duration = Duration::from_secs(1);
 

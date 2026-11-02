@@ -112,3 +112,30 @@ async fn eleventh_phone_is_told_the_lobby_is_full() {
     assert_eq!((reply["t"].as_str(), reply["reason"].as_str()), (Some("reject"), Some("full")));
     assert!(lobby.lock().unwrap().waiting().is_empty(), "quem foi recusado não fica na fila");
 }
+
+// "Adicionar à Tela de Início" no iPhone: o app aberto pelo ícone não enxerga o que o Safari guardou, então o
+// token vai no endereço que o ícone abre (o manifesto o leva). Aberto pelo ícone com a aba do Safari ainda
+// conectada, o celular continua sendo o mesmo jogador, não um novo.
+#[tokio::test]
+async fn home_screen_app_keeps_the_same_seat() {
+    let (server, _events, _lobby) = start().await;
+    let (_safari, welcome) = phone(&server, None).await;
+    let token = welcome["token"].as_str().unwrap().to_string();
+
+    let manifest = http_get(&server, &format!("/manifest.webmanifest?t={token}")).await;
+    assert!(manifest.contains(&format!("\"start_url\": \"/?t={token}\"")), "{manifest}");
+    // sem token (ou com lixo), o ícone abre a página normal
+    assert!(http_get(&server, "/manifest.webmanifest?t=zz").await.contains("\"start_url\": \"/\""));
+
+    let (_app, again) = phone(&server, Some(&token)).await;
+    assert_eq!(again["seat"].as_u64(), Some(1));
+}
+
+async fn http_get(server: &PhoneServer, path: &str) -> String {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let mut tcp = TcpStream::connect(server.local_addr()).await.unwrap();
+    tcp.write_all(format!("GET {path} HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n").as_bytes()).await.unwrap();
+    let mut out = String::new();
+    tcp.read_to_string(&mut out).await.unwrap();
+    out
+}

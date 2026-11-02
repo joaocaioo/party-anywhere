@@ -197,11 +197,14 @@ mod tests {
             unsafe { pa_view_size(game, 3, &mut w, &mut h) };
             (w, h)
         };
-        assert_eq!(size(), (640, 360));
+        assert_eq!(size(), (960, 540));
         view.set_aspect(19.5 / 9.0);
-        assert_eq!(size(), (780, 360));
+        assert_eq!(size(), (1170, 540));
+        // mais larga que o máximo: a altura diminui junto, sem esticar (3:1 → 1280x426)
+        view.set_aspect(3.0);
+        assert_eq!(size(), (1280, 426));
         view.set_aspect(f32::NAN);
-        assert_eq!(size(), (640, 360));
+        assert_eq!(size(), (960, 540));
         assert!(unsafe { pa_submit_view(game, 3, pixels.as_ptr() as *const c_void, 4, 2, 6 * 4) });
 
         let mut out = Vec::new();

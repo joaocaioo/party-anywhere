@@ -202,7 +202,8 @@ pub async fn virtual_pads_install(app: tauri::AppHandle, hub: Hubs<'_>) -> Resul
     };
     // o instalador de driver precisa de administrador: o Windows mostra o aviso (UAC) e o Hub espera terminar
     step("installer", None, None);
-    let ran = tauri::async_runtime::spawn_blocking(move || run_elevated_and_wait(&path)).await.map_err(|e| e.to_string())?;
+    let declined = "Você recusou o aviso do Windows. Sem ele o componente não instala.";
+    let ran = tauri::async_runtime::spawn_blocking(move || run_elevated_and_wait(&path, None, declined)).await.map_err(|e| e.to_string())?;
     if let Err(e) = ran {
         step("failed", None, Some(e));
         return Ok(false);
@@ -235,41 +236,65 @@ struct VirtualStep {
     message: Option<String>,
 }
 
-/// Abre um instalador pedindo administrador (o aviso do Windows) e espera ele fechar.
+/// "Permitir no firewall": a mesma regra que o instalador cria (só o programa do Hub, só aparelhos da rede local),
+/// para quem pulou a permissão na instalação ou roda o Hub de outra pasta. O Windows pede a confirmação.
+#[tauri::command]
+pub async fn firewall_allow() -> Result<(), String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let rule = "name=\"Party Anywhere\"";
+    let args = format!(
+        "/c netsh advfirewall firewall delete rule {rule} >nul & netsh advfirewall firewall add rule {rule} dir=in action=allow program=\"{}\" remoteip=localsubnet profile=any enable=yes",
+        exe.display()
+    );
+    let cmd = std::path::PathBuf::from(std::env::var_os("ComSpec").unwrap_or_else(|| "cmd.exe".into()));
+    let declined = "Você recusou o aviso do Windows. Sem ele os celulares não chegam ao PC.";
+    let code = tauri::async_runtime::spawn_blocking(move || run_elevated_and_wait(&cmd, Some(&args), declined))
+        .await
+        .map_err(|e| e.to_string())??;
+    if code != 0 {
+        return Err(format!("O Windows não aceitou a regra (erro {code})."));
+    }
+    Ok(())
+}
+
+/// Abre um programa pedindo administrador (o aviso do Windows), espera ele fechar e devolve o código de saída.
+/// Com `params`, a janela fica escondida (um comando); sem, aparece (um instalador).
 #[cfg(windows)]
-fn run_elevated_and_wait(path: &std::path::Path) -> Result<(), String> {
+fn run_elevated_and_wait(path: &std::path::Path, params: Option<&str>, declined: &str) -> Result<u32, String> {
     use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::Foundation::{CloseHandle, GetLastError};
-    use windows_sys::Win32::System::Threading::{WaitForSingleObject, INFINITE};
+    use windows_sys::Win32::System::Threading::{GetExitCodeProcess, WaitForSingleObject, INFINITE};
     use windows_sys::Win32::UI::Shell::{ShellExecuteExW, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW};
-    use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{SW_HIDE, SW_SHOWNORMAL};
     let file: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
+    let args: Option<Vec<u16>> = params.map(|p| p.encode_utf16().chain(Some(0)).collect());
     let verb: Vec<u16> = "runas".encode_utf16().chain(Some(0)).collect();
     let mut info: SHELLEXECUTEINFOW = unsafe { std::mem::zeroed() };
     info.cbSize = std::mem::size_of::<SHELLEXECUTEINFOW>() as u32;
     info.fMask = SEE_MASK_NOCLOSEPROCESS;
     info.lpVerb = verb.as_ptr();
     info.lpFile = file.as_ptr();
-    info.nShow = SW_SHOWNORMAL;
+    if let Some(a) = &args {
+        info.lpParameters = a.as_ptr();
+    }
+    info.nShow = if args.is_some() { SW_HIDE } else { SW_SHOWNORMAL };
     if unsafe { ShellExecuteExW(&mut info) } == 0 {
         let code = unsafe { GetLastError() };
-        return Err(if code == 1223 {
-            "Você recusou o aviso do Windows. Sem ele o componente não instala.".into()
-        } else {
-            format!("Não consegui abrir o instalador (erro {code}).")
-        });
+        return Err(if code == 1223 { declined.into() } else { format!("Não consegui abrir o programa do Windows (erro {code}).") });
     }
+    let mut exit = 0u32;
     if !info.hProcess.is_null() {
         unsafe {
             WaitForSingleObject(info.hProcess, INFINITE);
+            GetExitCodeProcess(info.hProcess, &mut exit);
             CloseHandle(info.hProcess);
         }
     }
-    Ok(())
+    Ok(exit)
 }
 
 #[cfg(not(windows))]
-fn run_elevated_and_wait(_: &std::path::Path) -> Result<(), String> {
+fn run_elevated_and_wait(_: &std::path::Path, _: Option<&str>, _: &str) -> Result<u32, String> {
     Err("só no Windows.".into())
 }
 

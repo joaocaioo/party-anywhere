@@ -15,7 +15,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::{ConnectInfo, State};
+use axum::extract::{ConnectInfo, Query, State};
 use axum::http::header;
 use axum::response::{Html, IntoResponse};
 use axum::routing::get;
@@ -204,10 +204,13 @@ async fn page(State(shared): State<Arc<Shared>>) -> impl IntoResponse {
 // preto (no iPhone é o único jeito de ter tela cheia; no Android também funciona).
 const ICON_192: &[u8] = include_bytes!("../web/icon-192.png");
 const ICON_512: &[u8] = include_bytes!("../web/icon-512.png");
+// O ícone abre o controle com o token do celular (`/?t=...`): a mesma vaga, mesmo onde o app da Tela de Início
+// não enxerga o que o navegador guardou (iPhone).
 const WEB_MANIFEST: &str = r##"{
   "name": "Party Anywhere",
   "short_name": "Party Anywhere",
-  "start_url": "/",
+  "start_url": "/START",
+  "id": "/",
   "display": "fullscreen",
   "orientation": "landscape",
   "background_color": "#000000",
@@ -218,8 +221,24 @@ const WEB_MANIFEST: &str = r##"{
   ]
 }"##;
 
-async fn web_manifest() -> impl IntoResponse {
-    ([(header::CONTENT_TYPE, "application/manifest+json")], WEB_MANIFEST)
+async fn web_manifest(Query(q): Query<ManifestQuery>) -> impl IntoResponse {
+    let start = match q.t {
+        Some(t) if valid_token(&t) => format!("/?t={t}"),
+        _ => "/".to_owned(),
+    };
+    (
+        [(header::CONTENT_TYPE, "application/manifest+json"), (header::CACHE_CONTROL, "no-store")],
+        WEB_MANIFEST.replacen("/START", &start, 1),
+    )
+}
+
+#[derive(serde::Deserialize)]
+struct ManifestQuery {
+    t: Option<String>,
+}
+
+fn valid_token(t: &str) -> bool {
+    t.len() == 32 && t.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 fn png(bytes: &'static [u8]) -> impl IntoResponse {
@@ -250,7 +269,7 @@ async fn connection(socket: WebSocket, shared: Arc<Shared>, peer: SocketAddr) {
         _ => return,
     };
     // token do celular, ou um novo de 128 bits; formato inválido é tratado como celular novo
-    let token = token.filter(|t| t.len() == 32 && t.bytes().all(|b| b.is_ascii_hexdigit())).unwrap_or_else(new_token);
+    let token = token.filter(|t| valid_token(t)).unwrap_or_else(new_token);
     let key = DeviceKey(format!("phone:{token}"));
     let conn = shared.next_conn.fetch_add(1, Ordering::Relaxed);
 

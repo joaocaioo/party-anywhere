@@ -153,7 +153,10 @@ e o atraso do jogo até a tela do celular, para o Diagnóstico) e `leave` (C→S
 livre como ao remover no Hub). `layouts` (S→C) leva `look`: o jogo aberto lê a câmera por deslocamento.
 
 A página também é um app da Tela de Início: `/manifest.webmanifest` (tela cheia, deitado, fundo preto) e os
-ícones `/icon-192.png` e `/icon-512.png`. No iPhone é o único jeito de ter tela cheia.
+ícones `/icon-192.png` e `/icon-512.png`. No iPhone é o único jeito de ter tela cheia. O app da Tela de Início
+do iPhone não enxerga o que o Safari guardou, então o token também vai no endereço: depois do `welcome` a página
+passa a ser `/?t=<token>` e o manifesto vira `/manifest.webmanifest?t=<token>` (com `start_url` `/?t=<token>`).
+Aberto pelo ícone, o celular volta à mesma vaga em vez de entrar como jogador novo.
 
 **Medição** (a página do Hub usa sempre; uma página mínima pode usar só STATE):
 
@@ -310,8 +313,10 @@ Regras:
   "Em foco" é a janela em primeiro plano do Windows (`GetForegroundWindow`): o foco do Tauri some quando o
   teclado está dentro da página (WebView2), isto é, depois de qualquer clique no Hub.
 - O componente dos controles virtuais (ViGEmBus 1.22.0, BSD-3, versão fixa conferida pelo hash em
-  `pa_library::vigem`): o instalador do Hub leva o arquivo e, no fim, oferece instalar (o Windows pede
-  administrador; atualização silenciosa não pergunta). No app, "Instalar" baixa a mesma versão, abre com o
+  `pa_library::vigem`): o instalador do Hub leva o arquivo e, no fim, pede numa confirmação só do Windows o
+  que falta: a regra do firewall (entrada, só o programa do Hub, `remoteip=localsubnet`; marcada por
+  `firewall.ok` na pasta do Hub) e o componente. Atualização silenciosa não pergunta. Sem a regra, "Não
+  conecta?" na tela do QR tem "Permitir no firewall do Windows" (`firewall_allow`, a mesma regra). No app, "Instalar" baixa a mesma versão, abre com o
   aviso de administrador (`ShellExecuteEx` "runas": `CreateProcess` falha calado com instalador que exige
   admin), espera fechar, confere e avisa cada passo (`virtual-install`: baixando %, instalador aberto,
   conferindo, pronto ou o erro). Na tela de antes do jogo, pronto já segue para o jogo.
