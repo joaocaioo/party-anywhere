@@ -157,6 +157,15 @@ lugares escondem jogabilidade perdida:
   escolher, e a resposta vai pelo mesmo evento de rede do jogo, no contexto do jogador. O original fica na
   parte de quem hospeda. Campo de texto livre não cabe num controle: troque por opções (a certa e outras do
   próprio jogo).
+- **O que o jogo decide pela "camada do jogador local"**. Muitos jogos põem o próprio personagem numa camada só
+  dele, e os dos outros PCs em outra. Aqui todos são locais, e isso esconde dois erros opostos: o que procura
+  alvos (empurrar, socar, atirar) só olha a camada dos outros e não acha ninguém; o que reage ao jogador local
+  (o chão que mata, a placa de pressão) guarda o primeiro que encostou e trata todo mundo como ele. Enquanto um
+  jogador procura alvos, ponha os outros jogadores do sofá na camada "dos outros PCs" e devolva logo depois; e
+  faça cada encostada valer para quem encostou.
+- **Gestos do mouse** (chacoalhar uma lata movendo o mouse rápido de um lado ao outro). O analógico, usado como
+  mouse, não chega lá a tempo: no controle, faça o analógico ser a posição do gesto (até o fim de um lado, até o
+  fim do outro).
 
 Antes de publicar, passe por **todos** os modos e desafios do jogo com 2 jogadores e confira cada um.
 
