@@ -142,12 +142,23 @@ pub enum Art {
 
 fn steam_art_path(steam: &Path, appid: &str, art: Art) -> Option<PathBuf> {
     let cache = steam.join("appcache/librarycache");
-    // layout antigo (<appid>_library_600x900.jpg) e o novo (<appid>/library_600x900.jpg)
+    // layout antigo (<appid>_library_600x900.jpg), o de 2023 (<appid>/library_600x900.jpg) e o atual, com uma
+    // pasta por versão da arte (<appid>/<hash>/library_600x900.jpg; jogos novos, como o PEAK, só têm este)
     let file = match art {
         Art::Cover => "library_600x900.jpg",
         Art::Hero => "library_hero.jpg",
     };
-    [cache.join(format!("{appid}_{file}")), cache.join(appid).join(file)].into_iter().find(|p| p.is_file())
+    let dir = cache.join(appid);
+    if let Some(p) = [cache.join(format!("{appid}_{file}")), dir.join(file)].into_iter().find(|p| p.is_file()) {
+        return Some(p);
+    }
+    // várias versões: a mais nova
+    fs::read_dir(&dir)
+        .ok()?
+        .filter_map(|e| e.ok())
+        .map(|e| e.path().join(file))
+        .filter(|p| p.is_file())
+        .max_by_key(|p| fs::metadata(p).and_then(|m| m.modified()).ok())
 }
 
 /// O arquivo de arte da Steam de um appid (só dígitos: nada de caminho vindo de fora).
@@ -324,6 +335,17 @@ mod tests {
         assert_eq!(games[1].image, None);
         assert_eq!(games[0].steam_app_id, Some(12120));
         assert!(games[0].install_dir.as_ref().unwrap().ends_with("steamapps/common/GTA San Andreas"));
+    }
+
+    #[test]
+    fn finds_steam_art_in_hashed_folders() {
+        let steam = tempfile::tempdir().unwrap();
+        let cache = steam.path().join("appcache/librarycache/3527290/480bd879ac737921bfa2529a6fea15961267ad21");
+        fs::create_dir_all(&cache).unwrap();
+        fs::write(cache.join("library_600x900.jpg"), b"jpg").unwrap();
+        let found = steam_art_path(steam.path(), "3527290", Art::Cover).expect("a capa na pasta com hash");
+        assert!(found.ends_with("library_600x900.jpg"));
+        assert_eq!(steam_art_path(steam.path(), "3527290", Art::Hero), None);
     }
 
     #[test]
