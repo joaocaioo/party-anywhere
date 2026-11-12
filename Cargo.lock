@@ -2588,7 +2588,7 @@ dependencies = [
 
 [[package]]
 name = "pa-cli"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "pa-library",
  "pa-manifest",
@@ -2605,11 +2605,11 @@ dependencies = [
 
 [[package]]
 name = "pa-core"
-version = "0.1.3"
+version = "0.1.4"
 
 [[package]]
 name = "pa-latency-spike"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "pa-core",
  "pa-phone",
@@ -2622,7 +2622,7 @@ dependencies = [
 
 [[package]]
 name = "pa-library"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "base64 0.22.1",
  "pa-manifest",
@@ -2637,7 +2637,7 @@ dependencies = [
 
 [[package]]
 name = "pa-manifest"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "imagesize",
  "semver",
@@ -2648,7 +2648,7 @@ dependencies = [
 
 [[package]]
 name = "pa-phone"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "axum",
  "futures-util",
@@ -2663,7 +2663,7 @@ dependencies = [
 
 [[package]]
 name = "pa-sdk"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "cc",
  "pa-core",
@@ -2672,7 +2672,7 @@ dependencies = [
 
 [[package]]
 name = "pa-virtualpad"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "pa-core",
  "vigem-client",
@@ -2734,7 +2734,7 @@ dependencies = [
 
 [[package]]
 name = "party-anywhere-hub"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "gilrs",
  "jpeg-encoder",
