@@ -12,7 +12,11 @@ Comece por [docs/VISION.md](docs/VISION.md), [docs/UX.md](docs/UX.md) e [docs/AR
 - **Lógica testável sem hardware.** Regras de lobby, protocolo e manifesto ficam em código puro com testes;
   hardware (SDL3, WinRT, ViGEm) fica atrás de interfaces com implementações falsas.
 - **Nada no caminho da entrada aloca ou escreve em disco.** Log só de eventos raros.
-- **Idioma:** docs e textos da UI em português do Brasil; código, identificadores e commits em inglês.
+- **Idioma:** docs e textos da UI em português do Brasil; código, identificadores e commits em inglês. A UI
+  (Hub e celular) também tem inglês: o texto-fonte continua em português e o inglês vem do dicionário
+  (`apps/hub/ui/i18n-en.js` no Hub, o `EN` dentro de `crates/pa-phone/web/controller.html` no celular).
+  Texto novo na UI ganha a entrada em inglês no mesmo PR. O README existe em inglês (`README.md`, o principal)
+  e em português (`README.pt-BR.md`): mudou um, mude o outro.
 - **Referência, não cópia:** o mod SACoop do dono (`C:\Games\SACoop`, GTA San Andreas, até 8 jogadores numa
   cópia só do jogo) é a referência de produto e da técnica de todo mod: troca de contexto e uma passada de
   desenho por jogador (docs/MOD-COOP-LOCAL.md). Não copie código de lá; reimplemente.

@@ -173,6 +173,9 @@ pub struct Settings {
     /// Layout que veio com um jogo → os modos como o jogo trouxe (para "Restaurar" e para as atualizações).
     #[serde(default)]
     pub shipped: HashMap<String, Vec<Mode>>,
+    /// Idioma da UI ("pt-BR" ou "en"). Vazio: a UI segue o idioma do Windows.
+    #[serde(default)]
+    pub lang: Option<String>,
 }
 
 impl Default for Settings {
@@ -185,6 +188,7 @@ impl Default for Settings {
             phone_layout: HashMap::new(),
             game_layout: HashMap::new(),
             shipped: HashMap::new(),
+            lang: None,
         }
     }
 }
@@ -370,6 +374,28 @@ fn clean_mode(m: Mode) -> Mode {
     Mode { name: m.name.trim().into(), pieces }
 }
 
+/// Idioma aceito pela UI: "pt-BR" ou "en" (também aceita "pt" e "en-US", como o instalador e um agente
+/// podem escrever). Qualquer outra coisa: `None`.
+pub fn normalize_lang(raw: &str) -> Option<&'static str> {
+    let l = raw.trim().to_ascii_lowercase();
+    if l.starts_with("pt") {
+        Some("pt-BR")
+    } else if l.starts_with("en") {
+        Some("en")
+    } else {
+        None
+    }
+}
+
+/// O instalador deixa `lang.pending` ao lado do executável com o idioma escolhido nele. Vale uma vez: o Hub
+/// lê, guarda nos ajustes e apaga (uma atualização silenciosa não deixa o arquivo e não muda nada).
+pub fn take_installer_lang(exe_dir: &Path) -> Option<&'static str> {
+    let file = exe_dir.join("lang.pending");
+    let raw = fs::read_to_string(&file).ok()?;
+    let _ = fs::remove_file(&file);
+    normalize_lang(&raw)
+}
+
 pub fn path(roaming: &Path) -> PathBuf {
     roaming.join("settings.json")
 }
@@ -377,6 +403,33 @@ pub fn path(roaming: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lang_from_installer_or_agent() {
+        assert_eq!(normalize_lang("en"), Some("en"));
+        assert_eq!(normalize_lang(" EN-us
+"), Some("en"));
+        assert_eq!(normalize_lang("pt"), Some("pt-BR"));
+        assert_eq!(normalize_lang("pt-BR"), Some("pt-BR"));
+        assert_eq!(normalize_lang("fr"), None);
+        assert_eq!(normalize_lang(""), None);
+    }
+
+    #[test]
+    fn installer_lang_is_taken_once() {
+        let dir = std::env::temp_dir().join(format!("pa-lang-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("lang.pending"), "en").unwrap();
+        assert_eq!(take_installer_lang(&dir), Some("en"));
+        assert_eq!(take_installer_lang(&dir), None);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn old_settings_without_lang_still_load() {
+        let s: Settings = serde_json::from_str(r#"{"version":1}"#).unwrap();
+        assert_eq!(s.lang, None);
+    }
     use pa_manifest::controls::check_mode;
 
     fn mode(name: &str, pieces: Vec<Piece>) -> Mode {

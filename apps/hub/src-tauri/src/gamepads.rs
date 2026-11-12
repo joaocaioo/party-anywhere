@@ -3,6 +3,10 @@
 //!
 //! Cuidado com o eco: os controles virtuais do Modo Universal (ViGEm) também aparecem como controles de
 //! Xbox 360. Quem aparece logo depois de o Hub ligar um virtual é marcado como virtual e ignorado.
+//!
+//! E com a Steam: com um jogo dela aberto, o Steam Input cria um "Steam Virtual Gamepad" (Valve, 28DE:11FF)
+//! para cada controle que ele assume, inclusive os nossos virtuais. Para o Hub ele seria um jogador a mais (e o
+//! mesmo controle entraria duas vezes): é ignorado, aqui e nas vagas do XInput.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::mpsc::{Receiver, TryRecvError};
@@ -20,6 +24,13 @@ const DEADZONE: f32 = 0.15;
 /// Um Xbox 360 que aparece até este tempo depois de ligar um virtual é o próprio virtual.
 const ECHO_WINDOW: Duration = Duration::from_secs(3);
 const XBOX360_VID_PID: (u16, u16) = (0x045e, 0x028e);
+/// O controle virtual do Steam Input.
+const STEAM_VIRTUAL_VID_PID: (u16, u16) = (0x28de, 0x11ff);
+
+/// Controle que a Steam cria por cima de outro (nunca uma pessoa a mais).
+pub fn is_steam_virtual(vid_pid: (Option<u16>, Option<u16>), name: &str) -> bool {
+    vid_pid == (Some(STEAM_VIRTUAL_VID_PID.0), Some(STEAM_VIRTUAL_VID_PID.1)) || name.to_ascii_lowercase().contains("steam virtual")
+}
 
 pub enum Command {
     /// O Hub vai ligar um controle virtual agora.
@@ -74,6 +85,11 @@ fn run(hub: &Hub, gilrs: &mut Gilrs, rx: &Receiver<Command>) {
     // controles já ligados quando o Hub abriu
     let initial: Vec<GamepadId> = gilrs.gamepads().map(|(id, _)| id).collect();
     for id in initial {
+        let gp = gilrs.gamepad(id);
+        if is_steam_virtual((gp.vendor_id(), gp.product_id()), gp.name()) {
+            ignored.insert(id);
+            continue;
+        }
         connect(hub, gilrs, id, &mut keys);
     }
 
@@ -144,7 +160,8 @@ fn run(hub: &Hub, gilrs: &mut Gilrs, rx: &Receiver<Command>) {
         match ev.event {
             EventType::Connected => {
                 let gp = gilrs.gamepad(ev.id);
-                if echo.is_echo((gp.vendor_id(), gp.product_id()), Instant::now()) {
+                let vid_pid = (gp.vendor_id(), gp.product_id());
+                if is_steam_virtual(vid_pid, gp.name()) || echo.is_echo(vid_pid, Instant::now()) {
                     ignored.insert(ev.id);
                     continue;
                 }
@@ -344,13 +361,14 @@ mod xinput {
         Some((s.packet, super::Pad { buttons: bits, lx, ly, rx, ry, lt: trig(g.lt), rt: trig(g.rt) }))
     }
 
-    /// Vagas do XInput com controle de verdade (os Xbox 360 virtuais do ViGEm têm o modelo 028E).
+    /// Vagas do XInput com controle de verdade (os Xbox 360 virtuais do ViGEm têm o modelo 028E; os do
+    /// Steam Input, 28DE:11FF).
     pub fn physical_slots() -> Vec<u32> {
         let Some((caps_ex, _, _)) = api() else { return vec![] };
         (0..4u32)
             .filter(|&slot| {
                 let mut c = CapsEx::default();
-                unsafe { caps_ex(1, slot, 0, &mut c) == 0 && !(c.vid == 0x045e && c.pid == 0x028e) }
+                unsafe { caps_ex(1, slot, 0, &mut c) == 0 && !(c.vid == 0x045e && c.pid == 0x028e) && !(c.vid == 0x28de && c.pid == 0x11ff) }
             })
             .collect()
     }
@@ -457,6 +475,15 @@ fn display_name(raw: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn steam_input_virtual_pads_are_not_players() {
+        assert!(is_steam_virtual((Some(0x28de), Some(0x11ff)), "Xbox 360 Controller"));
+        assert!(is_steam_virtual((None, None), "Steam Virtual Gamepad"));
+        assert!(!is_steam_virtual((Some(0x045e), Some(0x02ea)), "Xbox One Controller"));
+        // o Steam Controller e o Steam Deck de verdade (outros modelos da Valve) continuam sendo jogadores
+        assert!(!is_steam_virtual((Some(0x28de), Some(0x1102)), "Steam Controller"));
+    }
 
     #[test]
     fn echo_filter_only_catches_x360_right_after_a_plug() {

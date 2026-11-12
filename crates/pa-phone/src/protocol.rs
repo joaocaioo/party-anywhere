@@ -18,7 +18,7 @@
 //! os relógios (como no NTP, usando a amostra de menor ida e volta) e mede quanto tempo um toque
 //! leva para chegar ao PC. A página do Hub usa STATE_T sempre; uma página mínima pode usar só STATE.
 //!
-//! Texto (JSON, baixa frequência): `hello` / `welcome` / `stats` / `toast` (ver [`ClientText`], [`ServerText`]).
+//! Texto (JSON, baixa frequência): `hello` / `welcome` / `stats` / `toast` / `lang` (ver [`ClientText`], [`ServerText`]).
 
 use pa_core::{buttons, Pad};
 use serde::{Deserialize, Serialize};
@@ -249,6 +249,8 @@ pub enum ServerText<'a> {
     Stats { data: serde_json::Value },
     /// A tela do jogo no celular: quadros por segundo e o atraso do jogo até a tela do celular (ms).
     Screen { fps: u32, ms: u32 },
+    /// Idioma do Hub ("pt-BR" ou "en"): o celular segue, a menos que a pessoa tenha escolhido outro no menu dele.
+    Lang { lang: &'a str },
 }
 
 fn decode_state_body(b: &[u8]) -> (u16, Pad) {

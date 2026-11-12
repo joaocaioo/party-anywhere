@@ -42,8 +42,10 @@
       "nsis": {
         "installMode": "currentUser",
         "languages": [
-          "PortugueseBR"
-        ]
+          "PortugueseBR",
+          "English"
+        ],
+        "displayLanguageSelector": true
       }
     }
   }

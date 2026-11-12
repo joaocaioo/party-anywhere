@@ -10,6 +10,15 @@
 
   document.documentElement.classList.add('in-app');
 
+  // idioma: o dos ajustes do Hub (escolhido no instalador ou no botão do topo) vale; trocar no botão salva lá
+  // sem escolha ainda (segue o Windows): guarda o idioma em uso, para os celulares seguirem o mesmo
+  invoke('settings_get').then((s) => {
+    if (s.lang) PA_I18N.set(s.lang, { fromApp: true });
+    else invoke('set_lang', { lang: PA_I18N.lang }).catch(() => {});
+  }).catch(() => {});
+  window.addEventListener('pa:lang', (e) => { if (!e.detail.fromApp) invoke('set_lang', { lang: e.detail.lang }).catch(warn); });
+  window.openExternal = (url) => invoke('open_url', { url }).catch(warn);
+
   // janela sem moldura: os três botões do topo e os cantos retos quando maximizada
   const win = T.window.getCurrentWindow();
   document.getElementById('winMin').addEventListener('click', () => win.minimize());
@@ -63,6 +72,8 @@
   window.__padNavExternal = true;
   listen('nav', (e) => navAction(e.payload.action, e.payload.color, e.payload.seat));
   listen('virtual-install', (e) => virtualStep(e.payload));
+  // o jogo não abriu depois de esperar a Steam (abrir já tinha respondido "ok")
+  listen('game-error', (e) => toast(String(e.payload), null, 'warn'));
   // um link de mod vindo de fora (`pa add`, um agente de IA): abre o "Adicionar por link" já lendo
   const addFromOutside = (link) => { if (link) { invoke('take_pending_add').catch(() => {}); openAddLink(link); } };
   listen('add-repo', (e) => addFromOutside(e.payload));
@@ -101,7 +112,12 @@
   window.startRename = (nameEl, card) => {
     renameCard(nameEl, card);
     const idx = +card.dataset.key.slice(1).split('-')[0];
-    nameEl.addEventListener('blur', () => invoke('seat_rename', { index: idx, name: nameEl.textContent.trim() }).catch(warn), { once: true });
+    // sem mudança, nada é salvo: em inglês o nome padrão aparece traduzido ("Player 2") e não pode virar o nome
+    const before = nameEl.textContent.trim();
+    nameEl.addEventListener('blur', () => {
+      const name = nameEl.textContent.trim();
+      if (name !== before) invoke('seat_rename', { index: idx, name }).catch(warn);
+    }, { once: true });
   };
 
   // ------------------------------------------------------------------ teclados

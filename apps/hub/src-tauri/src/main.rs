@@ -93,6 +93,12 @@ fn main() {
             }
             let (roaming, local) = dirs();
             let hub = hub::Hub::new(app.handle().clone(), settings::path(&roaming));
+            // o idioma escolhido no instalador (ou por quem instalou com /LANG=en), uma vez só
+            let exe_dir = std::env::current_exe().ok().and_then(|e| e.parent().map(|d| d.to_path_buf()));
+            if let Some(lang) = exe_dir.as_deref().and_then(settings::take_installer_lang) {
+                hub.settings.lock().unwrap().lang = Some(lang.into());
+                hub.save_settings();
+            }
             if let Err(e) = hub.start_phones() {
                 eprintln!("party-anywhere: celulares indisponíveis: {e}");
             }
@@ -141,6 +147,7 @@ fn main() {
             commands::network_addresses,
             commands::settings_get,
             commands::set_join_ip,
+            commands::set_lang,
             commands::layouts_list,
             commands::layout_save,
             commands::layout_delete,

@@ -1,184 +1,230 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/brand/logo-stacked-dark.png">
-    <img src="assets/brand/logo-stacked-light.png" alt="Party Anywhere: quatro camaleões jogando juntos no sofá" width="460">
+    <img src="assets/brand/logo-stacked-light.png" alt="Party Anywhere: four chameleons playing together on the couch" width="460">
   </picture>
 </p>
 
-<p align="center"><b>Qualquer jogo. Qualquer controle. Até 10 pessoas no mesmo sofá.</b></p>
+<p align="center"><b>Any game. Any controller. Up to 10 people on the same couch.</b></p>
 
 <p align="center">
-  <a href="https://github.com/joaocaioo/party-anywhere/releases/latest"><img src="https://img.shields.io/badge/Baixar_para_Windows-3cf060?style=for-the-badge&logo=windows&logoColor=0b0c0f&labelColor=3cf060&color=3cf060" alt="Baixar o Party Anywhere para Windows (versão mais nova)" height="44"></a>
+  <a href="https://github.com/joaocaioo/party-anywhere/releases/latest"><img src="https://img.shields.io/badge/Download_for_Windows-3cf060?style=for-the-badge&logo=windows&logoColor=0b0c0f&labelColor=3cf060&color=3cf060" alt="Download Party Anywhere for Windows (latest version)" height="44"></a>
   <br>
-  <a href="https://github.com/joaocaioo/party-anywhere/releases/latest"><img src="https://img.shields.io/github/v/release/joaocaioo/party-anywhere?label=vers%C3%A3o%20mais%20nova&color=1a1d22" alt="Versão mais nova"></a>
+  <a href="https://github.com/joaocaioo/party-anywhere/releases/latest"><img src="https://img.shields.io/github/v/release/joaocaioo/party-anywhere?label=latest%20version&color=1a1d22" alt="Latest version"></a>
 </p>
 
 <p align="center">
-  <a href="#jogar">Jogar</a> ·
-  <a href="#transformar-um-jogo-em-co-op-local">Transformar um jogo</a> ·
-  <a href="#perguntas-rápidas">Perguntas</a> ·
-  <a href="#colaborar">Colaborar</a>
+  <b>English</b> · <a href="README.pt-BR.md">Português (Brasil)</a>
+</p>
+
+<p align="center">
+  <a href="#play">Play</a> ·
+  <a href="#co-op-mods-you-can-play-today">Mods</a> ·
+  <a href="#turn-a-game-into-local-co-op">Make a mod</a> ·
+  <a href="#quick-questions">Questions</a> ·
+  <a href="#contribute">Contribute</a>
 </p>
 
 ---
 
-## O que é
+## What it is
 
-Juntar a galera para jogar no PC costuma dar trabalho: falta controle, um não conecta, o jogo só tem co-op
-online. O **Party Anywhere** resolve isso. É um app para Windows que coloca todo mundo num lobby só e abre
-jogos (e mods co-op feitos pela comunidade) para todos jogarem juntos no mesmo PC:
+Getting friends together to play on a PC is usually a hassle: not enough controllers, one won't connect, the
+game only has online co-op. **Party Anywhere** fixes that. It's a Windows app that puts everyone in one lobby
+and opens games (and co-op mods made by the community) so everybody can play together on the same PC:
 
-- 🎮 **Controle** com fio ou Bluetooth: liga e já entra.
-- 📱 **Celular**: escaneia um QR e vira controle. Sem instalar nada.
-- ⌨️ **Teclado**: até o do notebook vale.
+- 🎮 **Controller**, wired or Bluetooth: turn it on and you're in.
+- 📱 **Phone**: scan a QR code and it becomes a controller. Nothing to install.
+- ⌨️ **Keyboard**: even the laptop's one counts.
 
-Cada pessoa vira um jogador, de **P1 a P10**, com a sua cor. Depois é só escolher o jogo.
+Each person becomes a player, from **P1 to P10**, with their own color. Then just pick the game.
 
-> **Por enquanto, é co-op local:** todo mundo no mesmo lugar, na mesma tela (ou em tela dividida), com os
-> celulares no mesmo Wi-Fi do PC. Jogar pela internet não faz parte desta versão.
+The app is in **English and Brazilian Portuguese**: pick the language in the installer, or switch any time with
+the small **EN / PT** button at the top of the app.
 
-<p align="center">
-  <img src="docs/media/lobby.webp" alt="O lobby do Party Anywhere: controles, celulares e teclados entrando até 10 jogadores" width="800">
-</p>
-
-## Jogar
-
-1. Clique em **[Baixar para Windows](https://github.com/joaocaioo/party-anywhere/releases/latest)**, baixe o
-   **`PartyAnywhere-X.Y.Z-setup.exe`** (a versão mais nova) e abra.
-   Se o Windows mostrar "O Windows protegeu o computador", é porque o instalador ainda não tem assinatura
-   digital: clique em **Mais informações** → **Executar assim mesmo**.
-2. Abra o app. Ligue os controles ou escaneie o QR com o celular (no mesmo Wi-Fi do PC).
-3. Vá em **Biblioteca**, escolha o jogo e aperte **Jogar**.
-
-Pronto. O app se atualiza sozinho e avisa quando um jogo ganha versão nova.
+> **For now, it's local co-op:** everyone in the same place, on the same screen (or split screen), with the
+> phones on the same Wi-Fi as the PC. Playing over the internet isn't part of this version.
 
 <p align="center">
-  <img src="docs/media/library.webp" alt="A Biblioteca: escolhendo um jogo no fliperama e escolhendo quem vai jogar" width="800">
+  <img src="docs/media/lobby.webp" alt="The Party Anywhere lobby: controllers, phones and keyboards joining, up to 10 players" width="800">
 </p>
 
-| O que você quer | Como funciona |
+## Play
+
+1. Click **[Download for Windows](https://github.com/joaocaioo/party-anywhere/releases/latest)**, download
+   **`PartyAnywhere-X.Y.Z-setup.exe`** (the newest version) and open it. The installer asks for the language.
+   If Windows shows "Windows protected your PC", it's because the installer isn't digitally signed yet: click
+   **More info** → **Run anyway**.
+2. Open the app. Turn on the controllers or scan the QR code with your phone (on the same Wi-Fi as the PC).
+3. Go to **Library**, pick the game and press **Play**.
+
+That's it. The app updates itself and lets you know when a game gets a new version.
+
+<p align="center">
+  <img src="docs/media/library.webp" alt="The Library: picking a game in the arcade and choosing who plays" width="800">
+</p>
+
+| What you want | How it works |
 |---|---|
-| Jogar com celulares e teclados um jogo que já aceita vários controles | Abra o jogo pela Biblioteca (Steam, Epic ou qualquer `.exe`): celulares e teclados aparecem para ele como controles de Xbox. |
-| Jogar o **mod co-op** que alguém fez para um jogo seu | Biblioteca → **Adicionar** → cole o link do repositório. O app acha o seu jogo, instala o mod e deixa pronto para jogar. |
+| Play a game that already supports several controllers, using phones and keyboards | Open the game from the Library (Steam, Epic or any `.exe`): phones and keyboards show up to it as Xbox controllers. |
+| Play a **co-op mod** someone made for a game you own | Library → **Add** → paste the repository link. The app finds your game, installs the mod and gets it ready to play. |
 
-> **Quantos jogadores, em cada caso.** A maioria dos jogos comuns enxerga **até 4** controles de Xbox: é um
-> limite do Windows, não do app. **De 5 a 10 jogadores**, só com um mod co-op (ou num jogo que aceita mais
-> controles). E num jogo comum o próprio jogo também lê o teclado do PC: teclado como jogador funciona
-> melhor nos mods.
+> **How many players, in each case.** Most regular games see **up to 4** Xbox controllers: that's a Windows
+> limit, not the app's. **From 5 to 10 players**, only with a co-op mod (or a game that accepts more
+> controllers). And in a regular game, the game itself also reads the PC keyboard: keyboard as a player works
+> best in mods.
 
-### Instalar um mod: o que acontece
+<details>
+<summary><b>Installing with an AI agent (Claude Code and others)</b></summary>
 
-Um mod co-op é o que transforma o jogo, não o jogo em si. Ele roda em cima da **sua cópia** do jogo
-original. Ninguém pode distribuir o jogo de outra empresa, nem o autor do mod nem o Party Anywhere. Você cola o
-link e o app faz o resto:
+If you ask an agent to install Party Anywhere for you, it should **ask which language you want (English or
+Português)** and then install silently with that choice. Instructions for the agent, in PowerShell:
 
-1. **Procura o seu jogo** na Steam, na Epic e nos jogos do PC.
-2. **Não achou?** Mostra os caminhos: **instalar pela Steam** ou **pela Epic** (o app espera terminar e
-   segue sozinho), **ver na loja**, ou **"já tenho"**: você aponta o `.exe` ou a pasta do jogo, venha de
-   onde vier (GOG, CD, outra pasta).
-3. **Confere a versão** do jogo quando o mod exige uma específica, e diz o que fazer se não for.
-4. **Instala o mod** na pasta do jogo, guardando os arquivos originais. Remover o mod devolve tudo como estava.
-5. **Pronto:** o jogo aparece na Biblioteca. Apertou **Jogar**, abre já em co-op local.
+```powershell
+$r = Invoke-RestMethod https://api.github.com/repos/joaocaioo/party-anywhere/releases/latest
+$a = $r.assets | Where-Object name -like '*-setup.exe' | Select-Object -First 1
+Invoke-WebRequest $a.browser_download_url -OutFile "$env:TEMP\$($a.name)"
+Start-Process "$env:TEMP\$($a.name)" -ArgumentList '/S', '/LANG=en' -Wait   # or /LANG=pt-BR
+```
+
+A silent install skips the one-time Windows permission (phones on the Wi-Fi and the virtual-controller
+component); the app offers it again the first time it's needed.
+</details>
+
+### Installing a mod: what happens
+
+A co-op mod is what transforms the game, not the game itself. It runs on top of **your copy** of the original
+game. Nobody can distribute another company's game, neither the mod author nor Party Anywhere. You paste the
+link and the app does the rest:
+
+1. **Looks for your game** on Steam, Epic and the games on your PC.
+2. **Didn't find it?** It shows the ways forward: **install from Steam** or **from Epic** (the app waits for it
+   to finish and carries on by itself), **see it in the store**, or **"I already have it"**: you point to the
+   game's `.exe` or folder, wherever it came from (GOG, CD, another folder).
+3. **Checks the game version** when the mod needs a specific one, and tells you what to do if it doesn't match.
+4. **Installs the mod** in the game folder, keeping the original files. Removing the mod puts everything back.
+5. **Done:** the game shows up in the Library. Press **Play** and it opens in local co-op.
 
 ---
 
-## Transformar um jogo em co-op local
+## Co-op mods you can play today
 
-### Para quê
+Official mods live in the **[party-anywhere](https://github.com/party-anywhere)** organization on GitHub. In
+the app: Library → **Add** → **Add by link** and paste the link. You need your own copy of the original game.
 
-Muitos jogos ótimos têm **co-op só online**, cada pessoa no seu PC, ou são de um jogador só. Um mod co-op
-local faz esse jogo rodar com **várias pessoas no mesmo PC**: tela dividida, cada um com um controle ou um
-celular, **do jeito que você decidir** (quantos jogadores, como fica a câmera, o que cada um controla).
+| Mod | What it does | Players |
+|---|---|---|
+| **[PEAK Co-op Local](https://github.com/party-anywhere/peak-coop)** | [PEAK](https://store.steampowered.com/app/3527290/) in local co-op on the same PC: split screen, with each climber's own HUD, inventory and camera. | 1 to 10 |
+| **[MicroWorks Co-op Local](https://github.com/party-anywhere/microworks-coop)** | [MicroWorks](https://store.steampowered.com/app/1233410/) in local co-op on the same PC: split screen, with each player's own HUD, scoreboard and controls (or play on the phone). | 1 to 10 |
 
-Você publica o mod num repositório do GitHub. Quem tem o jogo cola o link no app e joga.
+**Want to find more?** Every community mod carries the
+**[`party-anywhere-game`](https://github.com/topics/party-anywhere-game)** topic on GitHub: that page lists
+everything available. The app also links to both pages right below the link field, under **Add by link**.
 
-> **A ideia em uma frase:** o Party Anywhere cuida das pessoas e dos controles. O seu mod só pergunta: *"o
-> que o jogador 3 está apertando?"*
+---
+
+## Turn a game into local co-op
+
+### What for
+
+Lots of great games have **online-only co-op**, each person on their own PC, or are single-player. A local
+co-op mod makes that game run with **several people on the same PC**: split screen, each with a controller or
+a phone, **the way you decide** (how many players, how the camera works, what each one controls).
+
+You publish the mod in a GitHub repository. Anyone who owns the game pastes the link into the app and plays.
+
+> **The idea in one sentence:** Party Anywhere takes care of the people and the controllers. Your mod only
+> asks: *"what is player 3 pressing?"*
 
 ```mermaid
 flowchart LR
-  P[Pessoas com controles,<br/>celulares e teclados] --> H[App Party Anywhere]
-  H -- "jogador 3 apertou A" --> M[Seu mod, dentro do<br/>jogo original de cada um]
-  M -- "vibra o controle do jogador 3" --> H
-  G[(Seu repositório<br/>no GitHub)] -- instala o mod e atualiza --> H
+  P[People with controllers,<br/>phones and keyboards] --> H[Party Anywhere app]
+  H -- "player 3 pressed A" --> M[Your mod, inside each<br/>person's original game]
+  M -- "rumble player 3's controller" --> H
+  G[(Your repository<br/>on GitHub)] -- installs and updates the mod --> H
 ```
 
-Você não escreve nada de controle, Bluetooth, celular ou lobby. O mod lê os jogadores por um arquivo pronto
-(o **SDK**), e o app instala, atualiza e abre.
+You don't write anything about controllers, Bluetooth, phones or lobbies. The mod reads the players through a
+ready-made file (the **SDK**), and the app installs, updates and launches it.
 
-**O que é com você, e é a parte grande:** fazer o jogo ter os jogadores extras e dividir a tela. Isso muda
-de jogo para jogo: num jogo com ferramentas de mod é mais simples; num jogo fechado é engenharia reversa
-(achar no jogo onde ficam os jogadores e a câmera). O [guia de co-op local](docs/MOD-COOP-LOCAL.md) mostra
-os caminhos, inclusive como aproveitar o multiplayer que o jogo já tem.
+**What's up to you, and it's the big part:** making the game have the extra players and split the screen. That
+changes from game to game: in a game with modding tools it's simpler; in a closed game it's reverse
+engineering (finding where the game keeps the players and the camera). The
+[local co-op guide](docs/MOD-COOP-LOCAL.md) (in Portuguese) shows the paths, including how to reuse the
+multiplayer the game already has.
 
-### Em 5 passos
+> The detailed docs in [`docs/`](docs) are written in Brazilian Portuguese. They read fine through a browser
+> translator, and your AI agent reads them directly.
 
-#### 1. Pegue a ferramenta `pa`
+### In 5 steps
 
-Baixe o **`pa.exe`** na página de [Releases](../../releases) e coloque numa pasta que esteja no `PATH`.
-Ela cria, confere e empacota o mod para você.
+#### 1. Get the `pa` tool
 
-#### 2. Crie o projeto do mod
+Download **`pa.exe`** from the [Releases](../../releases) page and put it in a folder on your `PATH`. It
+creates, checks and packages the mod for you.
 
-Com o jogo instalado no seu PC:
+#### 2. Create the mod project
+
+With the game installed on your PC:
 
 ```bash
-pa new meu-mod --name "Meu Mod Co-op" --base-game "nome do jogo"
+pa new my-mod --name "My Co-op Mod" --base-game "game name"
 ```
 
-A ferramenta acha o jogo (Steam ou Epic; de outro lugar, passe a pasta ou o `.exe` dele) e já preenche a ficha com ele: o nome, o executável e de onde ele
-vem. Assim o app de quem baixar sabe procurar e, se precisar, ajudar a pessoa a instalar. Você ganha:
+The tool finds the game (Steam or Epic; from anywhere else, pass its folder or `.exe`) and fills in the
+manifest with it: the name, the executable and where it comes from. That way the app of whoever downloads it
+knows where to look and, if needed, how to help them install it. You get:
 
-| Arquivo | Para que serve |
+| File | What it's for |
 |---|---|
-| `party-anywhere.json` | A "ficha" do mod: nome, quantos jogadores, qual é o jogo original, o que copiar para a pasta dele e o controle do celular do jogo (já vem um, com o meio da tela livre). É o que o app lê. |
-| `assets/cover.png` | A capa na Biblioteca. Vem uma provisória; troque pela sua (retrato 3:4, arte própria). |
-| `sdk/party_anywhere.h` | O SDK: o arquivo que o mod inclui para ler os jogadores. |
-| `.github/workflows/release.yml` | Publica cada versão sozinho quando você cria uma tag. |
-| `AGENTS.md`, `CLAUDE.md` e `.claude/` | Instruções para agentes de IA (veja abaixo). |
+| `party-anywhere.json` | The mod's "manifest": name, how many players, which is the original game, what to copy into its folder, and the game's phone controller (one comes included, with the middle of the screen free). It's what the app reads. |
+| `assets/cover.png` | The cover in the Library. A placeholder comes included; replace it with yours (3:4 portrait, your own art). |
+| `sdk/party_anywhere.h` | The SDK: the file the mod includes to read the players. |
+| `.github/workflows/release.yml` | Publishes each version by itself when you create a tag. |
+| `AGENTS.md`, `CLAUDE.md` and `.claude/` | Instructions for AI agents (see below). |
 
-#### 3. Escreva o mod
+#### 3. Write the mod
 
-O mod roda dentro do jogo (por exemplo, uma DLL que o jogo carrega). O jeito de entrar em cada jogo muda, mas
-a parte dos jogadores é sempre a mesma: um arquivo só, em C, que funciona em C e C++.
+The mod runs inside the game (for example, a DLL the game loads). How you get into each game varies, but the
+player part is always the same: a single C file that works in C and C++.
 
 ```c
 #define PARTY_ANYWHERE_IMPLEMENTATION
 #include "party_anywhere.h"
 
-// 1. Conecte ao app, uma vez, quando o jogo abre
-pa_game_info info = { sizeof info, "com.voce.meu-mod", "Meu Mod Co-op", 1, 4 };
+// 1. Connect to the app, once, when the game opens
+pa_game_info info = { sizeof info, "com.you.my-mod", "My Co-op Mod", 1, 4 };
 pa_client *pa;
 pa_connect(&info, &pa);
 
-// 2. A cada frame do jogo, leia os jogadores
+// 2. Every game frame, read the players
 pa_poll(pa);
-for (int jogador = 0; jogador < PA_MAX_SEATS; jogador++) {
+for (int player = 0; player < PA_MAX_SEATS; player++) {
     pa_pad pad;
-    if (pa_get_pad(pa, jogador, &pad) && (pad.pressed & PA_BTN_A)) {
-        // o jogador apertou A: faça o personagem dele pular
-        pa_rumble(pa, jogador, 0.8f, 0.8f, 80); // e o controle dele vibra
+    if (pa_get_pad(pa, player, &pad) && (pad.pressed & PA_BTN_A)) {
+        // the player pressed A: make their character jump
+        pa_rumble(pa, player, 0.8f, 0.8f, 80); // and their controller rumbles
     }
 }
 ```
 
-Também dá para saber quem entrou ou saiu, o nome e a cor de cada um, mandar um aviso para o celular de
-alguém e pausar quando um jogador cai. Tudo em [docs/SDK.md](docs/SDK.md).
+You can also know who joined or left, each person's name and color, send a notice to someone's phone, and pause
+when a player drops. All of it in [docs/SDK.md](docs/SDK.md).
 
-**O controle no celular do seu jogo:** monte no app (Controles → Criar layout), com o nome de cada botão
-("Pular", "Impulso") e modos se o jogo muda os comandos (a pé e no carro), e copie para a ficha. Quando o mod
-abre, os celulares trocam sozinhos para ele. Como fazer: [docs/GAME-MANIFEST.md](docs/GAME-MANIFEST.md).
+**Your game's phone controller:** build it in the app (Controls → Create layout), with a name for each button
+("Jump", "Boost") and modes if the game changes controls (on foot and in the car), and copy it into the
+manifest. When the mod opens, the phones switch to it by themselves. How: [docs/GAME-MANIFEST.md](docs/GAME-MANIFEST.md).
 
-#### 4. Teste com o app aberto
+#### 4. Test with the app open
 
-Abra o Party Anywhere, entre com um controle e um celular e abra o jogo com o mod. Antes de publicar:
+Open Party Anywhere, join with a controller and a phone, and open the game with the mod. Before publishing:
 
 ```bash
 pa validate
 ```
 
-Ele confere a ficha e a capa e diz, em português, o que ajustar. Para jogar o seu mod **sem publicar**,
-gere o pacote e leve a pasta para a Biblioteca:
+It checks the manifest and the cover and tells you what to fix. To play your mod **without publishing**,
+build the package and bring the folder into the Library:
 
 ```bash
 pa pack --from build
@@ -188,130 +234,143 @@ pa pack --from build
 pa add .
 ```
 
-#### 5. Publique (opcional, mas faz o seu mod chegar a todo mundo)
+#### 5. Publish (optional, but it gets your mod to everyone)
 
-1. Suba o projeto para um repositório **público** no GitHub (só o mod: nada do jogo original).
-2. No `release.yml`, troque o passo **Build** pelo jeito de compilar o seu mod.
-3. Crie a tag da versão, igual à `version` da ficha:
+1. Push the project to a **public** GitHub repository (just the mod: nothing from the original game).
+2. In `release.yml`, replace the **Build** step with the way your mod is compiled.
+3. Create the version tag, matching the manifest's `version`:
 
    ```bash
    git tag v0.1.0
    git push --tags
    ```
 
-4. Adicione o tópico **`party-anywhere-game`** ao repositório (na página dele, em "About").
+4. **Add the `party-anywhere-game` topic** to the repository (on its page, under "About" → ⚙️ → Topics).
 
-O GitHub publica a versão sozinho. A partir daí, qualquer pessoa cola o link na Biblioteca e joga, e o seu
-mod aparece em **Descobrir**. Versão nova? Suba a `version`, crie a tag nova e quem já instalou recebe o aviso.
+GitHub publishes the version by itself. From then on, anyone pastes the link into the Library and plays, and
+your mod shows up on the **[party-anywhere-game topic page](https://github.com/topics/party-anywhere-game)**,
+which the app links to. New version? Bump `version`, create the new tag and everyone who installed it gets
+notified.
 
-### Com um agente de IA
+> **Want your mod in the organization?** Mods can live in your own account, that's fine. If you'd rather have
+> it next to the official ones in **[party-anywhere](https://github.com/party-anywhere)** (more visibility and
+> help maintaining it), [open an issue](https://github.com/joaocaioo/party-anywhere/issues/new) with the link
+> to your mod and we'll talk about moving it or inviting you to the organization.
 
-Abra o seu agente (Claude Code, Cursor, Codex e outros) na pasta do mod. **Não precisa configurar nada:** o
-projeto traz um `AGENTS.md` que ensina o agente a usar a `pa` e a ler a documentação dela (`pa docs`). Peça
-uma coisa de cada vez:
+### With an AI agent
 
-- *"Quero o jogo X em co-op local para 4. Leia o guia de co-op e me proponha o caminho."*
-- *"Primeiro passo: o mod carrega no jogo e manda um aviso para o celular."*
-- *"Monte o controle do celular deste mod: a pé e no carro."*
-- *"Meu mod está pronto para publicar?"*
+Open your agent (Claude Code, Cursor, Codex and others) in the mod folder. **No setup needed:** the project
+comes with an `AGENTS.md` that teaches the agent to use `pa` and to read its documentation (`pa docs`). Ask for
+one thing at a time:
 
-O agente ajuda de verdade na parte do Party Anywhere (projeto, controles, celular, ficha, publicação) e é um
-bom parceiro na parte do jogo, mas essa é feita em idas e voltas com você, testando cada passo. Ele pede sua
-permissão antes de instalar qualquer coisa.
+- *"I want game X in local co-op for 4. Read the co-op guide and propose the path."*
+- *"First step: the mod loads in the game and sends a notice to the phone."*
+- *"Build the phone controller for this mod: on foot and in the car."*
+- *"Is my mod ready to publish?"*
+
+The agent really helps with the Party Anywhere part (project, controllers, phone, manifest, publishing) and is
+a good partner on the game part, but that part is done back and forth with you, testing each step. It asks your
+permission before installing anything.
 
 <details>
-<summary>Agente sem terminal (Claude Desktop e outros): servidor MCP</summary>
+<summary>Agent without a terminal (Claude Desktop and others): MCP server</summary>
 
-A `pa` também é um servidor MCP, com as mesmas ferramentas, rodando no seu PC (sem servidor na internet).
-No Claude Code, se preferir:
+`pa` is also an MCP server, with the same tools, running on your PC (no server on the internet). In Claude Code,
+if you prefer:
 
 ```bash
 claude mcp add --scope user party-anywhere -- pa mcp
 ```
 
-Em outros agentes, configure um servidor MCP com o comando `pa` e o argumento `mcp`.
+In other agents, configure an MCP server with the command `pa` and the argument `mcp`.
 </details>
 
-### O que o app exige para achar e instalar o seu mod
+### What the app needs to find and install your mod
 
-O app lê o seu repositório sozinho. O `pa new` já cria tudo assim e o `pa validate` avisa o que faltar:
+The app reads your repository by itself. `pa new` already sets everything up like this and `pa validate` warns
+about anything missing:
 
-- [ ] `party-anywhere.json` na raiz do repositório ([como preencher](docs/GAME-MANIFEST.md)), dizendo
-      qual é o jogo original (o executável e, se tiver, o código dele na Steam ou na Epic).
-- [ ] Capa em retrato (3:4, a partir de 600×800), com arte sua.
-- [ ] Cada versão é um release do GitHub com a tag igual à `version` (ex.: `v0.1.0`), com o pacote `.zip` e
-      o `party-anywhere.release.json` (o workflow gera os dois).
-- [ ] Repositório público, com o tópico `party-anywhere-game`.
-- [ ] **Nenhum arquivo do jogo original** no repositório ou no pacote.
-- [ ] Nada de jogos com anti-cheat (contornar anti-cheat pode banir quem joga).
+- [ ] `party-anywhere.json` at the root of the repository ([how to fill it in](docs/GAME-MANIFEST.md)), saying
+      which is the original game (the executable and, if it has one, its Steam or Epic ID).
+- [ ] Portrait cover (3:4, from 600×800 up), with your own art.
+- [ ] Each version is a GitHub release with the tag equal to `version` (e.g. `v0.1.0`), with the `.zip` package
+      and `party-anywhere.release.json` (the workflow generates both).
+- [ ] Public repository, with the `party-anywhere-game` topic.
+- [ ] **No files from the original game** in the repository or the package.
+- [ ] No games with anti-cheat (bypassing anti-cheat can get players banned).
 
-Na hora de instalar, o app confere tudo. Se algo não bater, nada é instalado e a mensagem diz o que fazer.
+At install time, the app checks everything. If something doesn't match, nothing is installed and the message
+says what to do.
 
-> **E um jogo novo?** Também dá: `pa new meu-jogo --name "Meu Jogo"` (sem `--base-game`) cria um jogo que
-> já nasce co-op local. Ele vem inteiro no pacote, sem precisar de outro jogo.
-
----
-
-## Perguntas rápidas
-
-**Preciso ter o jogo original para jogar um mod?** Sim: o mod roda em cima da sua cópia. O app procura na
-Steam e na Epic e, se não achar, ajuda a instalar ou deixa você apontar a pasta.
-
-**Comprei o jogo fora da Steam e da Epic. Funciona?** Funciona: escolha o `.exe` ou a pasta do jogo quando o
-app pedir. Se o mod exigir uma versão específica, o app avisa.
-
-**Preciso pagar ou manter um servidor?** Não. O app, a `pa` e o MCP rodam no seu PC, e o GitHub hospeda
-os mods de graça.
-
-**Funciona pela internet?** Não. É co-op local: todo mundo no mesmo lugar, celulares no mesmo Wi-Fi do PC.
-
-**Quantos jogadores?** De 1 a 10. O mod diz quantos aceita na ficha; se tiver mais gente, o app pergunta
-quem vai jogar.
-
-**Que linguagem posso usar?** C e C++ (`party_anywhere.h`) e C# (`PartyAnywhere.cs`, para Unity com BepInEx
-ou MelonLoader). O `pa new` traz os dois.
-
-**Os celulares têm atraso?** Pouco: na rede de casa, o toque chega ao PC em cerca de 25 ms.
-
-**Posso fazer mod de qualquer jogo?** De jogos sem anti-cheat, e sem distribuir arquivos do jogo original.
-
-**É seguro instalar um mod?** Um mod é um programa: ele roda no seu PC, dentro do jogo. Instale só de quem
-você confia, como faria com qualquer mod. O app confere que o pacote é exatamente o publicado (pelo hash),
-só grava na pasta do jogo e na do próprio app, guarda os arquivos originais e devolve tudo ao remover.
-Achou um mod malicioso? Abra uma issue com o link.
+> **What about a brand-new game?** That works too: `pa new my-game --name "My Game"` (without `--base-game`)
+> creates a game that's born local co-op. It comes whole in the package, no other game needed.
 
 ---
 
-## Colaborar
+## Quick questions
 
-Toda ajuda é bem-vinda, de quem joga e de quem programa.
+**Do I need the original game to play a mod?** Yes: the mod runs on top of your copy. The app looks on Steam
+and Epic and, if it doesn't find it, helps you install it or lets you point to the folder.
 
-- **Publicou um mod?** Com o tópico `party-anywhere-game` ele já aparece em **Descobrir**. Quer divulgar?
-  Abra uma issue com o link.
-- **Achou um problema?** Abra uma issue contando o que fez, o que esperava e o que aconteceu.
-- **Tem uma ideia?** Abra uma issue: as próximas prioridades saem do que as pessoas pedem.
-- **Quer mexer no código?** Faça um fork, crie um branch e abra um pull request.
+**I bought the game outside Steam and Epic. Does it work?** It does: choose the game's `.exe` or folder when
+the app asks. If the mod needs a specific version, the app tells you.
 
-Combinados: textos do app e docs em português do Brasil; código e commits em inglês. Mudou o protocolo do
-celular, o SDK ou a ficha do jogo? Atualize o doc no mesmo pull request.
+**Do I need to pay or run a server?** No. The app, `pa` and the MCP run on your PC, and GitHub hosts the mods
+for free.
+
+**Does it work over the internet?** No. It's local co-op: everyone in the same place, phones on the same Wi-Fi
+as the PC.
+
+**How many players?** From 1 to 10. The mod says how many it accepts in the manifest; if there are more people,
+the app asks who's playing.
+
+**Which language can I use?** C and C++ (`party_anywhere.h`) and C# (`PartyAnywhere.cs`, for Unity with BepInEx
+or MelonLoader). `pa new` includes both.
+
+**Is there lag on phones?** Very little: on a home network, a touch reaches the PC in about 25 ms.
+
+**Can I mod any game?** Games without anti-cheat, and without distributing files from the original game.
+
+**Is it safe to install a mod?** A mod is a program: it runs on your PC, inside the game. Only install from
+people you trust, as you would with any mod. The app checks that the package is exactly what was published (by
+hash), only writes to the game folder and the app's own folder, keeps the original files and restores
+everything on removal. Found a malicious mod? Open an issue with the link.
+
+---
+
+## Contribute
+
+All help is welcome, from players and from programmers.
+
+- **Published a mod?** With the `party-anywhere-game` topic it already shows up on the
+  [topic page](https://github.com/topics/party-anywhere-game). Want it in the
+  [organization](https://github.com/party-anywhere) or want to spread the word? Open an issue with the link.
+- **Found a problem?** Open an issue telling what you did, what you expected and what happened.
+- **Have an idea?** Open an issue: the next priorities come from what people ask for.
+- **Want to work on the code?** Fork, create a branch and open a pull request.
+
+Conventions: the app's texts and the docs are written in Brazilian Portuguese, and the app's English comes from
+`apps/hub/ui/i18n-en.js` (new UI text needs its English entry there); this README exists in both languages. Code
+and commits in English. Changed the phone protocol, the SDK or the game manifest? Update the doc in the same
+pull request.
 
 <details>
-<summary><b>Desenvolver o app</b></summary>
+<summary><b>Developing the app</b></summary>
 
-Requisitos: Windows 10 ou 11, Rust estável e Node 22 (só para gerar o instalador).
+Requirements: Windows 10 or 11, stable Rust and Node 22 (only to build the installer).
 
 ```bash
 cargo run -p party-anywhere-hub
 ```
 
-A interface também abre no navegador, em modo demonstração (com o painel "Demo" para simular celulares e
-controles):
+The interface also opens in the browser, in demo mode (with the "Demo" panel to simulate phones and
+controllers):
 
 ```bash
 python -m http.server 5173 --directory apps/hub/ui
 ```
 
-Testes, antes de abrir um pull request:
+Tests, before opening a pull request:
 
 ```bash
 cargo test --workspace
@@ -321,31 +380,31 @@ cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 
-A `pa` direto do código:
+`pa` straight from the source:
 
 ```bash
 cargo install --path crates/pa-cli
 ```
 
-Gerar o instalador (sai em `target/release/bundle/nsis/`), dentro de `apps/hub/src-tauri`:
+Building the installer (output in `target/release/bundle/nsis/`), inside `apps/hub/src-tauri`:
 
 ```bash
 npx --yes @tauri-apps/cli@2 build
 ```
 
-Uma tag `vX.Y.Z` publica o instalador e a `pa` pelo workflow `.github/workflows/release.yml`.
+A `vX.Y.Z` tag publishes the installer and `pa` through the `.github/workflows/release.yml` workflow.
 
-| Pasta | O que tem |
+| Folder | What's in it |
 |---|---|
-| `apps/hub` | O app (Tauri 2): `src-tauri` em Rust, `ui` em HTML e JS |
-| `crates/` | Lobby, celular, controles virtuais, SDK, ficha do jogo, Biblioteca e a `pa` |
-| `sdk/c` | O `party_anywhere.h` e o exemplo |
-| `templates/game` | O projeto modelo que o `pa new` cria |
-| `schema/` | O esquema da ficha (autocompletar no editor) |
-| `assets/brand` | Marca: mascote, ícone do app e a logo empilhada e deitada, para fundo escuro e claro |
+| `apps/hub` | The app (Tauri 2): `src-tauri` in Rust, `ui` in HTML and JS |
+| `crates/` | Lobby, phone, virtual controllers, SDK, game manifest, Library and `pa` |
+| `sdk/c` | `party_anywhere.h` and the example |
+| `templates/game` | The template project `pa new` creates |
+| `schema/` | The manifest schema (editor autocomplete) |
+| `assets/brand` | Brand: mascot, app icon and the stacked and horizontal logo, for dark and light backgrounds |
 
 </details>
 
-## Licença
+## License
 
 [MIT](LICENSE).

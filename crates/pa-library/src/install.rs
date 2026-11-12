@@ -138,6 +138,7 @@ fn copy_files<'a>(game: &'a GameManifest, package_dir: &Path, base: &Path, backu
 /// Desinstala um mod de jogo-base: devolve os originais do backup e apaga o que o mod trouxe.
 pub fn uninstall_from_base(game: &GameManifest, installed: &Installed, package_dir: &Path) -> Result<(), String> {
     let Some(base) = &installed.base_dir else { return Ok(()) };
+    crate::steam::remove_app_id_file(&base.join(&installed.working_dir), package_dir);
     let backup = package_dir.join("backup");
     for f in &game.install.files {
         let to = base.join(&f.to);

@@ -187,6 +187,7 @@ Implementação: `crates/pa-phone/src/protocol.rs` (codificação, com testes) e
 { "t": "seat", "seat": 3, "color": "#22C55E", "name": "João", "state": "active" }
 { "t": "layout", "id": "gamepad" | "simple" | "driving" | "menu", "labels": { "A": "Correr", "RT": "Atirar" } }
 { "t": "toast", "text": "Você está no time azul" }
+{ "t": "lang", "lang": "pt-BR" | "en" } // idioma do Hub: o celular segue, salvo escolha própria no menu dele
 ```
 
 ### Vida da conexão

@@ -8,6 +8,7 @@ pub mod http;
 pub mod hubapp;
 pub mod install;
 pub mod pcgames;
+pub mod steam;
 pub mod store;
 pub mod updates;
 pub mod vigem;

@@ -9,6 +9,9 @@
 <!-- tudo local (vendor/, gerado por apps/hub/tools/vendor_ui.py): o Hub funciona sem internet -->
 <link href="vendor/fonts.css" rel="stylesheet">
 <script src="vendor/qrcode.js"></script>
+<!-- idiomas: o texto da UI é em português; i18n.js troca para o inglês de i18n-en.js quando a pessoa escolhe -->
+<script src="i18n-en.js"></script>
+<script src="i18n.js"></script>
 <script type="importmap">
 { "imports": {
   "three": "./vendor/three/three.module.js",
@@ -157,6 +160,16 @@ button:focus-visible { outline: 2px solid var(--neon); outline-offset: 2px; }
 /* na biblioteca o topo flutua sobre o fliperama: fundos escuros só nas pílulas, sem faixa por cima do 3D */
 .shell.in-library nav.tabs { background: rgba(6, 14, 3, .66); border-color: rgba(220, 255, 200, .12); }
 .shell.in-library .update { background: rgba(6, 14, 3, .66); }
+/* idioma: a sigla do idioma atual, no mesmo círculo discreto da atualização */
+.lang {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center;
+  color: var(--faint); border: 1px solid var(--line);
+  font: 700 10.5px/1 Inter, sans-serif; letter-spacing: .04em;
+  transition: color .2s, border-color .2s, background .45s;
+}
+.lang:hover { color: var(--text); border-color: var(--line-strong); }
+.shell.in-library .lang { background: rgba(6, 14, 3, .66); }
 .shell.in-library .logo { background: rgba(6, 14, 3, .58); }
 .shell.in-library .btn-soft { background: rgba(6, 14, 3, .7); }
 .btn-neon {
@@ -992,6 +1005,7 @@ main { perspective: 1800px; }
       </nav>
       <div class="top-right">
         <button class="btn-soft" id="addBtn"><span data-icon="plus"></span><span class="lbl-long">Adicionar jogador</span></button>
+        <button class="lang" id="langBtn" data-no-i18n title="Idioma / Language" aria-label="Idioma / Language"></button>
         <button class="update" id="updatePill" aria-label="Atualizações do Hub"></button>
         <div class="winctl" aria-label="Janela">
           <button id="winMin" title="Minimizar" aria-label="Minimizar"><svg viewBox="0 0 12 12"><path d="M2 6h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
@@ -2425,12 +2439,17 @@ function openAddLink(prefill) {
       <input id="linkInput" placeholder="https://github.com/autor/meu-mod" autocomplete="off" spellcheck="false" value="${escapeHtml(prefill || '')}">
       <button class="btn-neon" style="height:50px">Ler</button>
     </form>
-    <div style="margin-top:10px;font-size:12.5px;color:var(--faint)">Dica: experimente <span class="linkish" data-fill="https://github.com/sofagames/kart-caos">github.com/sofagames/kart-caos</span> ou um link com "sem-manifesto" para ver o erro.</div>
+    ${document.documentElement.classList.contains('in-app') ? '' : '<div style="margin-top:10px;font-size:12.5px;color:var(--faint)">Dica: experimente <span class="linkish" data-fill="https://github.com/sofagames/kart-caos">github.com/sofagames/kart-caos</span> ou um link com "sem-manifesto" para ver o erro.</div>'}
+    <div style="margin-top:10px;font-size:12.5px;color:var(--faint)">Não sabe o que jogar? Veja os <span class="linkish" data-open="https://github.com/party-anywhere">mods oficiais</span> e os <span class="linkish" data-open="https://github.com/topics/party-anywhere-game">jogos da comunidade</span> no GitHub.</div>
     <div id="linkResult"></div>`, () => {
     const form = document.getElementById('linkForm');
     const input = document.getElementById('linkInput');
     setTimeout(() => (prefill ? form.requestSubmit() : input.focus()), 50);
-    const fill = (e) => { const f = e.target.closest('[data-fill]'); if (f) { input.value = f.dataset.fill; form.requestSubmit(); } };
+    const fill = (e) => {
+      const o = e.target.closest('[data-open]');
+      if (o) { openExternal(o.dataset.open); return; }
+      const f = e.target.closest('[data-fill]'); if (f) { input.value = f.dataset.fill; form.requestSubmit(); }
+    };
     modal.addEventListener('click', fill);
     form.addEventListener('submit', (e) => { e.preventDefault(); readManifest(input.value.trim()); });
     const off = backTo(openAddGame);
@@ -2508,6 +2527,16 @@ function install(g) {
 // ===================================================================================
 // Atualização do Hub
 // ===================================================================================
+// links para fora (GitHub): no navegador, uma aba nova; no app, bridge.js abre no navegador do Windows
+window.openExternal = (url) => window.open(url, '_blank', 'noopener');
+
+// idioma: PT ↔ EN na hora, sem recarregar (i18n.js); no app, a escolha também fica nos ajustes do Hub
+const langBtn = document.getElementById('langBtn');
+const renderLang = () => { langBtn.textContent = PA_I18N.lang === 'en' ? 'EN' : 'PT'; };
+langBtn.addEventListener('click', () => PA_I18N.set(PA_I18N.lang === 'en' ? 'pt-BR' : 'en'));
+window.addEventListener('pa:lang', renderLang);
+renderLang();
+
 const updatePill = document.getElementById('updatePill');
 let updateState = 'checking';
 function renderUpdate(pct) {
@@ -4073,8 +4102,8 @@ function legendMaterial(width) {
   const FONT = '700 72px Caveat, "Segoe Print", cursive';
   // perto dos cantos, sob os botões
   const groups = [
-    { x: -0.41, parts: [['key', '←'], ['key', '→'], ['text', 'escolher']] },
-    { x: 0.41, parts: [['key', 'A'], ['text', 'jogar']] },
+    { x: -0.41, parts: [['key', '←'], ['key', '→'], ['text', tr('escolher')]] },
+    { x: 0.41, parts: [['key', 'A'], ['text', tr('jogar')]] },
   ];
   const write = (g, color, dy, keyColor) => {
     g.font = FONT;
@@ -4384,9 +4413,10 @@ function drawPage(g, game) {
   const widest = Math.max(...lines.map((l) => g.measureText(l).width));
   const size = Math.min(134, (LAY.textW / widest) * 100, 250 / (lines.length * 0.92));
   g.font = '500 36px Inter, sans-serif';
-  const tag = wrap(g, game.tagline, LAY.textW, 3);
+  const tagline = tr(game.tagline);
+  const tag = wrap(g, tagline, LAY.textW, 3);
   // não cabe em 3 linhas: corta na palavra e põe reticências
-  if (tag.join(' ').length < game.tagline.length) tag[tag.length - 1] = tag[tag.length - 1].replace(/\s*\S*$/, '') + '…';
+  if (tag.join(' ').length < tagline.length) tag[tag.length - 1] = tag[tag.length - 1].replace(/\s*\S*$/, '') + '…';
   const GAP = { badge: 22, title: 22, players: 14 };
   const hTitle = size * 0.92 * (lines.length - 1) + size * 0.78;
   // a área do título tem sempre a mesma altura (a de duas linhas grandes): um nome de uma palavra que não
@@ -4396,7 +4426,7 @@ function drawPage(g, game) {
   // bloco ancorado embaixo
   let y = Math.max(96, LAY.bottomY - total);
 
-  const badge = game.badge === 'ok' ? 'VERIFICADO' : game.badge === 'pc' ? `${(game.store || 'PC').toUpperCase()} · MODO UNIVERSAL` : 'DA COMUNIDADE';
+  const badge = tr(game.badge === 'ok' ? 'VERIFICADO' : game.badge === 'pc' ? `${(game.store || 'PC').toUpperCase()} · MODO UNIVERSAL` : 'DA COMUNIDADE');
   g.font = '800 27px Inter, sans-serif';
   const bw = g.measureText(badge).width + 40;
   g.lineWidth = 3; g.strokeStyle = INK_SOFT; g.fillStyle = INK_SOFT;
@@ -4411,7 +4441,7 @@ function drawPage(g, game) {
   y += TITLE_BOX + GAP.title;
 
   g.font = '800 36px Inter, sans-serif';
-  g.fillText(game.players.toUpperCase(), X, y + 33);
+  g.fillText(tr(game.players).toUpperCase(), X, y + 33);
   y += 38 + GAP.players;
   g.font = '500 36px Inter, sans-serif';
   g.fillStyle = INK_SOFT;
@@ -4851,12 +4881,17 @@ const fontsReady = Promise.race([
   Promise.all(['100px Anton', '800 22px Inter', '900 32px Inter', '700 72px Caveat'].map((f) => document.fonts.load(f))),
   new Promise((r) => setTimeout(r, 2500)), // sem internet para as fontes: segue com as de reserva
 ]).catch(() => {});
-fontsReady.then(() => {
+// legenda e páginas pintadas de novo: com as fontes certas e quando o idioma muda
+function repaintTexts() {
   const oldLegend = main.legend.material;
   main.legend.material = legendMaterial(main.legendWidth);
   oldLegend.map.dispose(); oldLegend.bumpMap.dispose(); oldLegend.dispose();
   S.games.forEach((game) => { if (S.pages.has(game.id)) buildPage(game); });
   drawChrome();
+}
+window.addEventListener('pa:lang', repaintTexts);
+fontsReady.then(() => {
+  repaintTexts();
   camera.position.copy(front.pos);
   camera.lookAt(front.target);
   composer.setSize(stage.clientWidth || 1, stage.clientHeight || 1);

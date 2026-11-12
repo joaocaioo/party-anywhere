@@ -144,6 +144,8 @@ pub struct SettingsView {
     join_url: String,
     virtual_pads: bool,
     virtual_error: Option<String>,
+    /// Idioma da UI escolhido (no instalador ou no botão do topo); `None`: segue o do Windows.
+    lang: Option<String>,
 }
 
 #[tauri::command]
@@ -156,7 +158,18 @@ pub fn settings_get(hub: Hubs) -> SettingsView {
         join_url: hub.join_url.lock().unwrap().clone(),
         virtual_pads: hub.virtual_pads.lock().unwrap().is_some(),
         virtual_error: hub.virtual_error.lock().unwrap().clone(),
+        lang: st.lang,
     }
+}
+
+/// Idioma da UI: "pt-BR" ou "en".
+#[tauri::command]
+pub fn set_lang(hub: Hubs, lang: String) -> Result<(), String> {
+    let lang = crate::settings::normalize_lang(&lang).ok_or("idioma desconhecido")?;
+    hub.settings.lock().unwrap().lang = Some(lang.into());
+    hub.save_settings();
+    hub.broadcast_lang();
+    Ok(())
 }
 
 /// Endereço do QR: um IP deste PC, ou `None` para o Hub escolher.
@@ -910,7 +923,7 @@ pub fn game_play(app: tauri::AppHandle, hub: Hubs, libs: Libs, id: String, playe
                 crate::foreground::launching(crate::foreground::Target::AnyNew);
                 app.opener().open_url(launch, None::<&str>).map_err(|e| format!("não consegui abrir {}: {e}", entry.name))
             } else {
-                spawn(&PathBuf::from(launch), &[], None)
+                spawn(&PathBuf::from(launch), &[], None, None)
             }
         }
         (Source::Repo { .. }, Some(inst)) => {
@@ -925,7 +938,33 @@ pub fn game_play(app: tauri::AppHandle, hub: Hubs, libs: Libs, id: String, playe
                     None => format!("{} não está mais instalado. Instale de novo pelo link.", entry.name),
                 });
             }
-            spawn(&exe, &inst.args, Some(inst.dir.join(&inst.working_dir)))
+            let work = inst.dir.join(&inst.working_dir);
+            // jogo-base da Steam: sem preparo, a Steam fecha o jogo e o reabre por ela, sem o Hub (pa_library::steam)
+            let Some(app_id) = inst.base_dir.as_deref().and_then(pa_library::steam::app_id_for_dir) else {
+                return spawn(&exe, &inst.args, Some(work), None);
+            };
+            pa_library::steam::ensure_app_id_file(&work, app_id, &libs.games_root.join(&entry.id).join(&inst.version))?;
+            if pa_library::steam::logged_in() {
+                return spawn(&exe, &inst.args, Some(work), Some(app_id));
+            }
+            // Steam fechada: abre e espera ela entrar, depois o jogo (a tela "O jogo abriu" já está esperando)
+            let _ = app.opener().open_url("steam://open/main", None::<&str>);
+            let (args, name) = (inst.args.clone(), entry.name.clone());
+            std::thread::spawn(move || {
+                let until = std::time::Instant::now() + STEAM_WAIT;
+                while !pa_library::steam::logged_in() {
+                    if std::time::Instant::now() > until {
+                        let _ = app.emit("game-error", format!("A Steam não abriu a tempo. Abra a Steam, entre na sua conta e aperte Jogar de novo em {name}."));
+                        return;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                }
+                std::thread::sleep(std::time::Duration::from_secs(3)); // a Steam termina de entrar
+                if let Err(e) = spawn(&exe, &args, Some(work), Some(app_id)) {
+                    let _ = app.emit("game-error", e);
+                }
+            });
+            Ok(())
         }
         (Source::Repo { .. }, None) => Err(format!("{} ainda não está instalado.", entry.name)),
     }
@@ -938,13 +977,20 @@ pub fn game_stopped(hub: Hubs) {
     hub.set_session_layout(None);
 }
 
-/// Abre o jogo e traz a janela dele para a frente do Hub quando ela aparecer.
-fn spawn(exe: &std::path::Path, args: &[String], cwd: Option<PathBuf>) -> Result<(), String> {
+/// Quanto esperar a Steam abrir e entrar na conta antes de desistir de abrir o jogo.
+const STEAM_WAIT: std::time::Duration = std::time::Duration::from_secs(90);
+
+/// Abre o jogo e traz a janela dele para a frente do Hub quando ela aparecer. `steam_app_id`: o jogo é da Steam
+/// e recebe as variáveis que a própria Steam passa quando abre um jogo.
+fn spawn(exe: &std::path::Path, args: &[String], cwd: Option<PathBuf>, steam_app_id: Option<u32>) -> Result<(), String> {
     let is_exe = exe.extension().is_some_and(|e| e.eq_ignore_ascii_case("exe"));
     let name = exe.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
     crate::foreground::launching(if is_exe { crate::foreground::Target::Exe(name) } else { crate::foreground::Target::AnyNew });
     let mut cmd = std::process::Command::new(exe);
     cmd.args(args);
+    if let Some(id) = steam_app_id {
+        cmd.env("SteamAppId", id.to_string()).env("SteamGameId", id.to_string());
+    }
     if let Some(dir) = cwd.or_else(|| exe.parent().map(|p| p.to_path_buf())) {
         cmd.current_dir(dir);
     }

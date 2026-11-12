@@ -170,6 +170,7 @@ impl Hub {
                             );
                         }
                         hub.plug(seat as usize);
+                        hub.send_lang(seat);
                         hub.send_layouts(seat);
                         hub.emit_lobby();
                     }
@@ -268,6 +269,22 @@ impl Hub {
     }
 
     /// A lista de layouts mudou (criado, editado, apagado na aba Controles): avisa todos os celulares.
+    /// O idioma do Hub para o celular (que segue, a menos que a pessoa tenha escolhido outro no menu dele).
+    pub fn send_lang(&self, seat: u8) {
+        let Some(lang) = self.settings.lock().unwrap().lang.clone() else { return };
+        if let Some(server) = self.phone.lock().unwrap().as_ref() {
+            server.send_text(seat, &ServerText::Lang { lang: &lang });
+        }
+    }
+
+    pub fn broadcast_lang(&self) {
+        let phones: Vec<u8> =
+            self.lobby.lock().unwrap().seats().filter(|s| s.kind == DeviceKind::Phone).map(|s| s.index as u8).collect();
+        for seat in phones {
+            self.send_lang(seat);
+        }
+    }
+
     pub fn broadcast_layouts(&self) {
         let phones: Vec<u8> =
             self.lobby.lock().unwrap().seats().filter(|s| s.kind == DeviceKind::Phone).map(|s| s.index as u8).collect();

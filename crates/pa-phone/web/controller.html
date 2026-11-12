@@ -227,6 +227,8 @@ body.viewing .knob { background: rgba(255, 255, 255, .35); box-shadow: none; }
     <button class="opt" id="optVibe"><span><b>Vibrar ao tocar</b><small>Um toque leve a cada botão</small></span><span class="sw"></span></button>
     <button class="opt" id="optFs"><span><b>Tela cheia</b><small>Esconde as barras do navegador</small></span><span class="sw"></span></button>
     <button class="opt" id="optScreen"><span><b>Tela do jogo no celular</b><small>Nos jogos que mostram, a sua parte aparece aqui e sai da TV</small></span><span class="sw"></span></button>
+    <h3>Idioma · Language</h3>
+    <div class="seg" id="langSeg"><button data-lang="auto">Como no PC</button><button data-lang="pt-BR">Português</button><button data-lang="en">English</button></div>
     <div id="lookPrefs" hidden>
       <h3>Câmera (arrastar o dedo na direita)</h3>
       <div class="seg" id="lookSens"><button data-sens="low">Devagar</button><button data-sens="mid">Normal</button><button data-sens="high">Rápida</button></div>
@@ -298,6 +300,114 @@ try { const l = JSON.parse(localStorage.getItem('pa.layout') || 'null'); if (l &
 
 const $ = (id) => document.getElementById(id);
 
+// ---------------------------------------------------------------- idioma
+// O português é o texto-fonte (escrito direto aqui). Celular em outro idioma: inglês, pelo dicionário abaixo.
+// Qual: `?lang=` (para testar) > o escolhido no menu do celular > o do Hub (vem na conexão e fica guardado) > o
+// do celular. Decidido ao abrir; se o Hub (ou o menu) muda o idioma, a página recarrega e volta para a mesma
+// vaga. Só o texto da própria página (e os textos fixos que o Hub manda): nomes de layout criados, de modo, de
+// botão e avisos do jogo ficam como chegam. Nada disto roda no caminho do toque.
+const langOf = (v) => (v ? (/^pt\b/i.test(v) ? 'pt-BR' : 'en') : null);
+const readLang = (k) => { try { return langOf(localStorage.getItem(k)); } catch (_) { return null; } };
+const LANG_Q = new URLSearchParams(location.search).get('lang');
+const pickLang = () => langOf(LANG_Q) || readLang('pa.lang.own') || readLang('pa.lang.hub') || langOf(navigator.language || 'pt');
+const LANG = pickLang();
+function setLangPref(key, value) {
+  try { if (value) localStorage.setItem(key, value); else localStorage.removeItem(key); } catch (_) {}
+  if (pickLang() !== LANG) location.reload();
+}
+const EN = LANG === 'en' ? {
+  // menu e camadas (HTML)
+  'Menu (segure)': 'Menu (hold)',
+  'Como no PC': 'Same as PC',
+  'Conectando...': 'Connecting...',
+  'Voltar ao jogo': 'Back to game',
+  'Controle': 'Controller',
+  'Seu nome': 'Your name',
+  'Como te chamam': 'What should we call you?',
+  'Salvar': 'Save',
+  'Preferências': 'Settings',
+  'Vibrar ao tocar': 'Vibrate on touch',
+  'Um toque leve a cada botão': 'A light buzz on every button',
+  'Tela cheia': 'Full screen',
+  'Esconde as barras do navegador': 'Hides the browser bars',
+  'Tela do jogo no celular': 'Game screen on phone',
+  'Nos jogos que mostram, a sua parte aparece aqui e sai da TV': 'In games that support it, your view shows here instead of on the TV',
+  'Câmera (arrastar o dedo na direita)': 'Camera (drag on the right side)',
+  'Devagar': 'Slow',
+  'Normal': 'Normal',
+  'Rápida': 'Fast',
+  'Partida': 'Game',
+  'Sair da partida': 'Leave the game',
+  'Segure. A sua vaga fica livre para outra pessoa': 'Hold. Your seat opens up for someone else',
+  'Diagnóstico': 'Diagnostics',
+  'Medir a conexão': 'Check the connection',
+  'Atraso do toque até o PC': 'Delay from touch to PC',
+  'amostras': 'samples',
+  'Toque → PC': 'Touch → PC',
+  'Rede': 'Network',
+  'Ida e volta': 'Round trip',
+  'Tela do jogo': 'Game screen',
+  'sem imagem': 'no image',
+  'Medir a rede (30 s)': 'Test the network (30 s)',
+  'Reconectando...': 'Reconnecting...',
+  'O celular está no mesmo Wi-Fi do PC?': 'Is the phone on the same Wi-Fi as the PC?',
+  'Não deu para entrar': "Couldn't join",
+  'Gire o celular': 'Turn your phone',
+  'O controle funciona deitado.': 'The controller works sideways.',
+  'Tela cheia no iPhone: toque em': 'Full screen on iPhone: tap',
+  'Compartilhar': 'Share',
+  'e depois em': 'then',
+  'Adicionar à Tela de Início': 'Add to Home Screen',
+  '. Abra pelo ícone.': '. Open it from the icon.',
+  'Entendi': 'Got it',
+  // controles
+  'VOLTAR': 'BACK',
+  'Arraste<br>para olhar': 'Drag<br>to look',
+  'Toque e<br>arraste': 'Touch<br>and drag',
+  'Simples': 'Simple',
+  'Avançado': 'Advanced',
+  'analógico': 'stick',
+  '2º analógico': '2nd stick',
+  'setas': 'arrows',
+  'gatilhos': 'triggers',
+  'ombros': 'bumpers',
+  // mensagens
+  'O lobby está cheio (10 de 10).': 'The lobby is full (10 of 10).',
+  'Atualize a página.': 'Refresh the page.',
+  'O lobby está fechado agora.': 'The lobby is closed right now.',
+  'Você saiu do lobby. Aperte qualquer botão para voltar.': 'You left the lobby. Press any button to come back.',
+  '{fps} quadros/s · {ms} ms do jogo até aqui': '{fps} frames/s · {ms} ms from the game to here',
+  'É você! O Hub está te procurando.': "It's you! The Hub is looking for you.",
+  'Segure o botão Menu para abrir': 'Hold the Menu button to open',
+  'Nome trocado': 'Name changed',
+  'Segure para sair da partida': 'Hold to leave the game',
+  'Pronto.': 'Done.',
+  'Medindo... {s} s': 'Testing... {s} s',
+} : null;
+// traduz uma frase; `{nome}` no texto vira vars.nome
+function t(pt, vars) {
+  let s = EN && Object.prototype.hasOwnProperty.call(EN, pt) ? EN[pt] : pt;
+  if (vars) s = s.replace(/\{(\w+)\}/g, (_, k) => vars[k]);
+  return s;
+}
+// o nome padrão que o Hub dá à vaga ("Jogador 3"); o nome que a pessoa escolheu fica como está
+const shownName = (name) => (EN && /^Jogador \d+$/.test(name) ? name.replace('Jogador', 'Player') : name);
+// os prontos do Hub têm nome fixo; os criados na aba Controles ficam com o nome que a pessoa deu
+const layoutName = (l) => (l.id === 'simple' || l.id === 'advanced' ? t(l.name) : l.name);
+// o HTML acima, uma vez ao abrir
+document.documentElement.lang = LANG;
+if (EN) {
+  const it = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n = it.nextNode(); n; n = it.nextNode()) {
+    const key = n.data.trim();
+    const en = key && n.parentElement.nodeName !== 'SCRIPT' ? t(key) : key;
+    if (en !== key) n.data = n.data.replace(key, () => en); // mantém os espaços das pontas
+  }
+  document.querySelectorAll('[aria-label], [placeholder]').forEach((el) => {
+    for (const a of ['aria-label', 'placeholder']) if (el.hasAttribute(a)) el.setAttribute(a, t(el.getAttribute(a)));
+  });
+}
+
 // ---------------------------------------------------------------- layout: peças posicionadas
 const currentLayoutObj = () => layouts.find((l) => l.id === currentLayout) || layouts[0];
 // as peças do modo atual; com a tela do jogo, a versão do layout com o meio livre (`screen`, nos prontos)
@@ -315,12 +425,12 @@ function render() {
   const layout = currentLayoutObj();
   if (modeIdx >= layout.modes.length) modeIdx = 0;
   releaseAll();
-  const label = { BACK: 'VOLTAR', START: 'START', LS: 'L3', RS: 'R3' };
+  const label = { BACK: t('VOLTAR'), START: 'START', LS: 'L3', RS: 'R3' };
   const arrows = { UP: '▲', LEFT: '◀', RIGHT: '▶', DOWN: '▼' };
   $('area').innerHTML = currentPieces().map((p, i) => {
     const k = p.kind, at = `data-i="${i}"`;
-    if (k === 'stickR' && lookOn) return `<div class="stick look${prefs.lookSeen ? ' used' : ''}" ${at} data-look><div class="hint">Arraste<br>para olhar</div></div>`;
-    if (k === 'stickL' || k === 'stickR') return `<div class="stick${prefs.stickSeen ? ' used' : ''}" ${at} data-stick="${k === 'stickL' ? 'l' : 'r'}"><div class="hint">Toque e<br>arraste</div></div>`;
+    if (k === 'stickR' && lookOn) return `<div class="stick look${prefs.lookSeen ? ' used' : ''}" ${at} data-look><div class="hint">${t('Arraste<br>para olhar')}</div></div>`;
+    if (k === 'stickL' || k === 'stickR') return `<div class="stick${prefs.stickSeen ? ' used' : ''}" ${at} data-stick="${k === 'stickL' ? 'l' : 'r'}"><div class="hint">${t('Toque e<br>arraste')}</div></div>`;
     if (k === 'dpad') return `<div class="dpad" ${at}>${Object.keys(arrows).map((d) => `<button data-b="${d}">${arrows[d]}</button>`).join('')}</div>`;
     // nome da ação no jogo ("Pular", "Impulso"), quando o layout tem: embaixo da letra
     const name = p.label ? `<em>${escapeHtml(p.label)}</em>` : '';
@@ -408,7 +518,7 @@ function keepToken(token) {
   if (!token || !TOKEN_RE.test(token)) return;
   try { localStorage.setItem('pa.token', token); } catch (_) {}
   if (new URLSearchParams(location.search).get('t') !== token) {
-    try { history.replaceState(null, '', `/?t=${token}`); } catch (_) {}
+    try { history.replaceState(null, '', `/?t=${token}${LANG_Q ? `&lang=${encodeURIComponent(LANG_Q)}` : ''}`); } catch (_) {}
   }
   const link = document.querySelector('link[rel="manifest"]');
   if (link) link.href = `/manifest.webmanifest?t=${token}`;
@@ -448,11 +558,13 @@ function onText(m) {
     document.documentElement.style.setProperty('--seat', m.color);
     $('seatNum').textContent = m.seat;
     $('sheetSeat').textContent = m.seat;
-    $('seatName').textContent = `P${m.seat} · ${m.name}`;
+    $('seatName').textContent = `P${m.seat} · ${shownName(m.name)}`;
     $('nameInput').value = /^Jogador \d+$/.test(m.name) ? '' : m.name;
     vibrate(60);
     sendScreen();
     if (isIOS && !standalone && !prefs.iosHint) $('iosHint').classList.add('on');
+  } else if (m.t === 'lang') {
+    setLangPref('pa.lang.hub', langOf(m.lang));
   } else if (m.t === 'layouts') {
     // mudou o layout ou o próprio layout foi editado no Hub: redesenha
     const before = JSON.stringify(currentLayoutObj());
@@ -472,20 +584,20 @@ function onText(m) {
     if (changed) render();
   } else if (m.t === 'reject') {
     const texts = { full: 'O lobby está cheio (10 de 10).', version: 'Atualize a página.', closed: 'O lobby está fechado agora.' };
-    $('rejText').textContent = texts[m.reason] || m.reason;
+    $('rejText').textContent = texts[m.reason] ? t(texts[m.reason]) : m.reason;
     $('rejected').classList.add('on');
     if (m.reason === 'version') { stopped = true; setTimeout(() => location.reload(), 1500); }
   } else if (m.t === 'screen') {
-    $('screenTxt').textContent = `${m.fps} quadros/s · ${m.ms} ms do jogo até aqui`;
+    $('screenTxt').textContent = t('{fps} quadros/s · {ms} ms do jogo até aqui', m);
   } else if (m.t === 'stats') {
     showStats(m.data);
   } else if (m.t === 'toast') {
-    showToast(m.text);
+    showToast(t(m.text)); // os avisos fixos do Hub estão no dicionário; os do jogo passam como chegam
   } else if (m.t === 'identify') {
     let el = $('flash');
     if (!el) { el = document.createElement('div'); el.id = 'flash'; document.body.appendChild(el); }
     el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
-    showToast('É você! O Hub está te procurando.');
+    showToast(t('É você! O Hub está te procurando.'));
   }
 }
 
@@ -766,7 +878,7 @@ function stopHold(tapped) {
   hold = null;
   menuBtn.classList.remove('holding');
   menuBtn.style.setProperty('--p', 0);
-  if (tapped) showToast('Segure o botão Menu para abrir');
+  if (tapped) showToast(t('Segure o botão Menu para abrir'));
 }
 menuBtn.addEventListener('pointerup', () => { if (hold) stopHold(true); });
 menuBtn.addEventListener('pointercancel', () => { if (hold) stopHold(false); });
@@ -788,11 +900,11 @@ function renderLayoutList() {
     if (l.modes.length > 1) return l.modes.map((m) => m.name).join(' · ');
     const c = l.modes[0].pieces.map((p) => p.kind);
     const names = { stickL: 'analógico', stickR: '2º analógico', dpad: 'setas', LT: 'gatilhos', LB: 'ombros' };
-    const parts = Object.keys(names).filter((k) => c.includes(k)).map((k) => names[k]);
+    const parts = Object.keys(names).filter((k) => c.includes(k)).map((k) => t(names[k]));
     const face = ['A', 'B', 'X', 'Y'].filter((b) => c.includes(b));
     return [face.join(' '), ...parts].filter(Boolean).join(' · ');
   };
-  $('layoutList').innerHTML = layouts.map((l) => `<button class="opt${l.id === currentLayout ? ' on' : ''}" data-layout="${escapeHtml(l.id)}"><span class="dot"></span><span><b>${escapeHtml(l.name)}</b><small>${escapeHtml(describe(l))}</small></span></button>`).join('');
+  $('layoutList').innerHTML = layouts.map((l) => `<button class="opt${l.id === currentLayout ? ' on' : ''}" data-layout="${escapeHtml(l.id)}"><span class="dot"></span><span><b>${escapeHtml(layoutName(l))}</b><small>${escapeHtml(describe(l))}</small></span></button>`).join('');
 }
 $('layoutList').addEventListener('click', (e) => {
   const b = e.target.closest('[data-layout]');
@@ -813,7 +925,7 @@ $('nameForm').addEventListener('submit', (e) => {
   sendText({ t: 'rename', name });
   $('seatName').textContent = $('seatName').textContent.replace(/·.*$/, `· ${name}`);
   $('nameInput').blur();
-  showToast('Nome trocado');
+  showToast(t('Nome trocado'));
 });
 $('optScreen').addEventListener('click', () => {
   prefs.screen = !prefs.screen;
@@ -822,6 +934,18 @@ $('optScreen').addEventListener('click', () => {
   savePrefs();
   sendScreen();
   if (!prefs.screen) setViewing(false);
+});
+// idioma: "Como no PC" segue o Hub; Português ou English valem só neste celular
+const paintLang = () => {
+  const own = readLang('pa.lang.own');
+  document.querySelectorAll('#langSeg [data-lang]').forEach((b) => b.classList.toggle('on', b.dataset.lang === (own || 'auto')));
+};
+paintLang();
+$('langSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-lang]');
+  if (!b) return;
+  setLangPref('pa.lang.own', b.dataset.lang === 'auto' ? null : b.dataset.lang);
+  paintLang();
 });
 $('lookSens').addEventListener('click', (e) => {
   const b = e.target.closest('[data-sens]');
@@ -858,7 +982,7 @@ const leaveStop = () => {
   cancelAnimationFrame(leaveHold);
   leaveHold = null;
   leaveBtn.style.setProperty('--p', 0);
-  showToast('Segure para sair da partida');
+  showToast(t('Segure para sair da partida'));
 };
 leaveBtn.addEventListener('pointerup', leaveStop);
 leaveBtn.addEventListener('pointercancel', leaveStop);
@@ -895,9 +1019,9 @@ $('burstBtn').addEventListener('click', () => {
   $('burstBtn').disabled = true;
   burstTimer = setInterval(() => {
     const now = performance.now();
-    if (now >= until) { stopBurst(); $('burstTxt').textContent = 'Pronto.'; return; }
+    if (now >= until) { stopBurst(); $('burstTxt').textContent = t('Pronto.'); return; }
     sendState(KIND.burst, now);
-    $('burstTxt').textContent = `Medindo... ${Math.ceil((until - now) / 1000)} s`;
+    $('burstTxt').textContent = t('Medindo... {s} s', { s: Math.ceil((until - now) / 1000) });
   }, 16);
 });
 function stopBurst() {
